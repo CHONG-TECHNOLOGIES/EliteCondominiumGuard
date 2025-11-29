@@ -1,0 +1,8 @@
+{
+  "name": "Copy of Elite CondoGuard",
+  "description": "High-performance PWA for Condominium Access Control in Kiosk Mode.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

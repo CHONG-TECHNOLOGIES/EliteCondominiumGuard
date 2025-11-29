@@ -1,0 +1,191 @@
+
+export enum UserRole {
+  ADMIN = 'ADMIN',
+  GUARD = 'GUARD'
+}
+
+export enum VisitType {
+  VISITOR = 'VISITANTE',
+  DELIVERY = 'ENTREGA',
+  SERVICE = 'SERVIÇO',
+  STUDENT = 'ESTUDANTE'
+}
+
+export enum VisitStatus {
+  PENDING = 'PENDENTE',
+  APPROVED = 'AUTORIZADO',
+  DENIED = 'NEGADO',
+  INSIDE = 'NO INTERIOR',
+  LEFT = 'SAIU'
+}
+
+export enum SyncStatus {
+  SYNCED = 'SINCRONIZADO',
+  PENDING_SYNC = 'PENDENTE_ENVIO'
+}
+
+export enum ApprovalMode {
+  APP = 'APP',
+  PHONE = 'TELEFONE',
+  INTERCOM = 'INTERFONE',
+  GUARD_MANUAL = 'MANUAL_PORTARIA',
+  QR_SCAN = 'QR_CODE'
+}
+
+export interface ApprovalModeConfig {
+  mode: ApprovalMode;
+  label: string;
+  description: string;
+  requiresOnline: boolean;
+  hasCallAction?: boolean; // True if mode can initiate a call (PHONE, INTERCOM)
+  icon: string;
+  color: string; // Tailwind color class
+}
+
+export interface Condominium {
+  id: number;                // SERIAL in Supabase
+  created_at?: string;
+  name: string;
+  address?: string;
+  logo_url?: string;
+  latitude?: number;
+  longitude?: number;
+  gps_radius_meters?: number;
+  status?: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface Device {
+  id?: string;
+  created_at?: string;
+  device_identifier: string;
+  device_name?: string;
+  condominium_id?: string;
+  configured_at?: string;
+  last_seen_at?: string;
+  status?: 'ACTIVE' | 'INACTIVE' | 'DECOMMISSIONED';
+  metadata?: any;
+}
+
+
+export interface Staff {
+  id: number;                // SERIAL in Supabase
+  first_name: string;
+  last_name: string;
+  pin_hash?: string;         // Opcional no retorno do login RPC por segurança
+  condominium_id: number;    // INT4
+  condominium?: Condominium; // Dados completos do condomínio (incluindo GPS)
+  role: UserRole;
+}
+
+export interface Resident {
+  id: number;
+  condominium_id: number;
+  unit_id: number;
+  name: string;
+  phone?: string;
+  email?: string;
+  type?: 'OWNER' | 'TENANT';
+  created_at?: string;
+}
+
+export interface Unit {
+  id: number;
+  condominium_id: number;
+  code_block?: string;
+  number: string;
+  floor?: string;
+  building_name?: string;
+  created_at?: string;
+  residents?: Resident[]; // Optional: Only populated when fetched online with residents
+}
+
+export interface VisitTypeConfig {
+  id: number;                     // SERIAL in Supabase
+  name: string;
+  icon_key: string;
+  requires_service_type: boolean;
+  requires_restaurant?: boolean;  // True for restaurant visits
+  requires_sport?: boolean;       // True for sport visits
+}
+
+export interface ServiceTypeConfig {
+  id: number;                     // SERIAL in Supabase
+  name: string;
+}
+
+export interface Restaurant {
+  id: number;             // SERIAL in Supabase
+  condominium_id: number; // INT4
+  name: string;
+  description?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  created_at?: string;
+}
+
+export interface Sport {
+  id: number;             // SERIAL in Supabase
+  condominium_id: number; // INT4
+  name: string;
+  description?: string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  created_at?: string;
+}
+
+export interface Visit {
+  id: number;                    // SERIAL in Supabase
+  created_at?: string;           // timestamptz
+  condominium_id: number;        // INT4
+  visitor_name: string;
+  visitor_doc?: string;
+  visitor_phone?: string;
+
+  // For display purposes (fetched via joins)
+  visit_type?: string;           // Nome do tipo (para exibição)
+  visit_type_id: number;         // INT4 NOT NULL (references visit_types)
+
+  service_type?: string;         // Nome do serviço (para exibição)
+  service_type_id?: number;      // INT4 (references service_types)
+
+  restaurant_id?: number;        // INT4 for restaurant visits
+  restaurant_name?: string;      // Nome do restaurante (para exibição)
+
+  sport_id?: number;             // INT4 for sport visits
+  sport_name?: string;           // Nome do desporto (para exibição)
+
+  unit_id?: number;              // INT4 (references units) - optional for restaurant/sport visits
+  unit_block?: string;           // Bloco da unidade (para exibição)
+  unit_number?: string;          // Número da unidade (para exibição)
+  reason?: string;
+  photo_url?: string;
+  qr_token?: string;
+  qr_expires_at?: string;        // timestamptz
+  check_in_at: string;           // timestamptz
+  check_out_at?: string;         // timestamptz
+  status: VisitStatus;
+  approval_mode?: ApprovalMode;
+  guard_id: number;              // INT4 (references staff)
+  sync_status: SyncStatus;       // 'SINCRONIZADO' or 'PENDENTE_ENVIO'
+}
+
+export interface Incident {
+  id: string;
+  condominium_id: string;
+  title: string;
+  description: string;
+  severity: 'BAIXA' | 'MÉDIA' | 'ALTA';
+  status: 'ABERTO' | 'VISTO' | 'RESOLVIDO';
+  reported_at: string;
+  acknowledged_at?: string;
+  acknowledged_by?: string;
+}
+
+export interface AuditLog {
+  id: string;
+  created_at: string;
+  condominium_id: string;
+  actor_id: string | null;
+  action: string;
+  target_table: string;
+  target_id: string | null;
+  details: any;
+}

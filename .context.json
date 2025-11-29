@@ -1,0 +1,347 @@
+{
+  "project": {
+    "name": "Elite CondoGuard",
+    "version": "0.0.0",
+    "type": "PWA (Progressive Web App)",
+    "company": "Chong Technologies",
+    "description": "Sistema de gestão de portaria para condomínios com funcionamento offline-first",
+    "status": "Alpha Development"
+  },
+  "stack": {
+    "frontend": {
+      "framework": "React 19.2",
+      "language": "TypeScript 5.8",
+      "router": "React Router DOM 7.9",
+      "bundler": "Vite 6.2",
+      "styling": "Tailwind CSS",
+      "icons": "Lucide React 0.554"
+    },
+    "backend": {
+      "database": "Supabase PostgreSQL",
+      "auth": "Supabase Auth + Custom RPC",
+      "storage": "Supabase Storage"
+    },
+    "offline": {
+      "storage": "Dexie.js 4.0 (IndexedDB)",
+      "strategy": "Cache-Then-Network",
+      "sync": "Write-Through with Retry"
+    },
+    "ai": {
+      "provider": "Google Generative AI (Gemini)",
+      "version": "1.30.0",
+      "features": ["Análise de fotos", "OCR de documentos"]
+    },
+    "security": {
+      "password_hashing": "bcryptjs 2.4.3",
+      "auth_method": "PIN-based (4-6 digits)"
+    }
+  },
+  "architecture": {
+    "pattern": "Offline-First Architecture",
+    "layers": [
+      "Presentation Layer (React Components)",
+      "Service Layer (DataService)",
+      "Persistence Layer (Dexie + Supabase)",
+      "Integration Layer (Gemini AI)"
+    ],
+    "key_principles": [
+      "Data disponível offline por padrão",
+      "Sincronização automática quando online",
+      "Health check contínuo do backend",
+      "Fallback local para todas as operações críticas"
+    ]
+  },
+  "key_features": {
+    "core": [
+      "Registro de visitas/entregas",
+      "Gestão de incidentes",
+      "Dashboard de atividades diárias",
+      "Múltiplos modos de aprovação (App, Telefone, Interfone, Manual, QR Code)"
+    ],
+    "offline": [
+      "Login offline com PIN hash local",
+      "Criação de visitas offline",
+      "Cache completo de configurações",
+      "Sincronização automática em background"
+    ],
+    "admin": [
+      "Configuração de dispositivo",
+      "Associação a condomínio específico",
+      "Gestão de tipos de visita e serviço"
+    ]
+  },
+  "database_schema": {
+    "local_tables": {
+      "visits": {
+        "indexes": ["id", "condominium_id", "status", "sync_status", "check_in_at"],
+        "description": "Registros de visitas e entregas"
+      },
+      "units": {
+        "indexes": ["id", "condominium_id", "block", "number"],
+        "description": "Unidades/frações do condomínio"
+      },
+      "visitTypes": {
+        "indexes": ["id"],
+        "description": "Tipos de visita configurados"
+      },
+      "serviceTypes": {
+        "indexes": ["id"],
+        "description": "Tipos de serviço configurados"
+      },
+      "settings": {
+        "indexes": ["key"],
+        "description": "Configurações do dispositivo"
+      },
+      "staff": {
+        "indexes": ["id", "condominium_id"],
+        "description": "Cache de guardas/staff"
+      },
+      "condominiums": {
+        "indexes": ["id", "status"],
+        "description": "Lista de condomínios disponíveis"
+      }
+    },
+    "remote_tables": {
+      "condominiums": "Condomínios cadastrados",
+      "devices": "Dispositivos de portaria",
+      "staff": "Guardas e administradores",
+      "units": "Unidades habitacionais",
+      "residents": "Moradores",
+      "visit_types": "Tipos de visita",
+      "service_types": "Tipos de serviço",
+      "visits": "Registros de visitas",
+      "incidents": "Incidentes reportados",
+      "audit_logs": "Logs de auditoria"
+    }
+  },
+  "routing": {
+    "public_routes": [
+      {
+        "path": "/setup",
+        "component": "Setup",
+        "description": "Configuração inicial do dispositivo"
+      }
+    ],
+    "protected_routes": [
+      {
+        "path": "/login",
+        "component": "Login",
+        "guard": "ConfigGuard",
+        "description": "Login com PIN"
+      },
+      {
+        "path": "/",
+        "component": "Dashboard",
+        "guards": ["ConfigGuard", "ProtectedRoute"],
+        "description": "Dashboard principal"
+      },
+      {
+        "path": "/new-entry",
+        "component": "NewEntry",
+        "guards": ["ConfigGuard", "ProtectedRoute"],
+        "description": "Registro de nova entrada"
+      },
+      {
+        "path": "/day-list",
+        "component": "DailyList",
+        "guards": ["ConfigGuard", "ProtectedRoute"],
+        "description": "Lista de atividades do dia"
+      },
+      {
+        "path": "/incidents",
+        "component": "Incidents",
+        "guards": ["ConfigGuard", "ProtectedRoute"],
+        "description": "Gestão de incidentes"
+      }
+    ]
+  },
+  "sync_strategy": {
+    "health_check": {
+      "interval": "60 segundos",
+      "method": "Ping Supabase service types",
+      "health_score_range": "0-3"
+    },
+    "heartbeat": {
+      "interval": "5 minutos",
+      "purpose": "Atualizar last_seen_at do dispositivo"
+    },
+    "auto_sync": {
+      "trigger": "Conexão restaurada",
+      "priority": ["Configurações", "Staff", "Visitas pendentes"]
+    },
+    "sync_status": {
+      "SYNCED": "Item sincronizado com backend",
+      "PENDING_SYNC": "Item aguardando sincronização"
+    }
+  },
+  "security_model": {
+    "device_isolation": {
+      "description": "Cada dispositivo só acessa dados do seu condomínio",
+      "enforcement": "Validação no login e em todas as queries"
+    },
+    "authentication": {
+      "method": "PIN-based",
+      "storage": "bcrypt hash",
+      "offline_fallback": "Hash local comparado com bcrypt.compare()"
+    },
+    "authorization": {
+      "roles": ["ADMIN", "GUARD"],
+      "scope": "Por condomínio"
+    },
+    "audit": {
+      "tracked_actions": [
+        "Login/Logout",
+        "Criação de visita",
+        "Mudança de status de visita",
+        "Criação de incidente",
+        "Configuração de dispositivo"
+      ]
+    }
+  },
+  "data_flow": {
+    "create_visit": [
+      "1. User preenche formulário NewEntry",
+      "2. Captura foto (opcional)",
+      "3. DataService.createVisit()",
+      "4. Salva localmente (IndexedDB) com sync_status=PENDING_SYNC",
+      "5. Se online: envia para Supabase",
+      "6. Se sucesso: sync_status=SYNCED",
+      "7. Se falha: mantém PENDING_SYNC para retry posterior"
+    ],
+    "login_flow": [
+      "1. User digita nome, sobrenome e PIN",
+      "2. DataService.login()",
+      "3. Se online: RPC verify_staff_login()",
+      "4. Valida se staff pertence ao condomínio do dispositivo",
+      "5. Sincroniza staff + configurações",
+      "6. Se offline: busca staff local e valida PIN hash",
+      "7. AuthContext.login(staff)"
+    ],
+    "setup_flow": [
+      "1. Lista condomínios ativos (Supabase ou cache)",
+      "2. User seleciona condomínio",
+      "3. Gera device_identifier (fingerprint único)",
+      "4. RPC register_device()",
+      "5. Salva device_condo_details em IndexedDB",
+      "6. Redireciona para /login"
+    ]
+  },
+  "environment_variables": {
+    "VITE_SUPABASE_URL": "URL do projeto Supabase",
+    "VITE_SUPABASE_ANON_KEY": "Chave anônima do Supabase",
+    "VITE_GEMINI_API_KEY": "Chave da API do Google Generative AI"
+  },
+  "build_commands": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "file_structure": {
+    "src/": {
+      "App.tsx": "Rotas + AuthContext + Layout + Guards",
+      "index.tsx": "Entry point",
+      "types.ts": "Definições TypeScript",
+      "metadata.json": "Metadados do projeto",
+      "components/": {
+        "CameraCapture.tsx": "Componente de captura de foto"
+      },
+      "pages/": {
+        "Login.tsx": "Login com PIN",
+        "Dashboard.tsx": "Dashboard principal",
+        "NewEntry.tsx": "Registro de visita",
+        "DailyList.tsx": "Lista de atividades",
+        "Incidents.tsx": "Gestão de incidentes",
+        "Setup.tsx": "Configuração inicial"
+      },
+      "services/": {
+        "db.ts": "Dexie database config",
+        "dataService.ts": "Camada de abstração offline-first",
+        "supabaseClient.ts": "Cliente Supabase",
+        "mockSupabase.ts": "Mock para desenvolvimento",
+        "geminiService.ts": "Integração Gemini AI"
+      }
+    }
+  },
+  "testing_checklist": {
+    "offline_mode": [
+      "Login com PIN hash local",
+      "Criação de visita offline",
+      "Visualização de dados em cache",
+      "Sincronização ao reconectar"
+    ],
+    "online_mode": [
+      "Login via Supabase RPC",
+      "Sincronização imediata de visitas",
+      "Atualização de configurações em background"
+    ],
+    "edge_cases": [
+      "Perda de conexão durante sincronização",
+      "Health score degradação",
+      "Dispositivo não configurado",
+      "Staff de condomínio diferente tentando login",
+      "IndexedDB limpo/corrompido"
+    ]
+  },
+  "known_issues": {
+    "critical": [],
+    "major": [
+      "Métodos getTodaysVisits, createVisit, updateVisitStatus não implementados (dataService.ts:243-246)",
+      "getUnits e getIncidents retornam array vazio (dataService.ts:247-248)"
+    ],
+    "minor": [
+      "Componentes de página não foram analisados em detalhe",
+      "Falta implementação de sincronização bidirecional completa"
+    ]
+  },
+  "next_steps": {
+    "immediate": [
+      "Implementar métodos de visitas em DataService",
+      "Implementar getUnits() e getIncidents()",
+      "Testar fluxo completo de criação de visita",
+      "Testar sincronização offline-online"
+    ],
+    "short_term": [
+      "Adicionar Service Worker para PWA completo",
+      "Implementar Background Sync API",
+      "Adicionar testes unitários",
+      "Documentar RPCs do Supabase"
+    ],
+    "long_term": [
+      "Push notifications para residentes",
+      "QR Code para visitantes recorrentes",
+      "Biometria facial",
+      "Dashboard analytics",
+      "Multi-idioma (i18n)"
+    ]
+  },
+  "conventions": {
+    "naming": {
+      "components": "PascalCase (ex: CameraCapture.tsx)",
+      "services": "camelCase (ex: dataService.ts)",
+      "types": "PascalCase (ex: Visit, Staff)",
+      "enums": "PascalCase (ex: UserRole, VisitStatus)"
+    },
+    "file_organization": {
+      "pages": "Componentes de rota completos",
+      "components": "Componentes reutilizáveis",
+      "services": "Lógica de negócio e integrações",
+      "types": "Centralizados em types.ts"
+    },
+    "imports": {
+      "order": [
+        "1. React e bibliotecas externas",
+        "2. Types e enums",
+        "3. Services",
+        "4. Componentes locais",
+        "5. Ícones e assets"
+      ]
+    }
+  },
+  "development_notes": {
+    "git_repo": "Não detectado (ainda não inicializado)",
+    "current_directory": "c:\\CHONG\\CHONGTECHNOLOGIES\\PROJECTS\\1 - ELITE CONDO GUARD\\APP GUARD\\src",
+    "platform": "Windows",
+    "created_at": "2025-11-28",
+    "last_updated": "2025-11-28"
+  }
+}
