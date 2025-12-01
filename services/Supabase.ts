@@ -365,7 +365,6 @@ export const SupabaseService = {
           )
         `)
         .eq('residents.condominium_id', condoId)
-        .eq('status', 'new')  // Only fetch NEW incidents for offline sync
         .order('reported_at', { ascending: false });
 
       if (error) throw error;

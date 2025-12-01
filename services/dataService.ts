@@ -250,7 +250,7 @@ class DataService {
   }
 
   // --- Auth & Staff ---
-  private async syncStaff(condoId: string) {
+  private async syncStaff(condoId: number) {
     if (!this.isBackendHealthy) return;
     try {
       const staffList = await SupabaseService.getStaffForSync(condoId);
@@ -297,7 +297,7 @@ class DataService {
   }
 
   // --- Configurações (Cache-then-Network) ---
-  private async refreshConfigs(condoId: string) {
+  private async refreshConfigs(condoId: number) {
     if (!this.isBackendHealthy) return;
     console.log('[DataService] refreshConfigs called for condo:', condoId);
     try {
@@ -416,7 +416,7 @@ class DataService {
     return [];
   }
 
-  private async refreshRestaurantsAndSports(condoId: string) {
+  private async refreshRestaurantsAndSports(condoId: number) {
     if (!this.isBackendHealthy) return;
     try {
       const restaurants = await SupabaseService.getRestaurants(condoId);
@@ -478,7 +478,7 @@ class DataService {
     }
   }
 
-  private async refreshUnits(condoId: string) {
+  private async refreshUnits(condoId: number) {
     if (!this.isBackendHealthy) return;
     try {
       const units = await SupabaseService.getUnitsWithResidents(condoId);
@@ -690,12 +690,14 @@ class DataService {
       return 0;
     }
 
+    let totalSynced = 0;
+
+    // Sync pending visits
     const pendingVisits = await db.visits
       .where('sync_status')
       .equals(SyncStatus.PENDING_SYNC)
       .toArray();
 
-    let synced = 0;
     for (const visit of pendingVisits) {
       try {
         // Check if visit has offline photo data that needs to be uploaded
@@ -726,7 +728,7 @@ class DataService {
           await db.visits.delete(visit.id); // Delete temp ID
           createdVisit.sync_status = SyncStatus.SYNCED;
           await db.visits.put(createdVisit); // Add server version
-          synced++;
+          totalSynced++;
           console.log("[DataService] Synced pending visit:", visit.id, "-> new ID:", createdVisit.id);
         }
       } catch (e) {
@@ -736,7 +738,12 @@ class DataService {
       }
     }
 
-    return synced;
+    // Sync pending incidents
+    const incidentsSynced = await this.syncPendingIncidents();
+    totalSynced += incidentsSynced;
+
+    console.log(`[DataService] Sync complete: ${totalSynced} items synced (visits + incidents)`);
+    return totalSynced;
   }
 
   // --- Incidents ---
@@ -762,44 +769,70 @@ class DataService {
       this.refreshIncidentConfigs();
     }
 
-    // Get local incidents (all incidents, will be filtered by resident's condominium)
+    // If online, fetch from backend and replace local cache (proper bidirectional sync)
+    if (this.isBackendHealthy && this.currentCondoId) {
+      try {
+        console.log('[DataService] Syncing incidents from backend...');
+
+        // Fetch ALL incidents from backend (including acknowledged, resolved, etc.)
+        const backendIncidents = await SupabaseService.getIncidents(this.currentCondoId);
+
+        // Get local incidents that have pending changes (sync_status = PENDING_SYNC)
+        const pendingLocalIncidents = await db.incidents
+          .where('sync_status')
+          .equals(SyncStatus.PENDING_SYNC)
+          .toArray();
+
+        // Clear ALL local incidents for this condominium to ensure deleted ones are removed
+        const allLocalIncidents = await db.incidents.toArray();
+        const incidentsToDelete = allLocalIncidents.filter(inc => {
+          // Delete if belongs to this condominium
+          if (inc.resident && inc.resident.condominium_id === this.currentCondoId) {
+            // Keep if has pending sync status (local changes not yet synced)
+            return inc.sync_status !== SyncStatus.PENDING_SYNC;
+          }
+          return false;
+        });
+
+        // Delete old incidents for this condo (excluding pending ones)
+        if (incidentsToDelete.length > 0) {
+          const idsToDelete = incidentsToDelete.map(inc => inc.id);
+          await db.incidents.bulkDelete(idsToDelete);
+          console.log(`[DataService] Cleared ${idsToDelete.length} old incidents from local cache`);
+        }
+
+        // Insert fresh backend data
+        if (backendIncidents.length > 0) {
+          await db.incidents.bulkPut(backendIncidents);
+          console.log(`[DataService] Synced ${backendIncidents.length} incidents from backend`);
+        }
+
+        // Merge backend incidents with pending local changes
+        const mergedIncidents = [...backendIncidents];
+
+        // Add back any pending local incidents that weren't in backend response
+        pendingLocalIncidents.forEach(localInc => {
+          if (!backendIncidents.find(backendInc => backendInc.id === localInc.id)) {
+            mergedIncidents.push(localInc);
+          }
+        });
+
+        // Sort by reported_at descending
+        return mergedIncidents.sort((a, b) =>
+          new Date(b.reported_at).getTime() - new Date(a.reported_at).getTime()
+        );
+      } catch (e) {
+        console.error("[DataService] Failed to sync incidents from backend, using local cache", e);
+        this.backendHealthScore--;
+      }
+    }
+
+    // Offline: return only local cached incidents for this condominium
     const localIncidents = await db.incidents
       .orderBy('reported_at')
       .reverse()
       .toArray();
 
-    // If online, sync and merge with backend
-    if (this.isBackendHealthy && this.currentCondoId) {
-      try {
-        // Fetch only NEW incidents from backend (for offline cache)
-        const backendIncidents = await SupabaseService.getIncidents(this.currentCondoId);
-
-        // Cache backend NEW incidents locally (bulkPut will update/insert)
-        if (backendIncidents.length > 0) {
-          await db.incidents.bulkPut(backendIncidents);
-        }
-
-        // Return all local incidents (includes NEW from backend + locally updated incidents)
-        // This ensures guards can see incidents they've acknowledged/worked on
-        const allLocalIncidents = await db.incidents
-          .orderBy('reported_at')
-          .reverse()
-          .toArray();
-
-        return allLocalIncidents.filter(inc => {
-          if (inc.resident && inc.resident.condominium_id === this.currentCondoId) {
-            return true;
-          }
-          return !inc.resident;
-        });
-      } catch (e) {
-        console.error("[DataService] Failed to sync incidents", e);
-        this.backendHealthScore--;
-      }
-    }
-
-    // Offline: return only local incidents
-    // Filter by condominium through resident relationship (if cached)
     return localIncidents.filter(inc => {
       // If resident info is cached and condominium_id matches, include it
       if (inc.resident && inc.resident.condominium_id === this.currentCondoId) {
@@ -884,6 +917,59 @@ class DataService {
         this.backendHealthScore--;
       }
     }
+  }
+
+  async syncPendingIncidents(): Promise<number> {
+    if (!this.isBackendHealthy) return 0;
+
+    const pendingIncidents = await db.incidents
+      .where('sync_status')
+      .equals(SyncStatus.PENDING_SYNC)
+      .toArray();
+
+    let synced = 0;
+    for (const incident of pendingIncidents) {
+      try {
+        // Determine what kind of update needs to be synced
+        if (incident.status === 'acknowledged' && incident.acknowledged_at) {
+          // Sync acknowledgment
+          const success = await SupabaseService.acknowledgeIncident(
+            incident.id,
+            incident.acknowledged_by!
+          );
+
+          if (success) {
+            incident.sync_status = SyncStatus.SYNCED;
+            await db.incidents.put(incident);
+            synced++;
+            console.log("[DataService] Synced incident acknowledgment:", incident.id);
+          }
+        } else if ((incident.status === 'inprogress' || incident.status === 'resolved') && incident.guard_notes) {
+          // Sync action report
+          // Extract the last note (most recent) to avoid re-sending all history
+          const lastNote = incident.guard_notes.split('\n---\n').pop() || incident.guard_notes;
+
+          const success = await SupabaseService.reportIncidentAction(
+            incident.id,
+            lastNote,
+            incident.status
+          );
+
+          if (success) {
+            incident.sync_status = SyncStatus.SYNCED;
+            await db.incidents.put(incident);
+            synced++;
+            console.log("[DataService] Synced incident action:", incident.id);
+          }
+        }
+      } catch (e) {
+        console.error("[DataService] Failed to sync incident:", incident.id, e);
+        this.backendHealthScore--;
+        break; // Stop on first failure
+      }
+    }
+
+    return synced;
   }
 
   checkOnline(): boolean { return this.isOnline; }
