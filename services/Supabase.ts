@@ -600,5 +600,37 @@ export const SupabaseService = {
       console.error("Get device error:", err.message || JSON.stringify(err));
       return null;
     }
+  },
+
+  /**
+   * Check if a condominium is already assigned to any active device
+   * @param condoId - Condominium ID to check
+   * @param excludeDeviceIdentifier - Optional device identifier to exclude from check (for reconfiguration)
+   * @returns Array of active devices assigned to this condominium
+   */
+  async getActiveDevicesByCondominium(condoId: number, excludeDeviceIdentifier?: string): Promise<Device[]> {
+    if (!supabase) return [];
+
+    try {
+      let query = supabase
+        .from('devices')
+        .select('*')
+        .eq('condominium_id', condoId)
+        .eq('status', 'ACTIVE');
+
+      // Exclude current device if reconfiguring
+      if (excludeDeviceIdentifier) {
+        query = query.neq('device_identifier', excludeDeviceIdentifier);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      return (data as Device[]) || [];
+    } catch (err: any) {
+      console.error("Get devices by condominium error:", err.message || JSON.stringify(err));
+      return [];
+    }
   }
 };

@@ -8,12 +8,12 @@ export default function Setup() {
   const navigate = useNavigate();
   const [condos, setCondos] = useState<Condominium[]>([]);
   const [search, setSearch] = useState('');
-  const [selectedCondoId, setSelectedCondoId] = useState('');
-  
+  const [selectedCondoId, setSelectedCondoId] = useState<number | null>(null);
+
   const [loadingList, setLoadingList] = useState(true);
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [error, setError] = useState('');
-  
+
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   useEffect(() => {
@@ -39,15 +39,17 @@ export default function Setup() {
   };
 
   const executeSetup = async () => {
+    if (!selectedCondoId) return;
+
     setIsConfiguring(true);
     setError('');
 
     try {
-      const success = await api.configureDevice(selectedCondoId);
-      if (success) {
+      const result = await api.configureDevice(selectedCondoId);
+      if (result.success) {
         navigate('/login');
       } else {
-        setError("Erro ao configurar. Tente novamente.");
+        setError(result.error || "Erro ao configurar. Tente novamente.");
         setShowConfirmModal(false);
       }
     } catch (err) {

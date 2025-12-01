@@ -202,31 +202,44 @@ class DataService {
     return [];
   }
 
-  async configureDevice(condoId: string): Promise<boolean> {
+  async configureDevice(condoId: number): Promise<{ success: boolean; error?: string; existingDevices?: any[] }> {
     const condo = await SupabaseService.getCondominium(condoId);
-    if (condo) {
-      // Register device with Supabase
-      const deviceId = getDeviceIdentifier();
-      const deviceRegistered = await SupabaseService.registerDevice({
-        device_identifier: deviceId,
-        device_name: `Tablet - ${condo.name}`,
-        condominium_id: condo.id,
-        metadata: getDeviceMetadata()
-      });
-
-      if (!deviceRegistered) {
-        console.warn("Failed to register device with Supabase, but continuing with local setup");
-      }
-
-      // Save configuration locally
-      await db.settings.put({ key: 'device_condo_details', value: condo });
-      await db.settings.put({ key: 'device_id', value: deviceId });
-
-      this.currentCondoDetails = condo;
-      this.currentCondoId = condo.id;
-      return true;
+    if (!condo) {
+      return { success: false, error: "Condomínio não encontrado" };
     }
-    return false;
+
+    // Check if condominium is already assigned to other active devices
+    const deviceId = getDeviceIdentifier();
+    const existingDevices = await SupabaseService.getActiveDevicesByCondominium(condo.id, deviceId);
+
+    if (existingDevices.length > 0) {
+      console.warn(`[DataService] Condominium ${condo.name} is already assigned to ${existingDevices.length} active device(s)`);
+      return {
+        success: false,
+        error: `Este condomínio já está associado a ${existingDevices.length} dispositivo(s) ativo(s). Cada condomínio só pode ter um tablet configurado.`,
+        existingDevices
+      };
+    }
+
+    // Register device with Supabase
+    const deviceRegistered = await SupabaseService.registerDevice({
+      device_identifier: deviceId,
+      device_name: `Tablet - ${condo.name}`,
+      condominium_id: condo.id,
+      metadata: getDeviceMetadata()
+    });
+
+    if (!deviceRegistered) {
+      console.warn("Failed to register device with Supabase, but continuing with local setup");
+    }
+
+    // Save configuration locally
+    await db.settings.put({ key: 'device_condo_details', value: condo });
+    await db.settings.put({ key: 'device_id', value: deviceId });
+
+    this.currentCondoDetails = condo;
+    this.currentCondoId = condo.id;
+    return { success: true };
   }
 
   async resetDevice() {

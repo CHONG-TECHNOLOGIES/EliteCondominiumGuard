@@ -55,11 +55,11 @@ export interface Condominium {
 }
 
 export interface Device {
-  id?: string;
+  id?: number;               // SERIAL in Supabase
   created_at?: string;
   device_identifier: string;
   device_name?: string;
-  condominium_id?: string;
+  condominium_id?: number;   // INT4 - matches Condominium.id
   configured_at?: string;
   last_seen_at?: string;
   status?: 'ACTIVE' | 'INACTIVE' | 'DECOMMISSIONED';
