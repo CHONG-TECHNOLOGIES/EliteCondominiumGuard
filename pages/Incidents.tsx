@@ -59,7 +59,7 @@ export default function Incidents() {
       }
 
       // Create a louder, more urgent triple-beep alarm sound
-      const playBeep = (startTime: number, frequency: number) => {
+      const playBeep = (startTime: number, frequency: number, duration: number = 0.3) => {
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
 
@@ -70,19 +70,29 @@ export default function Incidents() {
         oscillator.type = 'square'; // More attention-grabbing than sine
 
         // Louder volume
-        gainNode.gain.setValueAtTime(0.5, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.3);
+        gainNode.gain.setValueAtTime(0.6, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
 
         oscillator.start(startTime);
-        oscillator.stop(startTime + 0.3);
+        oscillator.stop(startTime + duration);
       };
 
-      // Triple beep pattern: high-low-high
-      playBeep(audioContext.currentTime, 880);       // High beep
-      playBeep(audioContext.currentTime + 0.4, 440); // Low beep
-      playBeep(audioContext.currentTime + 0.8, 880); // High beep
+      // CONTINUOUS ALERT PATTERN - Repeat the BIP-bip-BIP pattern 4 times
+      // Makes it impossible to miss!
+      const patternDuration = 1.2; // Duration of one BIP-bip-BIP cycle
+      const pauseBetweenPatterns = 0.3; // Short pause between cycles
+      const totalPatterns = 4; // Repeat 4 times
 
-      console.log('[Incidents] 🔊 Alert sound played successfully');
+      for (let cycle = 0; cycle < totalPatterns; cycle++) {
+        const cycleStart = audioContext.currentTime + (cycle * (patternDuration + pauseBetweenPatterns));
+
+        // Triple beep pattern: HIGH-low-HIGH
+        playBeep(cycleStart, 880, 0.3);           // High beep
+        playBeep(cycleStart + 0.4, 440, 0.3);     // Low beep
+        playBeep(cycleStart + 0.8, 880, 0.3);     // High beep
+      }
+
+      console.log('[Incidents] 🔊 Alert sound played successfully (4 cycles)');
       setAudioEnabled(true);
     } catch (err) {
       console.error('[Incidents] ❌ Error playing alert sound:', err);
