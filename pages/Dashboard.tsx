@@ -21,24 +21,43 @@ export default function Dashboard() {
 
   // Quick Actions State
   const [activeVisits, setActiveVisits] = useState<Visit[]>([]);
+  const [todaysVisitsCount, setTodaysVisitsCount] = useState(0);
+  const [incidentsCount, setIncidentsCount] = useState(0);
 
   const loadQuickActions = async () => {
     const data = await api.getTodaysVisits();
+    setTodaysVisitsCount(data.length); // Total count for the day
+
     // Filter for actionable items: Pending (Needs approval) or Inside/Approved (Needs checkout)
-    const actionable = data.filter(v => 
+    const actionable = data.filter(v =>
       [VisitStatus.PENDING, VisitStatus.APPROVED, VisitStatus.INSIDE].includes(v.status)
     ).sort((a, b) => new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime());
-    
+
     setActiveVisits(actionable);
+  };
+
+  const loadIncidentsCount = async () => {
+    try {
+      const incidents = await api.getIncidents();
+      // Count only new/unacknowledged incidents
+      const newIncidents = incidents.filter(inc => inc.status === 'new');
+      setIncidentsCount(newIncidents.length);
+    } catch (error) {
+      console.error('Error loading incidents count:', error);
+    }
   };
 
   useEffect(() => {
     const checkStatus = () => setIsOnline(api.checkOnline());
     window.addEventListener('online', checkStatus);
     window.addEventListener('offline', checkStatus);
-    
+
     loadQuickActions();
-    const interval = setInterval(loadQuickActions, 10000); // Refresh every 10s
+    loadIncidentsCount();
+    const interval = setInterval(() => {
+      loadQuickActions();
+      loadIncidentsCount();
+    }, 10000); // Refresh every 10s
 
     return () => {
       window.removeEventListener('online', checkStatus);
@@ -101,19 +120,14 @@ export default function Dashboard() {
             <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Olá, {user?.first_name} 👋</h1>
             <p className="text-slate-500">Aqui está o resumo da portaria hoje.</p>
           </div>
-          {/* Elegant Sync Status */}
-          <button 
+          {/* Elegant Sync Status - DISABLED FOR NOW */}
+          <button
             onClick={handleSync}
-            disabled={!isOnline || syncing}
-            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all border shadow-sm w-full md:w-auto
-              ${isOnline 
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300' 
-                : 'bg-red-50 text-red-600 border-red-100'
-              }
-            `}
+            disabled={true}
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all border shadow-sm w-full md:w-auto bg-slate-100 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
           >
-            <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
-            {syncing ? 'A Sincronizar...' : isOnline ? 'Sincronizar Agora' : 'Modo Offline'}
+            <RefreshCw size={16} />
+            {isOnline ? 'Sincronizar Agora' : 'Modo Offline'}
           </button>
         </div>
       </div>
@@ -146,10 +160,17 @@ export default function Dashboard() {
           </button>
 
           {/* Secondary Button: Daily List */}
-          <button 
+          <button
             onClick={() => navigate('/day-list')}
-            className="group col-span-1 rounded-3xl bg-white p-8 text-slate-800 shadow-lg shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-xl md:min-h-[220px] flex flex-col justify-between text-left border border-slate-100"
+            className="group col-span-1 rounded-3xl bg-white p-8 text-slate-800 shadow-lg shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-xl md:min-h-[220px] flex flex-col justify-between text-left border border-slate-100 relative"
           >
+            {/* Count Badge */}
+            {todaysVisitsCount > 0 && (
+              <div className="absolute top-4 right-4 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shadow-lg">
+                {todaysVisitsCount}
+              </div>
+            )}
+
              <div className="bg-indigo-50 text-indigo-600 w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
               <List size={28} />
             </div>
@@ -160,10 +181,17 @@ export default function Dashboard() {
           </button>
 
           {/* Secondary Button: Incidents */}
-          <button 
+          <button
             onClick={() => navigate('/incidents')}
-            className="group col-span-1 rounded-3xl bg-white p-8 text-slate-800 shadow-lg shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-xl md:min-h-[220px] flex flex-col justify-between text-left border border-slate-100"
+            className="group col-span-1 rounded-3xl bg-white p-8 text-slate-800 shadow-lg shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-xl md:min-h-[220px] flex flex-col justify-between text-left border border-slate-100 relative"
           >
+            {/* Count Badge - Show "+" if there are new incidents */}
+            {incidentsCount > 0 && (
+              <div className="absolute top-4 right-4 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl shadow-lg">
+                {incidentsCount > 9 ? '9+' : incidentsCount}
+              </div>
+            )}
+
              <div className="bg-amber-50 text-amber-600 w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-amber-100 transition-colors">
               <AlertTriangle size={28} />
             </div>
@@ -262,47 +290,15 @@ export default function Dashboard() {
 
       </div>
 
-      {/* AI Concierge Floating Button/Panel */}
+      {/* AI Concierge Floating Button/Panel - DISABLED FOR NOW */}
       <div className="fixed bottom-6 right-6 z-50">
-        {!showAI ? (
-          <button 
-            onClick={() => setShowAI(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white p-4 rounded-full shadow-2xl shadow-indigo-600/30 flex items-center gap-2 transition-all hover:scale-110 active:scale-95"
-          >
-            <MessageSquare size={24} />
-            <span className="font-bold hidden md:inline">Assistente</span>
-          </button>
-        ) : (
-          <div className="bg-white rounded-3xl shadow-2xl w-[90vw] md:w-96 flex flex-col overflow-hidden border border-slate-100 animate-in slide-in-from-bottom-10 fade-in fixed bottom-6 right-4 md:right-6">
-            <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex justify-between items-center text-white">
-              <h3 className="font-bold flex items-center gap-2"><MessageSquare size={18}/> Concierge IA</h3>
-              <button onClick={() => setShowAI(false)} className="p-1 hover:bg-white/20 rounded-full"><X size={20}/></button>
-            </div>
-            <div className="p-4 bg-slate-50 h-64 overflow-y-auto text-sm">
-              {aiResponse ? (
-                <div className="p-3 bg-white rounded-2xl rounded-tl-none shadow-sm text-slate-800 mb-4 border border-slate-100">
-                  <p className="font-semibold text-indigo-600 mb-1 text-xs uppercase tracking-wider">Resposta</p>
-                  {aiResponse}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-slate-400 text-center">
-                  <MessageSquare size={32} className="mb-2 opacity-20" />
-                  <p>Pergunte sobre regras ou<br/>peça ajuda para mensagens.</p>
-                </div>
-              )}
-              {thinking && <div className="flex justify-center p-4"><span className="animate-pulse text-indigo-400 font-bold">A pensar...</span></div>}
-            </div>
-            <form onSubmit={handleAskAI} className="p-3 border-t flex gap-2 bg-white">
-              <input 
-                className="flex-1 bg-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                placeholder="Escreva a dúvida..."
-                value={aiQuery}
-                onChange={(e) => setAiQuery(e.target.value)}
-              />
-              <button disabled={thinking} className="p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 transition-colors"><Send size={18}/></button>
-            </form>
-          </div>
-        )}
+        <button
+          disabled={true}
+          className="bg-slate-400 text-white p-4 rounded-full shadow-lg flex items-center gap-2 opacity-50 cursor-not-allowed"
+        >
+          <MessageSquare size={24} />
+          <span className="font-bold hidden md:inline">Assistente</span>
+        </button>
       </div>
     </div>
   );

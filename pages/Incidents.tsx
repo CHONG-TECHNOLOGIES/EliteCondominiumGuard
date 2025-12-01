@@ -14,6 +14,7 @@ export default function Incidents() {
   const [loading, setLoading] = useState(true);
   const knownIncidentIdsRef = useRef<Set<number>>(new Set());
   const [newIncidentAlert, setNewIncidentAlert] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(false);
 
   // Action report modal state
   const [showActionModal, setShowActionModal] = useState(false);
@@ -50,6 +51,13 @@ export default function Incidents() {
     try {
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
 
+      // Check if audio context is suspended (browser autoplay policy)
+      if (audioContext.state === 'suspended') {
+        console.warn('[Incidents] ⚠️ Audio context suspended - user interaction required');
+        console.warn('[Incidents] 💡 Click "Testar Som" button to enable audio');
+        return;
+      }
+
       // Create a louder, more urgent triple-beep alarm sound
       const playBeep = (startTime: number, frequency: number) => {
         const oscillator = audioContext.createOscillator();
@@ -74,9 +82,29 @@ export default function Incidents() {
       playBeep(audioContext.currentTime + 0.4, 440); // Low beep
       playBeep(audioContext.currentTime + 0.8, 880); // High beep
 
-      console.log('[Incidents] 🔊 Alert sound played');
+      console.log('[Incidents] 🔊 Alert sound played successfully');
+      setAudioEnabled(true);
     } catch (err) {
-      console.error('Error playing alert sound:', err);
+      console.error('[Incidents] ❌ Error playing alert sound:', err);
+    }
+  };
+
+  const testAlertSound = async () => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+      // Resume audio context if suspended
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+        console.log('[Incidents] ✅ Audio context resumed');
+      }
+
+      playAlertSound();
+      vibrateDevice();
+      alert('✅ Som de teste tocado! Agora as notificações de incidentes irão tocar som automaticamente.');
+    } catch (err) {
+      console.error('[Incidents] ❌ Error testing sound:', err);
+      alert('❌ Erro ao tocar som. Verifique as permissões do navegador.');
     }
   };
 
@@ -116,19 +144,48 @@ export default function Incidents() {
           {
             event: 'INSERT',
             schema: 'public',
-            table: 'incidents',
-            filter: `condominium_id=eq.${condoId}`
+            table: 'incidents'
+            // Note: Cannot filter by condominium_id directly as it's not a column in incidents table
+            // It's related through residents table. We'll filter client-side instead.
           },
-          (payload) => {
+          async (payload) => {
             console.log('[Incidents] 🆕 New incident received via realtime:', payload);
 
-            // Play alert IMMEDIATELY when new incident arrives
-            playAlertSound();
-            vibrateDevice();
-            showNewIncidentBanner();
+            // Verify if incident belongs to this condominium
+            // Get resident_id from payload and check condominium
+            const newIncident = payload.new as any;
 
-            // Then reload incidents to update the list
-            loadIncidents();
+            // Fetch resident info to check condominium
+            if (newIncident.resident_id) {
+              try {
+                const { data: resident } = await supabase
+                  .from('residents')
+                  .select('condominium_id')
+                  .eq('id', newIncident.resident_id)
+                  .single();
+
+                if (resident?.condominium_id === condoId) {
+                  console.log('[Incidents] ✅ Incident belongs to this condominium - triggering alert');
+
+                  // Play alert IMMEDIATELY when new incident arrives
+                  playAlertSound();
+                  vibrateDevice();
+                  showNewIncidentBanner();
+
+                  // Then reload incidents to update the list
+                  loadIncidents();
+                } else {
+                  console.log('[Incidents] ⏭️ Incident from different condominium - ignoring');
+                }
+              } catch (err) {
+                console.error('[Incidents] Error checking resident condominium:', err);
+                // If error, still show alert to be safe
+                playAlertSound();
+                vibrateDevice();
+                showNewIncidentBanner();
+                loadIncidents();
+              }
+            }
           }
         )
         .on(
@@ -136,13 +193,32 @@ export default function Incidents() {
           {
             event: 'UPDATE',
             schema: 'public',
-            table: 'incidents',
-            filter: `condominium_id=eq.${condoId}`
+            table: 'incidents'
           },
-          (payload) => {
+          async (payload) => {
             console.log('[Incidents] 🔄 Incident updated via realtime:', payload);
-            // Reload incidents when one is updated
-            loadIncidents();
+
+            // Verify if incident belongs to this condominium
+            const updatedIncident = payload.new as any;
+
+            if (updatedIncident.resident_id) {
+              try {
+                const { data: resident } = await supabase
+                  .from('residents')
+                  .select('condominium_id')
+                  .eq('id', updatedIncident.resident_id)
+                  .single();
+
+                if (resident?.condominium_id === condoId) {
+                  // Reload incidents when one is updated
+                  loadIncidents();
+                }
+              } catch (err) {
+                console.error('[Incidents] Error checking resident condominium on update:', err);
+                // If error, still reload to be safe
+                loadIncidents();
+              }
+            }
           }
         )
         .subscribe((status) => {
@@ -277,15 +353,46 @@ export default function Incidents() {
         </div>
       )}
 
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center justify-between mb-6 gap-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-slate-200 rounded-full transition-colors active:scale-95"
+          >
+            <ArrowLeft size={28} className="text-slate-700" />
+          </button>
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Registo de Incidentes</h2>
+        </div>
+
+        {/* Test Sound Button */}
         <button
-          onClick={() => navigate(-1)}
-          className="p-2 hover:bg-slate-200 rounded-full transition-colors active:scale-95"
+          onClick={testAlertSound}
+          className={`px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition-all shadow-md ${
+            audioEnabled
+              ? 'bg-green-600 hover:bg-green-700 text-white'
+              : 'bg-orange-600 hover:bg-orange-700 text-white animate-pulse'
+          }`}
+          title="Clique para testar o som de alerta e habilitar notificações"
         >
-          <ArrowLeft size={28} className="text-slate-700" />
+          🔊 {audioEnabled ? 'Som Ativo' : 'Testar Som'}
         </button>
-        <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Registo de Incidentes</h2>
       </div>
+
+      {/* Audio Permission Warning */}
+      {!audioEnabled && (
+        <div className="mb-4 p-4 bg-orange-50 border-l-4 border-orange-500 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertTriangle size={24} className="text-orange-600 flex-shrink-0 mt-1" />
+            <div>
+              <p className="font-bold text-orange-800">⚠️ Notificações Sonoras Desabilitadas</p>
+              <p className="text-sm text-orange-700 mt-1">
+                Para receber alertas sonoros quando novos incidentes forem reportados, clique no botão <strong>"Testar Som"</strong> acima.
+                Isso é necessário devido às políticas de segurança do navegador.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4">
         {incidents.length === 0 ? (
