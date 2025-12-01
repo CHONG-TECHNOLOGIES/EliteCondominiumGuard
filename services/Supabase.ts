@@ -631,5 +631,181 @@ export const SupabaseService = {
       console.error("Get devices by condominium error:", err.message || JSON.stringify(err));
       return [];
     }
+  },
+
+  // --- ADMIN METHODS (Cross-Condominium Access) ---
+
+  /**
+   * Admin: Get all visits across all condominiums with optional filters
+   * Uses RPC function for better performance and security
+   * @param startDate - Optional start date filter (ISO string)
+   * @param endDate - Optional end date filter (ISO string)
+   * @param condominiumId - Optional condominium filter
+   */
+  async adminGetAllVisits(startDate?: string, endDate?: string, condominiumId?: number): Promise<Visit[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase.rpc('admin_get_all_visits', {
+        p_start_date: startDate || null,
+        p_end_date: endDate || null,
+        p_condominium_id: condominiumId || null
+      });
+
+      if (error) throw error;
+
+      return (data || []) as Visit[];
+    } catch (err: any) {
+      console.error("[Admin] Error fetching visits via RPC:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  /**
+   * Admin: Get all incidents across all condominiums
+   * Uses RPC function for better performance and security
+   * @param condominiumId - Optional condominium filter
+   */
+  async adminGetAllIncidents(condominiumId?: number): Promise<Incident[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase.rpc('admin_get_all_incidents', {
+        p_condominium_id: condominiumId || null
+      });
+
+      if (error) throw error;
+
+      // Transform RPC result to match Incident interface
+      return (data || []).map((inc: any) => ({
+        id: inc.id,
+        reported_at: inc.reported_at,
+        resident_id: inc.resident_id,
+        resident: {
+          id: inc.resident_id,
+          name: inc.resident_name,
+          condominium_id: inc.resident_condominium_id,
+          unit_id: inc.resident_unit_id
+        },
+        unit: inc.resident_unit_id ? {
+          id: inc.resident_unit_id,
+          code_block: inc.unit_code_block,
+          number: inc.unit_number,
+          floor: inc.unit_floor,
+          building_name: inc.unit_building_name,
+          condominium_id: inc.resident_condominium_id
+        } : undefined,
+        description: inc.description,
+        type: inc.type,
+        type_label: inc.type_label,
+        status: inc.status,
+        status_label: inc.status_label,
+        photo_path: inc.photo_path,
+        acknowledged_at: inc.acknowledged_at,
+        acknowledged_by: inc.acknowledged_by,
+        guard_notes: inc.guard_notes,
+        resolved_at: inc.resolved_at
+      } as Incident));
+    } catch (err: any) {
+      console.error("[Admin] Error fetching incidents via RPC:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  /**
+   * Admin: Get all units across all condominiums
+   * Uses RPC function for better performance and security
+   * @param condominiumId - Optional condominium filter
+   */
+  async adminGetAllUnits(condominiumId?: number): Promise<Unit[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase.rpc('admin_get_all_units', {
+        p_condominium_id: condominiumId || null
+      });
+
+      if (error) throw error;
+
+      // RPC returns residents as JSONB, convert to array
+      return (data || []).map((unit: any) => ({
+        ...unit,
+        residents: unit.residents || []
+      })) as Unit[];
+    } catch (err: any) {
+      console.error("[Admin] Error fetching units via RPC:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  /**
+   * Admin: Get all staff across all condominiums
+   * Uses RPC function for better performance and security
+   * @param condominiumId - Optional condominium filter
+   */
+  async adminGetAllStaff(condominiumId?: number): Promise<Staff[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase.rpc('admin_get_all_staff', {
+        p_condominium_id: condominiumId || null
+      });
+
+      if (error) throw error;
+      return (data as Staff[]) || [];
+    } catch (err: any) {
+      console.error("[Admin] Error fetching staff via RPC:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  /**
+   * Admin: Get aggregated dashboard statistics
+   * Uses RPC function for efficient single-query aggregation
+   */
+  async adminGetDashboardStats(): Promise<{
+    totalCondominiums: number;
+    activeCondominiums: number;
+    totalDevices: number;
+    activeDevices: number;
+    totalStaff: number;
+    totalUnits: number;
+    totalResidents: number;
+    todayVisits: number;
+    pendingVisits: number;
+    insideVisits: number;
+    activeIncidents: number;
+    totalIncidents: number;
+    resolvedIncidents: number;
+  } | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase.rpc('admin_get_dashboard_stats');
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) return null;
+
+      const stats = data[0];
+      return {
+        totalCondominiums: stats.total_condominiums,
+        activeCondominiums: stats.active_condominiums,
+        totalDevices: stats.total_devices,
+        activeDevices: stats.active_devices,
+        totalStaff: stats.total_staff,
+        totalUnits: stats.total_units,
+        totalResidents: stats.total_residents,
+        todayVisits: stats.today_visits,
+        pendingVisits: stats.pending_visits,
+        insideVisits: stats.inside_visits,
+        activeIncidents: stats.active_incidents,
+        totalIncidents: stats.total_incidents,
+        resolvedIncidents: stats.resolved_incidents
+      };
+    } catch (err: any) {
+      console.error("[Admin] Error fetching dashboard stats via RPC:", err.message || JSON.stringify(err));
+      return null;
+    }
   }
 };

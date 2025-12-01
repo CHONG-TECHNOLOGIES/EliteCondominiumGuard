@@ -1,0 +1,138 @@
+Telas e fluxos do Kiosk (texto pronto para dev)
+
+Tela 1 — Login do guarda
+
+Campos: Username, Senha. Botão grande: Entrar.
+
+Tela 2 — Home (Kiosk)
+
+3 Botões grandes: + NOVA ENTRADA, LISTA DO DIA, BUSCAR (pesquisa rápida por nome/apt).
+
+Indicador de sincronização (LED verde = online; amarelo = offline pending sync).
+
+Tela 3 — Nova Entrada (passos)
+
+Selecionar tipo: Visitante / Entrega / Serviço / Aluno
+
+Formulário (campos principais):
+
+Nome do visitante (obrigatório)
+
+Documento / Telefone (opcional)
+
+Apartamento / aluno (campo obrigatório quando aplicável)
+
+Motivo / Empresa (textbox curto)
+
+Foto: botão Tirar Foto (abre câmara)
+
+Botão Gerar QR (opcional) — chama Edge Function → armazena qr_token e qr_expires_at
+
+Botão grande: REGISTRAR ENTRADA → grava na tabela visits, envia notificação (chamada a Edge Function send_notification) se configurado. Mostra tela de confirmação com QR (se gerado) e botão Voltar para Home.
+
+Tela 4 — Lista do Dia
+
+Tabela listando entradas do dia com colunas (Nome, Tipo, Apt, Entrada, Saída, Status).
+
+Cada linha tem botão à direita: Marcar Saída (se status = inside) ou Detalhes.
+
+Ao clicar Marcar Saída: confirmar ação → grava checkout_ts = now() e muda status para left.
+
+Tela 5 — Detalhes da Visita
+
+Mostra foto (signed URL), campos completos, histórico de notificações e botão para reenviar notificação.
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Chegada do visitante/motoboy/serviço/aluno
+
+Kiosk captura foto + tipo de visita + apartamento.
+
+Gera QR token (opcional).
+
+Envia dados para Supabase (tabela visits) + storage (foto_path).
+
+Notificação ao morador
+
+Morador recebe push / WhatsApp / app notification com foto ou vídeo frame.
+
+Pode aprovar ou negar entrada.
+
+Decisão do morador
+
+Aprova: visita recebe status inside → QR liberado / entrada automática.
+
+Nega: visita marcada como denied → portaria alertada.
+
+Incidente: morador registra incidente → cria registro na tabela incidents.
+
+Portaria
+
+Recebe alertas em tempo real: visitas pendentes, incidentes.
+
+Confirma check-in/check-out manual se necessário.
+
+Histórico registrado para auditoria.
+
+Saída
+
+Guard marca checkout → atualiza checkout_ts e status left.
+
+Morador pode receber notificação de saída se quiser.
+
+-----------------------------------------------------------------------------------------------------------------
+
+
+Offline / sincronização
+
+Kiosk PWA deve manter cache local (IndexedDB) com as entradas em estado pending.
+
+Ao ter conexão, o frontend envia ao Supabase via REST (ou RPC) e marca como sincronizado.
+
+Para detecção de conflitos: últimos eventos vêm com timestamps; se houver conflito (ex.: dois checkouts para mesma visita), registrar um evento de auditoria e avisar admin.
+
+Supabase Realtime pode ajudar para sincronizar alterações entre múltiplos kiosks e dashboard.
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+Aqui estão os principais motivos pelos quais faz todo o sentido adicionar isso:
+Segurança (Geofencing): O tablet pode verificar via GPS (navigator.geolocation) se está fisicamente dentro do raio do condomínio. Se alguém roubar o tablet ou tentar fazer login fora do local, o sistema pode bloquear o acesso.
+Mapas para Visitantes/Entregas: Quando se envia uma notificação ao visitante ou entregador, podemos enviar o link exato do Google Maps/Waze, o que é muito útil se a entrada da portaria for diferente da morada oficial.
+Auditoria: Em cada registo de visita, podemos comparar a localização do dispositivo com a do condomínio para garantir que o registo foi feito no local.
+
+
+--------------------------------------------------------------------------------------------------------
+
+4) Offline-first behavior (detalhes)
+
+Armazenamento local: IndexedDB (store pending_visits, pending_updates).
+
+Sync loop: a cada 10s ou ao detectar online → send pending items sequentially.
+
+Conflito simples: se PATCH falhar por conflito, mostrar alert no kiosk para sincronização manual e envio de log para admin.
+
+Export fallback: botão Exportar logs (CSV) para USB se for necessário transferir dados manualmente.
+
+5) Regras e guardrails (operacionais)
+
+Foto obrigatória por padrão (permite exceção no primeiro mês).
+
+Se morador negar, registrar status='denied' e exigir que o guard registre ação (por ex.: convidado foi informado a sair).
+
+Logs imutáveis: manter visits_audit trigger que copia mudanças para tabela de auditoria com quem (registered_by) e quando.
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+implementei um "Gesto de Segurança":
+Para aceder ao menu de reset, deve tocar 5 vezes seguidas no ícone do Escudo (logótipo) no painel esquerdo.
+Isso abrirá uma janela que pede um Código Mestre (configurei como 123456 para testes). Só com este código é possível desvincular o dispositivo."
+
+Nome do Prompt: Gesto de Segurança
+Contexto:
+"Anteriormente, implementámos na página de Login (Login.tsx) um mecanismo oculto para resetar as configurações do quiosque. Atualmente, funciona tocando 5 vezes no logótipo e inserindo um PIN fixo (123456) no frontend.
+Objetivo:
+Precisamos de melhorar a segurança e a robustez deste 'Gesto de Segurança'. Quero rever a implementação para torná-la mais profissional, segura (talvez validando o PIN no backend ou usando um token de admin) e evitar hardcoded strings no código do cliente."

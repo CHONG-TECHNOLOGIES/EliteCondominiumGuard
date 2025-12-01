@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, Loader2, AlertCircle, Delete, Lock } from 'lucide-react';
 import { AuthContext } from '../App';
 import { api } from '../services/dataService';
+import { UserRole } from '../types';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -64,7 +65,12 @@ export default function Login() {
       const staff = await api.login(firstName, lastName, pin);
       if (staff) {
         login(staff);
-        navigate('/');
+        // Redirect based on user role
+        if (staff.role === UserRole.ADMIN) {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
       } else {
         setError('Credenciais inválidas.');
         setPin('');

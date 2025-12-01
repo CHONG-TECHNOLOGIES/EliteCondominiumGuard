@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Staff } from './types';
+import { Staff, UserRole } from './types';
 import { api } from './services/dataService';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -9,6 +9,21 @@ import DailyList from './pages/DailyList';
 import Incidents from './pages/Incidents';
 import Setup from './pages/Setup';
 import { Wifi, WifiOff, LogOut, ShieldCheck, Loader2 } from 'lucide-react';
+import { AdminRoute } from './components/AdminRoute';
+import { AdminLayout } from './components/AdminLayout';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminCondominiums from './pages/admin/AdminCondominiums';
+import AdminDevices from './pages/admin/AdminDevices';
+import AdminStaff from './pages/admin/AdminStaff';
+import AdminUnits from './pages/admin/AdminUnits';
+import AdminResidents from './pages/admin/AdminResidents';
+import AdminRestaurants from './pages/admin/AdminRestaurants';
+import AdminSports from './pages/admin/AdminSports';
+import AdminVisits from './pages/admin/AdminVisits';
+import AdminIncidents from './pages/admin/AdminIncidents';
+import AdminVisitTypes from './pages/admin/AdminVisitTypes';
+import AdminServiceTypes from './pages/admin/AdminServiceTypes';
+import AdminAnalytics from './pages/admin/AdminAnalytics';
 
 // --- Auth Context ---
 interface AuthContextType {
@@ -146,10 +161,28 @@ export default function App() {
         <Routes>
           <Route path="/setup" element={<Setup />} />
           <Route path="/login" element={<ConfigGuard><Login /></ConfigGuard>} />
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/condominiums" element={<ConfigGuard><AdminRoute><AdminLayout><AdminCondominiums /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/devices" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDevices /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/staff" element={<ConfigGuard><AdminRoute><AdminLayout><AdminStaff /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/units" element={<ConfigGuard><AdminRoute><AdminLayout><AdminUnits /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/residents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminResidents /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/restaurants" element={<ConfigGuard><AdminRoute><AdminLayout><AdminRestaurants /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/sports" element={<ConfigGuard><AdminRoute><AdminLayout><AdminSports /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/visits" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisits /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/incidents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminIncidents /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/config/visit-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisitTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/config/service-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminServiceTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
+          <Route path="/admin/analytics" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAnalytics /></AdminLayout></AdminRoute></ConfigGuard>} />
+
+          {/* Guard Routes */}
           <Route path="/" element={<ConfigGuard><ProtectedRoute><Dashboard /></ProtectedRoute></ConfigGuard>} />
           <Route path="/new-entry" element={<ConfigGuard><ProtectedRoute><NewEntry /></ProtectedRoute></ConfigGuard>} />
           <Route path="/day-list" element={<ConfigGuard><ProtectedRoute><DailyList /></ProtectedRoute></ConfigGuard>} />
           <Route path="/incidents" element={<ConfigGuard><ProtectedRoute><Incidents /></ProtectedRoute></ConfigGuard>} />
+
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </HashRouter>

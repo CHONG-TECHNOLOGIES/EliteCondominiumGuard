@@ -67,71 +67,7 @@ onNotificationReceived((notification: VisitApprovalNotification) => {
 });
 ```
 
----
 
-### 4. **Aprovar/Negar Visitante**
-
-```typescript
-// Resident App - Approval Actions
-async function approveVisit(visitId: number) {
-  const { error } = await supabase
-    .from('visits')
-    .update({
-      status: 'AUTORIZADO',
-      approved_at: new Date().toISOString()
-    })
-    .eq('id', visitId);
-
-  if (!error) {
-    showToast('Visitante autorizado!');
-  }
-}
-
-async function denyVisit(visitId: number) {
-  const { error } = await supabase
-    .from('visits')
-    .update({
-      status: 'NEGADO',
-      denied_at: new Date().toISOString()
-    })
-    .eq('id', visitId);
-
-  if (!error) {
-    showToast('Visita negada');
-  }
-}
-```
-
----
-
-
-
-## 🔄 Fluxo Completo: Visita com Notificação
-
-```
-1. Visitante chega à portaria
-   ↓
-2. Guarda registra visita no app CondoGuard
-   ↓
-3. Guarda seleciona unidade
-   ↓
-4. Sistema verifica: residents.has_app_installed
-   ├─ TRUE → Mostra opção "Aplicativo"
-   └─ FALSE → Oculta "Aplicativo", mostra Telefone/Interfone
-   ↓
-5. [SE APP INSTALADO] Guarda seleciona "Aplicativo"
-   ↓
-6. Sistema envia notificação push via FCM/APNS
-   usando residents.device_token
-   ↓
-7. Residente recebe notificação
-   ↓
-8. Residente aprova/nega
-   ↓
-9. Status da visita é atualizado em tempo real
-   ↓
-10. Guarda vê aprovação e libera entrada
-```
 
 ---
 
@@ -161,46 +97,7 @@ USING (
 );
 ```
 
----
 
-## 📱 Push Notifications (Firebase Cloud Messaging)
-
-### Server-side (quando guarda seleciona "Aplicativo"):
-
-```typescript
-// Guard App - Backend Service
-async function sendVisitApprovalNotification(visit: Visit) {
-  // Get resident device tokens
-  const { data: residents } = await supabase
-    .from('residents')
-    .select('device_token, name')
-    .eq('unit_id', visit.unit_id)
-    .eq('has_app_installed', true);
-
-  if (!residents || residents.length === 0) {
-    throw new Error('No residents with app installed');
-  }
-
-  // Send FCM notification to all residents in unit
-  const tokens = residents.map(r => r.device_token).filter(Boolean);
-
-  await sendFCMNotification({
-    tokens,
-    notification: {
-      title: `🔔 Visitante: ${visit.visitor_name}`,
-      body: `${visit.reason || 'Sem motivo especificado'}. Aprovar entrada?`
-    },
-    data: {
-      type: 'VISIT_APPROVAL_REQUEST',
-      visit_id: String(visit.id),
-      visitor_name: visit.visitor_name,
-      visitor_photo_url: visit.photo_url || '',
-      visit_type: visit.visit_type,
-      reason: visit.reason || ''
-    }
-  });
-}
-```
 
 ---
 

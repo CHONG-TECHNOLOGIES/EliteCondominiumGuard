@@ -6,6 +6,7 @@ import { api } from '../services/dataService';
 import { Incident } from '../types';
 import { CheckSquare, ArrowLeft, AlertTriangle, AlertCircle, Info, FileText, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { audioService } from '../services/audioService';
 
 export default function Incidents() {
   const { user } = useContext(AuthContext);
@@ -14,7 +15,7 @@ export default function Incidents() {
   const [loading, setLoading] = useState(true);
   const knownIncidentIdsRef = useRef<Set<number>>(new Set());
   const [newIncidentAlert, setNewIncidentAlert] = useState(false);
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(audioService.isEnabled());
 
   // Action report modal state
   const [showActionModal, setShowActionModal] = useState(false);
@@ -48,70 +49,23 @@ export default function Incidents() {
   };
 
   const playAlertSound = () => {
-    try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-
-      // Check if audio context is suspended (browser autoplay policy)
-      if (audioContext.state === 'suspended') {
-        console.warn('[Incidents] ⚠️ Audio context suspended - user interaction required');
-        console.warn('[Incidents] 💡 Click "Testar Som" button to enable audio');
-        return;
-      }
-
-      // Create a louder, more urgent triple-beep alarm sound
-      const playBeep = (startTime: number, frequency: number, duration: number = 0.3) => {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        oscillator.frequency.value = frequency;
-        oscillator.type = 'square'; // More attention-grabbing than sine
-
-        // Louder volume
-        gainNode.gain.setValueAtTime(0.6, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-
-        oscillator.start(startTime);
-        oscillator.stop(startTime + duration);
-      };
-
-      // CONTINUOUS ALERT PATTERN - Repeat the BIP-bip-BIP pattern 4 times
-      // Makes it impossible to miss!
-      const patternDuration = 1.2; // Duration of one BIP-bip-BIP cycle
-      const pauseBetweenPatterns = 0.3; // Short pause between cycles
-      const totalPatterns = 4; // Repeat 4 times
-
-      for (let cycle = 0; cycle < totalPatterns; cycle++) {
-        const cycleStart = audioContext.currentTime + (cycle * (patternDuration + pauseBetweenPatterns));
-
-        // Triple beep pattern: HIGH-low-HIGH
-        playBeep(cycleStart, 880, 0.3);           // High beep
-        playBeep(cycleStart + 0.4, 440, 0.3);     // Low beep
-        playBeep(cycleStart + 0.8, 880, 0.3);     // High beep
-      }
-
-      console.log('[Incidents] 🔊 Alert sound played successfully (4 cycles)');
+    const played = audioService.playAlertSound();
+    if (played) {
       setAudioEnabled(true);
-    } catch (err) {
-      console.error('[Incidents] ❌ Error playing alert sound:', err);
     }
   };
 
   const testAlertSound = async () => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const success = await audioService.testSound();
 
-      // Resume audio context if suspended
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
-        console.log('[Incidents] ✅ Audio context resumed');
+      if (success) {
+        setAudioEnabled(true);
+        vibrateDevice();
+        alert('✅ Som de teste tocado! Agora as notificações de incidentes irão tocar som automaticamente, mesmo após fazer login ou navegar entre páginas.');
+      } else {
+        alert('❌ Erro ao tocar som. Verifique as permissões do navegador.');
       }
-
-      playAlertSound();
-      vibrateDevice();
-      alert('✅ Som de teste tocado! Agora as notificações de incidentes irão tocar som automaticamente.');
     } catch (err) {
       console.error('[Incidents] ❌ Error testing sound:', err);
       alert('❌ Erro ao tocar som. Verifique as permissões do navegador.');

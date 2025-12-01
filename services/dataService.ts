@@ -973,6 +973,114 @@ class DataService {
   }
 
   checkOnline(): boolean { return this.isOnline; }
+
+  // --- ADMIN METHODS (Online-Only, Cross-Condominium Access) ---
+  // NOTE: Admin users must be online. No offline fallback or caching.
+
+  /**
+   * Admin: Get all condominiums (not filtered by device)
+   * ONLINE ONLY - Admin requires active internet connection
+   */
+  async adminGetAllCondominiums(): Promise<Condominium[]> {
+    try {
+      return await SupabaseService.listActiveCondominiums();
+    } catch (e) {
+      console.error('[Admin] Failed to fetch condominiums (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Get all units across all condominiums
+   * ONLINE ONLY - Admin requires active internet connection
+   * @param condominiumId - Optional filter by specific condominium
+   */
+  async adminGetAllUnits(condominiumId?: number): Promise<Unit[]> {
+    try {
+      return await SupabaseService.adminGetAllUnits(condominiumId);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch units (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Get all visits across all condominiums
+   * ONLINE ONLY - Admin requires active internet connection
+   * @param startDate - Start date filter (ISO string)
+   * @param endDate - End date filter (ISO string)
+   * @param condominiumId - Optional filter by specific condominium
+   */
+  async adminGetAllVisits(startDate?: string, endDate?: string, condominiumId?: number): Promise<Visit[]> {
+    try {
+      return await SupabaseService.adminGetAllVisits(startDate, endDate, condominiumId);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch visits (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Get all incidents across all condominiums
+   * ONLINE ONLY - Admin requires active internet connection
+   * @param condominiumId - Optional filter by specific condominium
+   */
+  async adminGetAllIncidents(condominiumId?: number): Promise<Incident[]> {
+    try {
+      return await SupabaseService.adminGetAllIncidents(condominiumId);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch incidents (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Get all staff across all condominiums
+   * ONLINE ONLY - Admin requires active internet connection
+   * @param condominiumId - Optional filter by specific condominium
+   */
+  async adminGetAllStaff(condominiumId?: number): Promise<Staff[]> {
+    try {
+      return await SupabaseService.adminGetAllStaff(condominiumId);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch staff (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Get aggregated dashboard statistics across all condominiums
+   * ONLINE ONLY - Admin requires active internet connection
+   * Uses efficient RPC function for single-query aggregation
+   */
+  async adminGetDashboardStats(): Promise<{
+    totalCondominiums: number;
+    activeCondominiums: number;
+    totalDevices: number;
+    activeDevices: number;
+    totalStaff: number;
+    totalUnits: number;
+    totalResidents: number;
+    todayVisits: number;
+    pendingVisits: number;
+    insideVisits: number;
+    activeIncidents: number;
+    totalIncidents: number;
+    resolvedIncidents: number;
+  } | null> {
+    try {
+      console.log('[Admin] Fetching dashboard stats from RPC...');
+      const stats = await SupabaseService.adminGetDashboardStats();
+      if (stats) {
+        console.log('[Admin] Dashboard stats fetched successfully');
+        return stats;
+      }
+      return null;
+    } catch (error) {
+      console.error('[Admin] Error fetching dashboard stats (online required):', error);
+      return null;
+    }
+  }
 }
 
 export const api = new DataService();
