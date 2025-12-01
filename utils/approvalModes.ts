@@ -46,26 +46,52 @@ export const APPROVAL_MODE_CONFIGS: ApprovalModeConfig[] = [
 ];
 
 /**
- * Returns approval modes available based on online/offline status
+ * Returns approval modes available based on online/offline status and unit context
  *
- * STRICT MODE (Opção A):
- * - ONLINE: Show only APP (forces best UX)
- * - OFFLINE: Show only PHONE, INTERCOM, GUARD_MANUAL (local methods)
+ * CONTEXTUAL LOGIC:
+ * - ONLINE + Resident HAS App: Show only APP
+ * - ONLINE + Resident NO App: Show only PHONE, INTERCOM, GUARD_MANUAL
+ * - OFFLINE: Show only PHONE, INTERCOM, GUARD_MANUAL
  */
-export function getAvailableApprovalModes(isOnline: boolean): ApprovalModeConfig[] {
+export function getAvailableApprovalModes(isOnline: boolean, unit?: any): ApprovalModeConfig[] {
+  // Check if any resident in the unit has the app installed
+  const hasAppInstalled = unit?.residents?.some(
+    (r: any) => r.has_app_installed === true || r.device_token
+  ) || false;
+
   if (isOnline) {
-    // When ONLINE: Show only APP (primary method)
-    return APPROVAL_MODE_CONFIGS.filter(config =>
-      config.mode === ApprovalMode.APP
-    );
+    if (hasAppInstalled) {
+      // ONLINE + Resident HAS App: Show ONLY Aplicativo
+      return APPROVAL_MODE_CONFIGS.filter(config =>
+        config.mode === ApprovalMode.APP
+      );
+    } else {
+      // ONLINE + Resident NO App: Show only local methods
+      // (APP wouldn't work anyway, so don't show it)
+      return APPROVAL_MODE_CONFIGS.filter(config =>
+        config.mode === ApprovalMode.PHONE ||
+        config.mode === ApprovalMode.INTERCOM ||
+        config.mode === ApprovalMode.GUARD_MANUAL
+      );
+    }
   } else {
-    // When OFFLINE: Show only local methods (PHONE, INTERCOM, GUARD_MANUAL)
+    // OFFLINE: Show only local methods
     return APPROVAL_MODE_CONFIGS.filter(config =>
       config.mode === ApprovalMode.PHONE ||
       config.mode === ApprovalMode.INTERCOM ||
       config.mode === ApprovalMode.GUARD_MANUAL
     );
   }
+}
+
+/**
+ * Check if unit has any resident with app installed
+ */
+export function unitHasAppInstalled(unit: any): boolean {
+  if (!unit || !unit.residents) return false;
+  return unit.residents.some(
+    (r: any) => r.has_app_installed === true || r.device_token
+  );
 }
 
 /**

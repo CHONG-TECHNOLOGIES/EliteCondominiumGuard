@@ -4,7 +4,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { api } from '../services/dataService';
-import { Unit, VisitType, ApprovalMode, VisitTypeConfig, ServiceTypeConfig, Restaurant, Sport } from '../types';
+import { Unit, VisitType, ApprovalMode, VisitStatus, VisitTypeConfig, ServiceTypeConfig, Restaurant, Sport } from '../types';
 import CameraCapture from '../components/CameraCapture';
 import ErrorBoundary from '../components/ErrorBoundary';
 import ApprovalModeSelector from '../components/ApprovalModeSelector';
@@ -208,6 +208,9 @@ export default function NewEntry() {
       return alert("Unidade é obrigatória");
     }
 
+    // Check if this is a free entry (restaurant/sport)
+    const isFreeEntry = selectedTypeConfig?.requires_restaurant || selectedTypeConfig?.requires_sport;
+
     const visitData = {
       condominium_id: user!.condominium_id,
       visitor_name: visitorName,
@@ -221,7 +224,8 @@ export default function NewEntry() {
       reason: reason || undefined,
       photo_data_url: photo || undefined, // Base64 data URL for upload to Storage
       qr_token: qrToken || undefined,
-      approval_mode: approvalMode,
+      approval_mode: isFreeEntry ? 'ENTRADA_LIVRE' : approvalMode, // Free entry or selected mode
+      status: isFreeEntry ? VisitStatus.APPROVED : VisitStatus.PENDING, // Auto-approve free entry
       guard_id: user!.id
     };
 
@@ -516,14 +520,21 @@ export default function NewEntry() {
   const renderStep3 = () => {
     const selectedUnit = units.find(u => u.id === unitId);
 
+    // Check if visit type requires approval (restaurant and sport don't need approval)
+    const isFreeEntry = selectedTypeConfig?.requires_restaurant || selectedTypeConfig?.requires_sport;
+    const titleText = isFreeEntry ? 'Foto & Registo' : 'Foto & Autorização';
+    const subtitleText = isFreeEntry
+      ? 'Capture a foto do visitante - entrada livre, sem necessidade de aprovação'
+      : 'Capture a foto do visitante e selecione o método de aprovação';
+
     return (
       <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-6">
         <div className="mb-4">
           <h2 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight mb-2">
-            Foto & Autorização
+            {titleText}
           </h2>
           <p className="text-sm text-slate-500 font-medium">
-            Capture a foto do visitante e selecione o método de aprovação
+            {subtitleText}
           </p>
         </div>
 
@@ -590,10 +601,49 @@ export default function NewEntry() {
             </div>
           </div>
 
-          {/* Right Column: Approval Mode Selector */}
+          {/* Right Column: Approval Mode Selector OR Free Entry Message */}
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              {approvalMode === ApprovalMode.QR_SCAN ? (
+              {isFreeEntry ? (
+                /* Free Entry (Restaurant/Sport - No Approval Needed) */
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-black text-slate-400 uppercase tracking-wider">
+                      Modo de Entrada
+                    </h3>
+                  </div>
+
+                  <div className="p-6 bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-xl">
+                    <div className="flex flex-col items-center text-center gap-4">
+                      <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
+                        <CheckCircle size={32} className="text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-black text-emerald-800 mb-1">
+                          Entrada Livre
+                        </p>
+                        <p className="text-sm text-emerald-700 font-medium">
+                          {selectedTypeConfig?.requires_restaurant && 'Acesso direto ao restaurante'}
+                          {selectedTypeConfig?.requires_sport && 'Acesso direto às instalações desportivas'}
+                        </p>
+                      </div>
+                      <div className="w-full pt-4 border-t border-emerald-200">
+                        <p className="text-xs text-emerald-600 leading-relaxed">
+                          ✓ Sem necessidade de aprovação<br />
+                          ✓ Registo automático da entrada<br />
+                          ✓ Visitante pode prosseguir diretamente
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                    <p className="text-xs text-blue-800 font-medium">
+                      ℹ️ <strong>Informação:</strong> Áreas comuns não requerem autorização prévia. O registo é feito apenas para controlo de acesso.
+                    </p>
+                  </div>
+                </div>
+              ) : approvalMode === ApprovalMode.QR_SCAN ? (
                 <>
                   {!qrToken ? (
                     <div className="bg-blue-50 p-6 rounded-xl text-center border border-blue-200 flex flex-col gap-4">

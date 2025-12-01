@@ -4,7 +4,8 @@ import {
   getAvailableApprovalModes,
   initiatePhoneCall,
   initiateIntercomCall,
-  getResidentPhones
+  getResidentPhones,
+  unitHasAppInstalled
 } from '../utils/approvalModes';
 import {
   Smartphone,
@@ -14,7 +15,8 @@ import {
   QrCode,
   CheckCircle2,
   WifiOff,
-  PhoneOutgoing
+  PhoneOutgoing,
+  AlertCircle
 } from 'lucide-react';
 
 interface ApprovalModeSelectorProps {
@@ -74,10 +76,11 @@ export default function ApprovalModeSelector({
   visitorPhone
 }: ApprovalModeSelectorProps) {
   const [calling, setCalling] = useState(false);
-  const availableModes = getAvailableApprovalModes(isOnline);
+  const availableModes = getAvailableApprovalModes(isOnline, unit); // Pass unit for contextual logic
   const residentPhones = unit ? getResidentPhones(unit) : [];
+  const hasAppInstalled = unit ? unitHasAppInstalled(unit) : false;
 
-  // Auto-select appropriate mode when online/offline status changes
+  // Auto-select appropriate mode when online/offline status changes or unit changes
   useEffect(() => {
     // Check if current selected mode is available
     const isCurrentModeAvailable = availableModes.some(
@@ -87,10 +90,13 @@ export default function ApprovalModeSelector({
     // If current mode is not available, auto-select the first available mode
     if (!isCurrentModeAvailable && availableModes.length > 0) {
       const defaultMode = availableModes[0].mode;
-      console.log(`🔄 Auto-switching approval mode: ${selectedMode} → ${defaultMode} (${isOnline ? 'ONLINE' : 'OFFLINE'})`);
+      const context = isOnline
+        ? (hasAppInstalled ? 'ONLINE + HAS APP' : 'ONLINE + NO APP')
+        : 'OFFLINE';
+      console.log(`🔄 Auto-switching approval mode: ${selectedMode} → ${defaultMode} (${context})`);
       onModeSelect(defaultMode);
     }
-  }, [isOnline, availableModes, selectedMode, onModeSelect]);
+  }, [isOnline, unit, availableModes, selectedMode, onModeSelect, hasAppInstalled]);
 
   const handlePhoneCall = () => {
     const phoneToCall = residentPhones[0] || visitorPhone;
@@ -128,6 +134,23 @@ export default function ApprovalModeSelector({
           </div>
         )}
       </div>
+
+      {/* Alert: Resident has NO app installed (online only) */}
+      {isOnline && unit && !hasAppInstalled && (
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl animate-in fade-in duration-300">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-amber-800 font-bold mb-1">
+                Residente sem Aplicativo
+              </p>
+              <p className="text-xs text-amber-700 leading-relaxed">
+                Nenhum morador desta unidade possui o app instalado. Use telefone ou interfone para aprovação.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3">
         {availableModes.map(config => {

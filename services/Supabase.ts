@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitStatus, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, Device, Restaurant, Sport } from '../types';
+import { Staff, Visit, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, Device, Restaurant, Sport } from '../types';
 
 /**
  * Serviço Real de API Supabase
@@ -201,7 +201,7 @@ export const SupabaseService = {
           service_types(name),
           restaurants(name),
           sports(name),
-          units(block, number)
+          units(code_block, number)
         `)
         .eq('condominium_id', condoId)
         .gte('check_in_at', `${today}T00:00:00`)
@@ -215,7 +215,7 @@ export const SupabaseService = {
         service_type: v.service_types?.name,
         restaurant_name: v.restaurants?.name,
         sport_name: v.sports?.name,
-        unit_block: v.units?.block,
+        unit_block: v.units?.code_block,
         unit_number: v.units?.number,
         sync_status: 'SINCRONIZADO'
       }));
@@ -301,31 +301,162 @@ export const SupabaseService = {
     });
   },
 
+  // --- Incidents ---
+  async getIncidentTypes(): Promise<IncidentType[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('incident_types')
+        .select('*')
+        .order('sort_order');
+
+      if (error) throw error;
+      return (data as IncidentType[]) || [];
+    } catch (err: any) {
+      console.error("Error fetching incident types:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  async getIncidentStatuses(): Promise<IncidentStatus[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('incident_statuses')
+        .select('*')
+        .order('sort_order');
+
+      if (error) throw error;
+      return (data as IncidentStatus[]) || [];
+    } catch (err: any) {
+      console.error("Error fetching incident statuses:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
   async getIncidents(condoId: number): Promise<Incident[]> {
     if (!supabase) return [];
 
     try {
       const { data, error } = await supabase
         .from('incidents')
-        .select('*')
-        .eq('condominium_id', condoId)
-        .order('created_at', { ascending: false });
+        .select(`
+          *,
+          residents!inner (
+            id,
+            name,
+            condominium_id,
+            unit_id,
+            units (
+              id,
+              code_block,
+              number,
+              floor,
+              building_name
+            )
+          ),
+          incident_types (
+            label
+          ),
+          incident_statuses (
+            label
+          )
+        `)
+        .eq('residents.condominium_id', condoId)
+        .eq('status', 'new')  // Only fetch NEW incidents for offline sync
+        .order('reported_at', { ascending: false });
 
       if (error) throw error;
-      return (data as Incident[]) || [];
+
+      // Transform the data to flatten joins
+      return (data || []).map((inc: any) => ({
+        ...inc,
+        resident: inc.residents,
+        unit: inc.residents?.units,
+        type_label: inc.incident_types?.label,
+        status_label: inc.incident_statuses?.label
+      }));
     } catch (err: any) {
       console.error("Error fetching incidents:", err.message || JSON.stringify(err));
       return [];
     }
   },
 
+  async acknowledgeIncident(id: number, staffId: number): Promise<boolean> {
+    if (!supabase) return false;
 
-  async acknowledgeIncident(id: number, staffId: number) {
-    if (!supabase) return;
-    await supabase
-      .from('incidents')
-      .update({ status: 'VISTO', acknowledged_by: staffId, acknowledged_at: new Date().toISOString() })
-      .eq('id', id);
+    try {
+      const { error } = await supabase
+        .from('incidents')
+        .update({
+          status: 'acknowledged',
+          acknowledged_by: staffId,
+          acknowledged_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("Error acknowledging incident:", err.message || JSON.stringify(err));
+      return false;
+    }
+  },
+
+  async reportIncidentAction(id: number, guardNotes: string, newStatus: string): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      // First, fetch the existing incident to get current notes
+      const { data: incident, error: fetchError } = await supabase
+        .from('incidents')
+        .select('guard_notes')
+        .eq('id', id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Concatenate new notes with existing notes to preserve history
+      const timestamp = new Date().toLocaleString('pt-PT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const formattedNewNote = `[${timestamp}] ${guardNotes}`;
+
+      let updatedNotes: string;
+      if (incident?.guard_notes && incident.guard_notes.trim()) {
+        updatedNotes = `${incident.guard_notes}\n---\n${formattedNewNote}`;
+      } else {
+        updatedNotes = formattedNewNote;
+      }
+
+      const updates: any = {
+        guard_notes: updatedNotes,
+        status: newStatus
+      };
+
+      // If resolving, add resolved timestamp
+      if (newStatus === 'resolved') {
+        updates.resolved_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('incidents')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("Error reporting incident action:", err.message || JSON.stringify(err));
+      return false;
+    }
   },
 
   // --- Device Management ---

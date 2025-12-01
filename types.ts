@@ -86,6 +86,13 @@ export interface Resident {
   email?: string;
   type?: 'OWNER' | 'TENANT';
   created_at?: string;
+  // App authentication
+  pin_hash?: string;                 // bcrypt hash of resident's PIN (for app login)
+  // App installation tracking (integration with resident app)
+  has_app_installed?: boolean;      // True if resident has logged into app at least once
+  device_token?: string;             // Push notification token (if app installed)
+  app_first_login_at?: string;       // First time resident logged into app
+  app_last_seen_at?: string;         // Last activity in app
 }
 
 export interface Unit {
@@ -167,16 +174,35 @@ export interface Visit {
   sync_status: SyncStatus;       // 'SINCRONIZADO' or 'PENDENTE_ENVIO'
 }
 
+export interface IncidentType {
+  code: string;                  // Primary key
+  label: string;                 // Display name
+  sort_order?: number;
+}
+
+export interface IncidentStatus {
+  code: string;                  // Primary key
+  label: string;                 // Display name
+  sort_order?: number;
+}
+
 export interface Incident {
-  id: string;
-  condominium_id: string;
-  title: string;
+  id: number;                    // SERIAL in Supabase
+  reported_at: string;           // timestamptz
+  resident_id: number;           // INT4 (references residents)
+  resident?: Resident;           // Populated from join
+  unit?: Unit;                   // Populated from join (includes block and number)
   description: string;
-  severity: 'BAIXA' | 'MÉDIA' | 'ALTA';
-  status: 'ABERTO' | 'VISTO' | 'RESOLVIDO';
-  reported_at: string;
-  acknowledged_at?: string;
-  acknowledged_by?: string;
+  type: string;                  // text (references incident_types.code)
+  type_label?: string;           // Label from incident_types (for display)
+  status: string;                // text (references incident_statuses.code)
+  status_label?: string;         // Label from incident_statuses (for display)
+  photo_path?: string;
+  acknowledged_at?: string;      // timestamptz
+  acknowledged_by?: number;      // INT4 (references staff)
+  guard_notes?: string;          // TEXT - Guard's action report
+  resolved_at?: string;          // timestamptz - When guard closed/resolved
+  sync_status?: SyncStatus;      // For offline support
 }
 
 export interface AuditLog {

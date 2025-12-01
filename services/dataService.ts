@@ -726,8 +726,153 @@ class DataService {
     return synced;
   }
 
-  async getIncidents(): Promise<Incident[]> { return [] }
-  async acknowledgeIncident(id: string, staffName: string) { }
+  // --- Incidents ---
+  private async refreshIncidentConfigs() {
+    if (!this.isBackendHealthy) return;
+    try {
+      const types = await SupabaseService.getIncidentTypes();
+      if (types.length) await db.incidentTypes.bulkPut(types);
+
+      const statuses = await SupabaseService.getIncidentStatuses();
+      if (statuses.length) await db.incidentStatuses.bulkPut(statuses);
+
+      console.log('[DataService] Incident types and statuses synced');
+    } catch (e) {
+      console.error("[DataService] Failed to sync incident configs", e);
+      this.backendHealthScore--;
+    }
+  }
+
+  async getIncidents(): Promise<Incident[]> {
+    // Sync incident types and statuses if needed (fire-and-forget)
+    if (this.isBackendHealthy) {
+      this.refreshIncidentConfigs();
+    }
+
+    // Get local incidents (all incidents, will be filtered by resident's condominium)
+    const localIncidents = await db.incidents
+      .orderBy('reported_at')
+      .reverse()
+      .toArray();
+
+    // If online, sync and merge with backend
+    if (this.isBackendHealthy && this.currentCondoId) {
+      try {
+        // Fetch only NEW incidents from backend (for offline cache)
+        const backendIncidents = await SupabaseService.getIncidents(this.currentCondoId);
+
+        // Cache backend NEW incidents locally (bulkPut will update/insert)
+        if (backendIncidents.length > 0) {
+          await db.incidents.bulkPut(backendIncidents);
+        }
+
+        // Return all local incidents (includes NEW from backend + locally updated incidents)
+        // This ensures guards can see incidents they've acknowledged/worked on
+        const allLocalIncidents = await db.incidents
+          .orderBy('reported_at')
+          .reverse()
+          .toArray();
+
+        return allLocalIncidents.filter(inc => {
+          if (inc.resident && inc.resident.condominium_id === this.currentCondoId) {
+            return true;
+          }
+          return !inc.resident;
+        });
+      } catch (e) {
+        console.error("[DataService] Failed to sync incidents", e);
+        this.backendHealthScore--;
+      }
+    }
+
+    // Offline: return only local incidents
+    // Filter by condominium through resident relationship (if cached)
+    return localIncidents.filter(inc => {
+      // If resident info is cached and condominium_id matches, include it
+      if (inc.resident && inc.resident.condominium_id === this.currentCondoId) {
+        return true;
+      }
+      // If no resident info, include it (will show all cached incidents)
+      return !inc.resident;
+    });
+  }
+
+  async acknowledgeIncident(id: number, staffId: number): Promise<void> {
+    const incident = await db.incidents.get(id);
+    if (!incident) throw new Error("Incident not found");
+
+    // Update incident status to "acknowledged"
+    incident.status = 'acknowledged';
+    incident.acknowledged_by = staffId;
+    incident.acknowledged_at = new Date().toISOString();
+    incident.sync_status = SyncStatus.PENDING_SYNC;
+
+    // Update locally
+    await db.incidents.put(incident);
+
+    // Try to sync if online
+    if (this.isBackendHealthy) {
+      try {
+        const success = await SupabaseService.acknowledgeIncident(id, staffId);
+        if (success) {
+          incident.sync_status = SyncStatus.SYNCED;
+          await db.incidents.put(incident);
+        }
+      } catch (e) {
+        console.warn("[DataService] Incident acknowledged locally, will sync later");
+        this.backendHealthScore--;
+      }
+    }
+  }
+
+  async reportIncidentAction(id: number, guardNotes: string, newStatus: string): Promise<void> {
+    const incident = await db.incidents.get(id);
+    if (!incident) throw new Error("Incident not found");
+
+    // Concatenate new notes with existing notes to preserve history
+    const timestamp = new Date().toLocaleString('pt-PT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const formattedNewNote = `[${timestamp}] ${guardNotes}`;
+
+    if (incident.guard_notes && incident.guard_notes.trim()) {
+      incident.guard_notes = `${incident.guard_notes}\n---\n${formattedNewNote}`;
+    } else {
+      incident.guard_notes = formattedNewNote;
+    }
+
+    incident.status = newStatus;
+
+    // Add resolved timestamp if resolving
+    if (newStatus === 'resolved') {
+      incident.resolved_at = new Date().toISOString();
+    }
+
+    incident.sync_status = SyncStatus.PENDING_SYNC;
+
+    // Update locally
+    await db.incidents.put(incident);
+
+    // Try to sync if online
+    if (this.isBackendHealthy) {
+      try {
+        const success = await SupabaseService.reportIncidentAction(id, guardNotes, newStatus);
+        if (success) {
+          incident.sync_status = SyncStatus.SYNCED;
+          await db.incidents.put(incident);
+        }
+      } catch (e) {
+        console.warn("[DataService] Incident action reported locally, will sync later");
+        this.backendHealthScore--;
+      }
+    }
+  }
+
   checkOnline(): boolean { return this.isOnline; }
 }
 
