@@ -1,7 +1,194 @@
-import React from 'react';
-import { UserCircle, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, Plus, Edit2, Trash2, Loader2, Search, X, Building2, Home } from 'lucide-react';
+import { api } from '../../services/dataService';
+import { Resident, Condominium, Unit } from '../../types';
+import { useToast } from '../../components/Toast';
 
 export default function AdminResidents() {
+  const { showToast, showConfirm } = useToast();
+  const [residents, setResidents] = useState<Resident[]>([]);
+  const [condominiums, setCondominiums] = useState<Condominium[]>([]);
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCondoId, setFilterCondoId] = useState<number | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    condominium_id: null as number | null,
+    unit_id: null as number | null,
+    name: '',
+    email: '',
+    phone: '',
+    type: 'OWNER' as 'OWNER' | 'TENANT'
+  });
+
+  useEffect(() => {
+    loadData();
+  }, [filterCondoId]);
+
+  useEffect(() => {
+    // Load units when condominium is selected
+    if (formData.condominium_id) {
+      loadUnitsForCondominium(formData.condominium_id);
+    } else {
+      setUnits([]);
+    }
+  }, [formData.condominium_id]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [residentsData, condosData] = await Promise.all([
+        api.adminGetAllResidents(filterCondoId || undefined),
+        api.adminGetAllCondominiums()
+      ]);
+      setResidents(residentsData);
+      setCondominiums(condosData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadUnitsForCondominium = async (condoId: number) => {
+    try {
+      const unitsData = await api.adminGetAllUnits(condoId);
+      setUnits(unitsData);
+    } catch (error) {
+      console.error('Error loading units:', error);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!formData.condominium_id) {
+      showToast('warning', 'Condomínio é obrigatório');
+      return;
+    }
+    if (!formData.unit_id) {
+      showToast('warning', 'Unidade é obrigatória');
+      return;
+    }
+    if (!formData.name.trim()) {
+      showToast('warning', 'Nome é obrigatório');
+      return;
+    }
+
+    try {
+      const result = await api.adminCreateResident(formData);
+      if (result) {
+        await loadData();
+        setShowCreateModal(false);
+        resetForm();
+        showToast('success', 'Residente criado com sucesso!');
+      } else {
+        showToast('error', 'Erro ao criar residente');
+      }
+    } catch (error) {
+      console.error('Error creating resident:', error);
+      showToast('error', 'Erro ao criar residente');
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!selectedResident) return;
+    if (!formData.name.trim()) {
+      showToast('warning', 'Nome é obrigatório');
+      return;
+    }
+
+    try {
+      const result = await api.adminUpdateResident(String(selectedResident.id), formData);
+      if (result) {
+        await loadData();
+        setShowEditModal(false);
+        setSelectedResident(null);
+        resetForm();
+        showToast('success', 'Residente atualizado com sucesso!');
+      } else {
+        showToast('error', 'Erro ao atualizar residente');
+      }
+    } catch (error) {
+      console.error('Error updating resident:', error);
+      showToast('error', 'Erro ao atualizar residente');
+    }
+  };
+
+  const handleDelete = async (resident: Resident) => {
+    showConfirm(
+      `Deseja realmente remover o residente ${resident.name}?`,
+      async () => {
+        try {
+          const result = await api.adminDeleteResident(String(resident.id));
+          if (result) {
+            await loadData();
+            showToast('success', 'Residente removido com sucesso!');
+          } else {
+            showToast('error', 'Erro ao remover residente');
+          }
+        } catch (error) {
+          console.error('Error deleting resident:', error);
+          showToast('error', 'Erro ao remover residente');
+        }
+      }
+    );
+  };
+
+  const openEditModal = async (resident: Resident) => {
+    setSelectedResident(resident);
+    setFormData({
+      condominium_id: resident.condominium_id,
+      unit_id: resident.unit_id,
+      name: resident.name,
+      email: resident.email || '',
+      phone: resident.phone || '',
+      type: resident.type || 'OWNER'
+    });
+    // Load units for the resident's condominium
+    await loadUnitsForCondominium(resident.condominium_id);
+    setShowEditModal(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      condominium_id: null,
+      unit_id: null,
+      name: '',
+      email: '',
+      phone: '',
+      type: 'OWNER'
+    });
+    setUnits([]);
+  };
+
+  const getCondominiumName = (condoId: number) => {
+    const condo = condominiums.find(c => c.id === condoId);
+    return condo?.name || 'Desconhecido';
+  };
+
+  const getUnitInfo = (unitId: number) => {
+    const unit = units.find(u => u.id === unitId);
+    if (unit) {
+      return `${unit.code_block} ${unit.number}`;
+    }
+    // If unit not found in current units list, try to find in resident's unit_id
+    const resident = residents.find(r => r.unit_id === unitId);
+    if (resident) {
+      return `Unidade ${unitId}`;
+    }
+    return 'Desconhecida';
+  };
+
+  const filteredResidents = residents.filter(resident =>
+    resident.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    resident.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    resident.phone?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
@@ -9,17 +196,372 @@ export default function AdminResidents() {
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Residentes</h1>
           <p className="text-slate-600">Gerir residentes e proprietários das unidades</p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-colors">
+        <button
+          onClick={() => {
+            resetForm();
+            setShowCreateModal(true);
+          }}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-colors"
+        >
           <Plus size={20} />
           Novo Residente
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
-        <UserCircle size={64} className="text-slate-300 mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-slate-800 mb-2">Em Construção</h3>
-        <p className="text-slate-600">Esta funcionalidade será implementada em breve.</p>
+      {/* Filters */}
+      <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-3 text-slate-400" size={20} />
+          <input
+            type="text"
+            placeholder="Buscar por nome, email ou telefone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <select
+          value={filterCondoId || ''}
+          onChange={(e) => setFilterCondoId(e.target.value ? parseInt(e.target.value) : null)}
+          className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos os Condomínios</option>
+          {condominiums.map(condo => (
+            <option key={condo.id} value={condo.id}>{condo.name}</option>
+          ))}
+        </select>
       </div>
+
+      {/* Residents List */}
+      {loading ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+          <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
+          <p className="text-slate-600">Carregando residentes...</p>
+        </div>
+      ) : filteredResidents.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+          <Users size={64} className="text-slate-300 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-slate-800 mb-2">
+            {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum residente cadastrado'}
+          </h3>
+          <p className="text-slate-600">
+            {searchTerm
+              ? 'Tente buscar com outros termos'
+              : 'Clique em "Novo Residente" para começar'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {filteredResidents.map((resident) => (
+            <div
+              key={resident.id}
+              className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <Users className="text-blue-600" size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="text-lg font-bold text-slate-900">
+                        {resident.name}
+                      </h3>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                        resident.type === 'OWNER'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-green-100 text-green-700'
+                      }`}>
+                        {resident.type === 'OWNER' ? 'Proprietário' : 'Inquilino'}
+                      </span>
+                    </div>
+                    <div className="space-y-1 text-sm text-slate-600">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1">
+                          <Building2 size={14} />
+                          <span>{getCondominiumName(resident.condominium_id)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Home size={14} />
+                          <span>{getUnitInfo(resident.unit_id)}</span>
+                        </div>
+                      </div>
+                      {resident.email && (
+                        <p className="text-slate-500">{resident.email}</p>
+                      )}
+                      {resident.phone && (
+                        <p className="text-slate-500">{resident.phone}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => openEditModal(resident)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Editar"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(resident)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Remover"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-slate-900">Novo Residente</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Condomínio <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.condominium_id || ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      condominium_id: e.target.value ? parseInt(e.target.value) : null,
+                      unit_id: null
+                    })
+                  }
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecione um condomínio</option>
+                  {condominiums
+                    .filter(c => c.status === 'ACTIVE')
+                    .map(condo => (
+                      <option key={condo.id} value={condo.id}>{condo.name}</option>
+                    ))
+                  }
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Unidade <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.unit_id || ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      unit_id: e.target.value ? parseInt(e.target.value) : null
+                    })
+                  }
+                  disabled={!formData.condominium_id}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                >
+                  <option value="">Selecione uma unidade</option>
+                  {units.map(unit => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.code_block} {unit.number} {unit.building_name ? `- ${unit.building_name}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Nome <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nome completo do residente"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Telefone</label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="+351 912 345 678"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Tipo <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value as 'OWNER' | 'TENANT' })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="OWNER">Proprietário</option>
+                  <option value="TENANT">Inquilino</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreate}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Criar Residente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && selectedResident && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-slate-900">Editar Residente</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setSelectedResident(null);
+                }}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Condomínio (Apenas Leitura)
+                </label>
+                <input
+                  type="text"
+                  value={getCondominiumName(selectedResident.condominium_id)}
+                  disabled
+                  className="w-full px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-600 cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Unidade <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.unit_id || ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      unit_id: e.target.value ? parseInt(e.target.value) : null
+                    })
+                  }
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecione uma unidade</option>
+                  {units.map(unit => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.code_block} {unit.number} {unit.building_name ? `- ${unit.building_name}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Nome <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nome completo do residente"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Telefone</label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="+351 912 345 678"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Tipo <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value as 'OWNER' | 'TENANT' })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="OWNER">Proprietário</option>
+                  <option value="TENANT">Inquilino</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setSelectedResident(null);
+                }}
+                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEdit}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Salvar Alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

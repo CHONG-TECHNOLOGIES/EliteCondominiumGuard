@@ -256,26 +256,29 @@ export default function Dashboard() {
 
                   {/* Quick Actions */}
                   <div className="w-full md:w-auto flex gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-slate-50 mt-2 md:mt-0">
-                    <button
-                      onClick={() => handleContactResident(visit)}
-                      className="flex-1 md:flex-none h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
-                    >
-                      <Phone size={18} /> Contactar morador
-                    </button>
-
+                    {/* PENDING: Show "Contact Resident" + "Authorize" buttons */}
                     {visit.status === VisitStatus.PENDING && (
-                      <button
-                        disabled
-                        className="flex-1 md:flex-none h-12 px-6 bg-emerald-300 text-emerald-700 rounded-xl font-bold flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
-                      >
-                        <CheckCircle size={18} /> Autorizar
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleContactResident(visit)}
+                          className="flex-1 md:flex-none h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
+                        >
+                          <Phone size={18} /> Contactar morador
+                        </button>
+                        <button
+                          disabled
+                          className="flex-1 md:flex-none h-12 px-6 bg-emerald-300 text-emerald-700 rounded-xl font-bold flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
+                        >
+                          <CheckCircle size={18} /> Autorizar
+                        </button>
+                      </>
                     )}
 
+                    {/* APPROVED/INSIDE: Show only "Mark Exit" button (enabled) */}
                     {(visit.status === VisitStatus.APPROVED || visit.status === VisitStatus.INSIDE) && (
                       <button
-                        disabled
-                        className="flex-1 md:flex-none h-12 px-6 bg-slate-200 text-slate-500 rounded-xl font-bold flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
+                        onClick={() => handleQuickAction(visit, 'CHECKOUT')}
+                        className="flex-1 md:flex-none h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
                       >
                         <LogOut size={18} /> Marcar Saída
                       </button>

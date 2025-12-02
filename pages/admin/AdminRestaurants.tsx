@@ -1,7 +1,148 @@
-import React from 'react';
-import { Utensils, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Utensils, Plus, Edit2, Trash2, Loader2, Search, X, Building2 } from 'lucide-react';
+import { api } from '../../services/dataService';
+import { Restaurant, Condominium } from '../../types';
+import { useToast } from '../../components/Toast';
 
 export default function AdminRestaurants() {
+  const { showToast, showConfirm } = useToast();
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [condominiums, setCondominiums] = useState<Condominium[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCondoId, setFilterCondoId] = useState<number | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    condominium_id: null as number | null,
+    name: '',
+    description: '',
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE'
+  });
+
+  useEffect(() => {
+    loadData();
+  }, [filterCondoId]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [restaurantsData, condosData] = await Promise.all([
+        api.adminGetAllRestaurants(filterCondoId || undefined),
+        api.adminGetAllCondominiums()
+      ]);
+      setRestaurants(restaurantsData);
+      setCondominiums(condosData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!formData.condominium_id) {
+      showToast('warning', 'Condomínio é obrigatório');
+      return;
+    }
+    if (!formData.name.trim()) {
+      showToast('warning', 'Nome é obrigatório');
+      return;
+    }
+
+    try {
+      const result = await api.adminCreateRestaurant(formData);
+      if (result) {
+        await loadData();
+        setShowCreateModal(false);
+        resetForm();
+        showToast('success', 'Restaurante criado com sucesso!');
+      } else {
+        showToast('error', 'Erro ao criar restaurante');
+      }
+    } catch (error) {
+      console.error('Error creating restaurant:', error);
+      showToast('error', 'Erro ao criar restaurante');
+    }
+  };
+
+  const handleEdit = async () => {
+    if (!selectedRestaurant) return;
+    if (!formData.name.trim()) {
+      showToast('warning', 'Nome é obrigatório');
+      return;
+    }
+
+    try {
+      const result = await api.adminUpdateRestaurant(String(selectedRestaurant.id), formData);
+      if (result) {
+        await loadData();
+        setShowEditModal(false);
+        setSelectedRestaurant(null);
+        resetForm();
+        showToast('success', 'Restaurante atualizado com sucesso!');
+      } else {
+        showToast('error', 'Erro ao atualizar restaurante');
+      }
+    } catch (error) {
+      console.error('Error updating restaurant:', error);
+      showToast('error', 'Erro ao atualizar restaurante');
+    }
+  };
+
+  const handleDelete = async (restaurant: Restaurant) => {
+    showConfirm(
+      `Deseja realmente remover o restaurante ${restaurant.name}?`,
+      async () => {
+        try {
+          const result = await api.adminDeleteRestaurant(String(restaurant.id));
+          if (result) {
+            await loadData();
+            showToast('success', 'Restaurante removido com sucesso!');
+          } else {
+            showToast('error', 'Erro ao remover restaurante');
+          }
+        } catch (error) {
+          console.error('Error deleting restaurant:', error);
+          showToast('error', 'Erro ao remover restaurante');
+        }
+      }
+    );
+  };
+
+  const openEditModal = (restaurant: Restaurant) => {
+    setSelectedRestaurant(restaurant);
+    setFormData({
+      condominium_id: restaurant.condominium_id,
+      name: restaurant.name,
+      description: restaurant.description || '',
+      status: restaurant.status || 'ACTIVE'
+    });
+    setShowEditModal(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      condominium_id: null,
+      name: '',
+      description: '',
+      status: 'ACTIVE'
+    });
+  };
+
+  const getCondominiumName = (condoId: number) => {
+    const condo = condominiums.find(c => c.id === condoId);
+    return condo?.name || 'Desconhecido';
+  };
+
+  const filteredRestaurants = restaurants.filter(restaurant =>
+    restaurant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    restaurant.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
@@ -9,17 +150,295 @@ export default function AdminRestaurants() {
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Restaurantes</h1>
           <p className="text-slate-600">Gerir restaurantes e estabelecimentos comerciais</p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-colors">
+        <button
+          onClick={() => {
+            resetForm();
+            setShowCreateModal(true);
+          }}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-colors"
+        >
           <Plus size={20} />
           Novo Restaurante
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
-        <Utensils size={64} className="text-slate-300 mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-slate-800 mb-2">Em Construção</h3>
-        <p className="text-slate-600">Esta funcionalidade será implementada em breve.</p>
+      {/* Filters */}
+      <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-3 text-slate-400" size={20} />
+          <input
+            type="text"
+            placeholder="Buscar por nome ou descrição..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <select
+          value={filterCondoId || ''}
+          onChange={(e) => setFilterCondoId(e.target.value ? parseInt(e.target.value) : null)}
+          className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Todos os Condomínios</option>
+          {condominiums.map(condo => (
+            <option key={condo.id} value={condo.id}>{condo.name}</option>
+          ))}
+        </select>
       </div>
+
+      {/* Restaurants List */}
+      {loading ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+          <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
+          <p className="text-slate-600">Carregando restaurantes...</p>
+        </div>
+      ) : filteredRestaurants.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+          <Utensils size={64} className="text-slate-300 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-slate-800 mb-2">
+            {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum restaurante cadastrado'}
+          </h3>
+          <p className="text-slate-600">
+            {searchTerm
+              ? 'Tente buscar com outros termos'
+              : 'Clique em "Novo Restaurante" para começar'}
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {filteredRestaurants.map((restaurant) => (
+            <div
+              key={restaurant.id}
+              className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="p-2 bg-blue-50 rounded-lg">
+                    <Utensils className="text-blue-600" size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="text-lg font-bold text-slate-900">
+                        {restaurant.name}
+                      </h3>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                        restaurant.status === 'ACTIVE'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {restaurant.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </div>
+                    {restaurant.description && (
+                      <p className="text-sm text-slate-600 mb-2">{restaurant.description}</p>
+                    )}
+                    <div className="flex items-center gap-1 text-sm text-slate-500">
+                      <Building2 size={14} />
+                      <span>{getCondominiumName(restaurant.condominium_id)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => openEditModal(restaurant)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Editar"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(restaurant)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Remover"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-slate-900">Novo Restaurante</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Condomínio <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.condominium_id || ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      condominium_id: e.target.value ? parseInt(e.target.value) : null
+                    })
+                  }
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecione um condomínio</option>
+                  {condominiums
+                    .filter(c => c.status === 'ACTIVE')
+                    .map(condo => (
+                      <option key={condo.id} value={condo.id}>{condo.name}</option>
+                    ))
+                  }
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Nome <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nome do restaurante"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Descrição
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Breve descrição do restaurante"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Status <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as 'ACTIVE' | 'INACTIVE' })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ACTIVE">Ativo</option>
+                  <option value="INACTIVE">Inativo</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreate}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Criar Restaurante
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && selectedRestaurant && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-slate-900">Editar Restaurante</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setSelectedRestaurant(null);
+                }}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Condomínio (Apenas Leitura)
+                </label>
+                <input
+                  type="text"
+                  value={getCondominiumName(selectedRestaurant.condominium_id)}
+                  disabled
+                  className="w-full px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-600 cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Nome <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nome do restaurante"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Descrição
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Breve descrição do restaurante"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Status <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as 'ACTIVE' | 'INACTIVE' })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="ACTIVE">Ativo</option>
+                  <option value="INACTIVE">Inativo</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setSelectedRestaurant(null);
+                }}
+                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEdit}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Salvar Alterações
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -807,5 +807,575 @@ export const SupabaseService = {
       console.error("[Admin] Error fetching dashboard stats via RPC:", err.message || JSON.stringify(err));
       return null;
     }
+  },
+
+  // --- ADMIN CRUD OPERATIONS ---
+
+  /**
+   * Admin: Create a new condominium
+   */
+  async adminCreateCondominium(condo: Partial<Condominium>): Promise<Condominium | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('condominiums')
+        .insert({
+          name: condo.name,
+          address: condo.address,
+          logo_url: condo.logo_url,
+          latitude: condo.latitude,
+          longitude: condo.longitude,
+          gps_radius_meters: condo.gps_radius_meters,
+          status: condo.status || 'ACTIVE'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Condominium;
+    } catch (err: any) {
+      console.error("[Admin] Error creating condominium:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Update an existing condominium
+   */
+  async adminUpdateCondominium(id: number, updates: Partial<Condominium>): Promise<Condominium | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('condominiums')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Condominium;
+    } catch (err: any) {
+      console.error("[Admin] Error updating condominium:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Disable/Enable a condominium (soft delete)
+   */
+  async adminToggleCondominiumStatus(id: number, status: 'ACTIVE' | 'INACTIVE'): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('condominiums')
+        .update({ status })
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("[Admin] Error toggling condominium status:", err.message || JSON.stringify(err));
+      return false;
+    }
+  },
+
+  /**
+   * Admin: Update a device
+   */
+  async adminUpdateDevice(id: string, updates: Partial<Device>): Promise<Device | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('devices')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Device;
+    } catch (err: any) {
+      console.error("[Admin] Error updating device:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Decommission a device
+   */
+  async adminDecommissionDevice(id: string): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('devices')
+        .update({ status: 'DECOMMISSIONED' })
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("[Admin] Error decommissioning device:", err.message || JSON.stringify(err));
+      return false;
+    }
+  },
+
+  /**
+   * Admin: Get all devices (cross-condominium)
+   */
+  async adminGetAllDevices(condominiumId?: number): Promise<Device[]> {
+    if (!supabase) return [];
+
+    try {
+      let query = supabase
+        .from('devices')
+        .select('*')
+        .order('last_seen_at', { ascending: false });
+
+      if (condominiumId) {
+        query = query.eq('condominium_id', condominiumId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return (data as Device[]) || [];
+    } catch (err: any) {
+      console.error("[Admin] Error fetching devices:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  /**
+   * Admin: Create a new staff member
+   */
+  async adminCreateStaff(staff: Partial<Staff>): Promise<Staff | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('staff')
+        .insert({
+          first_name: staff.first_name,
+          last_name: staff.last_name,
+          condominium_id: staff.condominium_id,
+          role: staff.role,
+          pin_hash: staff.pin_hash
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Staff;
+    } catch (err: any) {
+      console.error("[Admin] Error creating staff:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Update an existing staff member
+   */
+  async adminUpdateStaff(id: number, updates: Partial<Staff>): Promise<Staff | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('staff')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Staff;
+    } catch (err: any) {
+      console.error("[Admin] Error updating staff:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Delete a staff member
+   */
+  async adminDeleteStaff(id: number): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('staff')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("[Admin] Error deleting staff:", err.message || JSON.stringify(err));
+      return false;
+    }
+  },
+
+  // --- UNITS CRUD ---
+
+  /**
+   * Admin: Create a new unit
+   */
+  async adminCreateUnit(unit: Partial<Unit>): Promise<Unit | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('units')
+        .insert({
+          condominium_id: unit.condominium_id,
+          code_block: unit.code_block,
+          number: unit.number,
+          floor: unit.floor,
+          building_name: unit.building_name
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Unit;
+    } catch (err: any) {
+      console.error("[Admin] Error creating unit:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Update an existing unit
+   */
+  async adminUpdateUnit(id: string, updates: Partial<Unit>): Promise<Unit | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('units')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Unit;
+    } catch (err: any) {
+      console.error("[Admin] Error updating unit:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Delete a unit
+   */
+  async adminDeleteUnit(id: string): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('units')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("[Admin] Error deleting unit:", err.message || JSON.stringify(err));
+      return false;
+    }
+  },
+
+  // --- RESIDENTS CRUD ---
+
+  /**
+   * Admin: Get all residents (cross-condominium)
+   */
+  async adminGetAllResidents(condominiumId?: number): Promise<any[]> {
+    if (!supabase) return [];
+
+    try {
+      let query = supabase
+        .from('residents')
+        .select('*, unit:units(*), condominium:condominiums(*)')
+        .order('name', { ascending: true });
+
+      if (condominiumId) {
+        query = query.eq('condominium_id', condominiumId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data || [];
+    } catch (err: any) {
+      console.error("[Admin] Error fetching residents:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  /**
+   * Admin: Create a new resident
+   */
+  async adminCreateResident(resident: any): Promise<any | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('residents')
+        .insert({
+          name: resident.name,
+          email: resident.email,
+          phone: resident.phone,
+          condominium_id: resident.condominium_id,
+          unit_id: resident.unit_id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      console.error("[Admin] Error creating resident:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Update an existing resident
+   */
+  async adminUpdateResident(id: string, updates: any): Promise<any | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('residents')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      console.error("[Admin] Error updating resident:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Delete a resident
+   */
+  async adminDeleteResident(id: string): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('residents')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("[Admin] Error deleting resident:", err.message || JSON.stringify(err));
+      return false;
+    }
+  },
+
+  // --- RESTAURANTS CRUD ---
+
+  /**
+   * Admin: Get all restaurants (cross-condominium)
+   */
+  async adminGetAllRestaurants(condominiumId?: number): Promise<Restaurant[]> {
+    if (!supabase) return [];
+
+    try {
+      let query = supabase
+        .from('restaurants')
+        .select('*, condominium:condominiums(*)')
+        .order('name', { ascending: true });
+
+      if (condominiumId) {
+        query = query.eq('condominium_id', condominiumId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return (data as Restaurant[]) || [];
+    } catch (err: any) {
+      console.error("[Admin] Error fetching restaurants:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  /**
+   * Admin: Create a new restaurant
+   */
+  async adminCreateRestaurant(restaurant: Partial<Restaurant>): Promise<Restaurant | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .insert({
+          name: restaurant.name,
+          description: restaurant.description,
+          condominium_id: restaurant.condominium_id,
+          status: restaurant.status || 'ACTIVE'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Restaurant;
+    } catch (err: any) {
+      console.error("[Admin] Error creating restaurant:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Update an existing restaurant
+   */
+  async adminUpdateRestaurant(id: string, updates: Partial<Restaurant>): Promise<Restaurant | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Restaurant;
+    } catch (err: any) {
+      console.error("[Admin] Error updating restaurant:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Delete a restaurant
+   */
+  async adminDeleteRestaurant(id: string): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('restaurants')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("[Admin] Error deleting restaurant:", err.message || JSON.stringify(err));
+      return false;
+    }
+  },
+
+  // --- SPORTS CRUD ---
+
+  /**
+   * Admin: Get all sports facilities (cross-condominium)
+   */
+  async adminGetAllSports(condominiumId?: number): Promise<Sport[]> {
+    if (!supabase) return [];
+
+    try {
+      let query = supabase
+        .from('sports')
+        .select('*, condominium:condominiums(*)')
+        .order('name', { ascending: true });
+
+      if (condominiumId) {
+        query = query.eq('condominium_id', condominiumId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return (data as Sport[]) || [];
+    } catch (err: any) {
+      console.error("[Admin] Error fetching sports:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  /**
+   * Admin: Create a new sport facility
+   */
+  async adminCreateSport(sport: Partial<Sport>): Promise<Sport | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('sports')
+        .insert({
+          name: sport.name,
+          description: sport.description,
+          condominium_id: sport.condominium_id,
+          status: sport.status || 'ACTIVE'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Sport;
+    } catch (err: any) {
+      console.error("[Admin] Error creating sport:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Update an existing sport facility
+   */
+  async adminUpdateSport(id: string, updates: Partial<Sport>): Promise<Sport | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('sports')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Sport;
+    } catch (err: any) {
+      console.error("[Admin] Error updating sport:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Delete a sport facility
+   */
+  async adminDeleteSport(id: string): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('sports')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("[Admin] Error deleting sport:", err.message || JSON.stringify(err));
+      return false;
+    }
   }
 };

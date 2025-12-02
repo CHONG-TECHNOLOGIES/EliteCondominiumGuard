@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, Restaurant, Sport } from '../types';
+import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, Device, Restaurant, Sport } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 
@@ -1079,6 +1079,304 @@ class DataService {
     } catch (error) {
       console.error('[Admin] Error fetching dashboard stats (online required):', error);
       return null;
+    }
+  }
+
+  // --- ADMIN CRUD OPERATIONS ---
+
+  /**
+   * Admin: Create a new condominium
+   */
+  async adminCreateCondominium(condo: Partial<Condominium>): Promise<Condominium | null> {
+    try {
+      return await SupabaseService.adminCreateCondominium(condo);
+    } catch (e) {
+      console.error('[Admin] Failed to create condominium (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Update an existing condominium
+   */
+  async adminUpdateCondominium(id: number, updates: Partial<Condominium>): Promise<Condominium | null> {
+    try {
+      return await SupabaseService.adminUpdateCondominium(id, updates);
+    } catch (e) {
+      console.error('[Admin] Failed to update condominium (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Toggle condominium status (ACTIVE/INACTIVE)
+   */
+  async adminToggleCondominiumStatus(id: number, status: 'ACTIVE' | 'INACTIVE'): Promise<boolean> {
+    try {
+      return await SupabaseService.adminToggleCondominiumStatus(id, status);
+    } catch (e) {
+      console.error('[Admin] Failed to toggle condominium status (online required):', e);
+      return false;
+    }
+  }
+
+  /**
+   * Admin: Get all devices (cross-condominium)
+   */
+  async adminGetAllDevices(condominiumId?: number): Promise<Device[]> {
+    try {
+      return await SupabaseService.adminGetAllDevices(condominiumId);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch devices (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Update a device
+   */
+  async adminUpdateDevice(id: string, updates: Partial<Device>): Promise<Device | null> {
+    try {
+      return await SupabaseService.adminUpdateDevice(id, updates);
+    } catch (e) {
+      console.error('[Admin] Failed to update device (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Decommission a device
+   */
+  async adminDecommissionDevice(id: string): Promise<boolean> {
+    try {
+      return await SupabaseService.adminDecommissionDevice(id);
+    } catch (e) {
+      console.error('[Admin] Failed to decommission device (online required):', e);
+      return false;
+    }
+  }
+
+  /**
+   * Admin: Create a new staff member
+   */
+  async adminCreateStaff(staff: Partial<Staff>): Promise<Staff | null> {
+    try {
+      return await SupabaseService.adminCreateStaff(staff);
+    } catch (e) {
+      console.error('[Admin] Failed to create staff (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Update an existing staff member
+   */
+  async adminUpdateStaff(id: number, updates: Partial<Staff>): Promise<Staff | null> {
+    try {
+      return await SupabaseService.adminUpdateStaff(id, updates);
+    } catch (e) {
+      console.error('[Admin] Failed to update staff (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Delete a staff member
+   */
+  async adminDeleteStaff(id: number): Promise<boolean> {
+    try {
+      return await SupabaseService.adminDeleteStaff(id);
+    } catch (e) {
+      console.error('[Admin] Failed to delete staff (online required):', e);
+      return false;
+    }
+  }
+
+  // --- UNITS CRUD ---
+
+  /**
+   * Admin: Create a new unit
+   */
+  async adminCreateUnit(unit: Partial<Unit>): Promise<Unit | null> {
+    try {
+      return await SupabaseService.adminCreateUnit(unit);
+    } catch (e) {
+      console.error('[Admin] Failed to create unit (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Update an existing unit
+   */
+  async adminUpdateUnit(id: string, updates: Partial<Unit>): Promise<Unit | null> {
+    try {
+      return await SupabaseService.adminUpdateUnit(id, updates);
+    } catch (e) {
+      console.error('[Admin] Failed to update unit (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Delete a unit
+   */
+  async adminDeleteUnit(id: string): Promise<boolean> {
+    try {
+      return await SupabaseService.adminDeleteUnit(id);
+    } catch (e) {
+      console.error('[Admin] Failed to delete unit (online required):', e);
+      return false;
+    }
+  }
+
+  // --- RESIDENTS CRUD ---
+
+  /**
+   * Admin: Get all residents (cross-condominium)
+   */
+  async adminGetAllResidents(condominiumId?: number): Promise<any[]> {
+    try {
+      return await SupabaseService.adminGetAllResidents(condominiumId);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch residents (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Create a new resident
+   */
+  async adminCreateResident(resident: any): Promise<any | null> {
+    try {
+      return await SupabaseService.adminCreateResident(resident);
+    } catch (e) {
+      console.error('[Admin] Failed to create resident (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Update an existing resident
+   */
+  async adminUpdateResident(id: string, updates: any): Promise<any | null> {
+    try {
+      return await SupabaseService.adminUpdateResident(id, updates);
+    } catch (e) {
+      console.error('[Admin] Failed to update resident (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Delete a resident
+   */
+  async adminDeleteResident(id: string): Promise<boolean> {
+    try {
+      return await SupabaseService.adminDeleteResident(id);
+    } catch (e) {
+      console.error('[Admin] Failed to delete resident (online required):', e);
+      return false;
+    }
+  }
+
+  // --- RESTAURANTS CRUD ---
+
+  /**
+   * Admin: Get all restaurants (cross-condominium)
+   */
+  async adminGetAllRestaurants(condominiumId?: number): Promise<Restaurant[]> {
+    try {
+      return await SupabaseService.adminGetAllRestaurants(condominiumId);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch restaurants (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Create a new restaurant
+   */
+  async adminCreateRestaurant(restaurant: Partial<Restaurant>): Promise<Restaurant | null> {
+    try {
+      return await SupabaseService.adminCreateRestaurant(restaurant);
+    } catch (e) {
+      console.error('[Admin] Failed to create restaurant (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Update an existing restaurant
+   */
+  async adminUpdateRestaurant(id: string, updates: Partial<Restaurant>): Promise<Restaurant | null> {
+    try {
+      return await SupabaseService.adminUpdateRestaurant(id, updates);
+    } catch (e) {
+      console.error('[Admin] Failed to update restaurant (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Delete a restaurant
+   */
+  async adminDeleteRestaurant(id: string): Promise<boolean> {
+    try {
+      return await SupabaseService.adminDeleteRestaurant(id);
+    } catch (e) {
+      console.error('[Admin] Failed to delete restaurant (online required):', e);
+      return false;
+    }
+  }
+
+  // --- SPORTS CRUD ---
+
+  /**
+   * Admin: Get all sports facilities (cross-condominium)
+   */
+  async adminGetAllSports(condominiumId?: number): Promise<Sport[]> {
+    try {
+      return await SupabaseService.adminGetAllSports(condominiumId);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch sports (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Create a new sport facility
+   */
+  async adminCreateSport(sport: Partial<Sport>): Promise<Sport | null> {
+    try {
+      return await SupabaseService.adminCreateSport(sport);
+    } catch (e) {
+      console.error('[Admin] Failed to create sport (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Update an existing sport facility
+   */
+  async adminUpdateSport(id: string, updates: Partial<Sport>): Promise<Sport | null> {
+    try {
+      return await SupabaseService.adminUpdateSport(id, updates);
+    } catch (e) {
+      console.error('[Admin] Failed to update sport (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Delete a sport facility
+   */
+  async adminDeleteSport(id: string): Promise<boolean> {
+    try {
+      return await SupabaseService.adminDeleteSport(id);
+    } catch (e) {
+      console.error('[Admin] Failed to delete sport (online required):', e);
+      return false;
     }
   }
 }

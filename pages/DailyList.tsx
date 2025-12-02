@@ -103,24 +103,29 @@ export default function DailyList() {
                  </div>
 
                  <div className="flex justify-end gap-2 mt-2">
-                    <button
-                      onClick={() => handleContactResident(visit)}
-                      className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm flex justify-center items-center gap-2 hover:bg-blue-700 transition-colors"
-                    >
-                      <Phone size={16}/> Contactar morador
-                    </button>
+                    {/* PENDING: Show "Contact Resident" + "Authorize" buttons */}
                     {visit.status === VisitStatus.PENDING && (
-                      <button
-                        disabled
-                        className="flex-1 px-3 py-2 bg-green-300 text-green-700 rounded-lg font-bold text-sm flex justify-center items-center gap-2 opacity-50 cursor-not-allowed"
-                      >
-                        <CheckCircle size={16}/> Autorizar
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleContactResident(visit)}
+                          className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm flex justify-center items-center gap-2 hover:bg-blue-700 transition-colors"
+                        >
+                          <Phone size={16}/> Contactar morador
+                        </button>
+                        <button
+                          disabled
+                          className="flex-1 px-3 py-2 bg-green-300 text-green-700 rounded-lg font-bold text-sm flex justify-center items-center gap-2 opacity-50 cursor-not-allowed"
+                        >
+                          <CheckCircle size={16}/> Autorizar
+                        </button>
+                      </>
                     )}
-                    {(visit.status === VisitStatus.APPROVED || visit.status === VisitStatus.INSIDE || visit.status === VisitStatus.PENDING) && (
+
+                    {/* APPROVED/INSIDE: Show only "Mark Exit" button (enabled) */}
+                    {(visit.status === VisitStatus.APPROVED || visit.status === VisitStatus.INSIDE) && (
                       <button
-                        disabled
-                        className="flex-1 px-3 py-2 bg-slate-200 text-slate-500 rounded-lg font-bold text-sm flex justify-center items-center gap-2 opacity-50 cursor-not-allowed"
+                        onClick={() => handleCheckout(visit.id)}
+                        className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm flex justify-center items-center gap-2 hover:bg-emerald-700 transition-colors"
                       >
                         <LogOut size={16}/> Saída
                       </button>
@@ -182,24 +187,29 @@ export default function DailyList() {
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => handleContactResident(visit)}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 flex items-center gap-2 transition-colors"
-                          >
-                            <Phone size={16}/> Contactar morador
-                          </button>
+                          {/* PENDING: Show "Contact Resident" + "Authorize" buttons */}
                           {visit.status === VisitStatus.PENDING && (
-                            <button
-                              disabled
-                              className="px-4 py-2 bg-green-300 text-green-700 rounded-lg font-bold text-sm flex items-center gap-2 opacity-50 cursor-not-allowed"
-                            >
-                              <CheckCircle size={16}/> Autorizar
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleContactResident(visit)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 flex items-center gap-2 transition-colors"
+                              >
+                                <Phone size={16}/> Contactar morador
+                              </button>
+                              <button
+                                disabled
+                                className="px-4 py-2 bg-green-300 text-green-700 rounded-lg font-bold text-sm flex items-center gap-2 opacity-50 cursor-not-allowed"
+                              >
+                                <CheckCircle size={16}/> Autorizar
+                              </button>
+                            </>
                           )}
-                          {(visit.status === VisitStatus.APPROVED || visit.status === VisitStatus.INSIDE || visit.status === VisitStatus.PENDING) && (
+
+                          {/* APPROVED/INSIDE: Show only "Mark Exit" button (enabled) */}
+                          {(visit.status === VisitStatus.APPROVED || visit.status === VisitStatus.INSIDE) && (
                             <button
-                              disabled
-                              className="px-4 py-2 bg-slate-200 text-slate-500 rounded-lg font-bold text-sm flex items-center gap-2 opacity-50 cursor-not-allowed"
+                              onClick={() => handleCheckout(visit.id)}
+                              className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 flex items-center gap-2 transition-colors"
                             >
                               <LogOut size={16}/> Saída
                             </button>
