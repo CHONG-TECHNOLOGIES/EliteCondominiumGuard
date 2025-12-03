@@ -1770,7 +1770,50 @@ export const SupabaseService = {
     if (!supabase) return { logs: [], total: 0 };
 
     try {
-      // Build query with joins for display data
+      // Method 1: Use RPC function (recommended for better performance)
+      // This requires the admin_get_audit_logs RPC function to be created in Supabase
+      const USE_RPC = false; // Set to true after running the audit logging migration
+
+      if (USE_RPC) {
+        const { data, error } = await supabase.rpc('admin_get_audit_logs', {
+          p_start_date: filters?.startDate || null,
+          p_end_date: filters?.endDate || null,
+          p_condominium_id: filters?.condominiumId || null,
+          p_actor_id: filters?.actorId || null,
+          p_action: filters?.action || null,
+          p_target_table: filters?.targetTable || null,
+          p_limit: limit,
+          p_offset: offset
+        });
+
+        if (error) throw error;
+
+        const logs: AuditLog[] = (data || []).map((row: any) => ({
+          id: row.id,
+          created_at: row.created_at,
+          condominium_id: row.condominium_id,
+          condominium: row.condominium_name ? {
+            id: row.condominium_id,
+            name: row.condominium_name
+          } : undefined,
+          actor_id: row.actor_id,
+          actor: row.actor_first_name ? {
+            id: row.actor_id,
+            first_name: row.actor_first_name,
+            last_name: row.actor_last_name,
+            role: row.actor_role
+          } : undefined,
+          action: row.action,
+          target_table: row.target_table,
+          target_id: row.target_id,
+          details: row.details
+        }));
+
+        const total = data && data.length > 0 ? data[0].total_count : 0;
+        return { logs, total };
+      }
+
+      // Method 2: Direct table query with joins (fallback)
       let query = supabase
         .from('audit_logs')
         .select(`
