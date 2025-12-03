@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, Device, Restaurant, Sport } from '../types';
+import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 
@@ -1377,6 +1377,190 @@ class DataService {
     } catch (e) {
       console.error('[Admin] Failed to delete sport (online required):', e);
       return false;
+    }
+  }
+
+  // --- VISIT OPERATIONS ---
+
+  /**
+   * Admin: Update visit status
+   */
+  async adminUpdateVisitStatus(id: number, status: VisitStatus): Promise<Visit | null> {
+    try {
+      return await SupabaseService.adminUpdateVisitStatus(id, status);
+    } catch (e) {
+      console.error('[Admin] Failed to update visit status (online required):', e);
+      return null;
+    }
+  }
+
+  // --- INCIDENT OPERATIONS ---
+
+  /**
+   * Admin: Acknowledge an incident
+   */
+  async adminAcknowledgeIncident(id: number, guardId: number, notes?: string): Promise<Incident | null> {
+    try {
+      return await SupabaseService.adminAcknowledgeIncident(id, guardId, notes);
+    } catch (e) {
+      console.error('[Admin] Failed to acknowledge incident (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Resolve an incident
+   */
+  async adminResolveIncident(id: number, guardId: number, notes?: string): Promise<Incident | null> {
+    try {
+      return await SupabaseService.adminResolveIncident(id, guardId, notes);
+    } catch (e) {
+      console.error('[Admin] Failed to resolve incident (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Update incident notes
+   */
+  async adminUpdateIncidentNotes(id: number, notes: string): Promise<Incident | null> {
+    try {
+      return await SupabaseService.adminUpdateIncidentNotes(id, notes);
+    } catch (e) {
+      console.error('[Admin] Failed to update incident notes (online required):', e);
+      return null;
+    }
+  }
+
+  // --- VISIT TYPES CONFIGURATION ---
+
+  /**
+   * Admin: Get all visit types
+   */
+  async adminGetAllVisitTypes(): Promise<VisitTypeConfig[]> {
+    try {
+      return await SupabaseService.adminGetAllVisitTypes();
+    } catch (e) {
+      console.error('[Admin] Failed to fetch visit types (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Create a new visit type
+   */
+  async adminCreateVisitType(visitType: Partial<VisitTypeConfig>): Promise<VisitTypeConfig | null> {
+    try {
+      return await SupabaseService.adminCreateVisitType(visitType);
+    } catch (e) {
+      console.error('[Admin] Failed to create visit type (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Update an existing visit type
+   */
+  async adminUpdateVisitType(id: number, updates: Partial<VisitTypeConfig>): Promise<VisitTypeConfig | null> {
+    try {
+      return await SupabaseService.adminUpdateVisitType(id, updates);
+    } catch (e) {
+      console.error('[Admin] Failed to update visit type (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Delete a visit type
+   */
+  async adminDeleteVisitType(id: number): Promise<boolean> {
+    try {
+      return await SupabaseService.adminDeleteVisitType(id);
+    } catch (e) {
+      console.error('[Admin] Failed to delete visit type (online required):', e);
+      return false;
+    }
+  }
+
+  // --- SERVICE TYPES CONFIGURATION ---
+
+  /**
+   * Admin: Get all service types
+   */
+  async adminGetAllServiceTypes(): Promise<ServiceTypeConfig[]> {
+    try {
+      return await SupabaseService.adminGetAllServiceTypes();
+    } catch (e) {
+      console.error('[Admin] Failed to fetch service types (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Create a new service type
+   */
+  async adminCreateServiceType(serviceType: Partial<ServiceTypeConfig>): Promise<ServiceTypeConfig | null> {
+    try {
+      return await SupabaseService.adminCreateServiceType(serviceType);
+    } catch (e) {
+      console.error('[Admin] Failed to create service type (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Update an existing service type
+   */
+  async adminUpdateServiceType(id: number, updates: Partial<ServiceTypeConfig>): Promise<ServiceTypeConfig | null> {
+    try {
+      return await SupabaseService.adminUpdateServiceType(id, updates);
+    } catch (e) {
+      console.error('[Admin] Failed to update service type (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Delete a service type
+   */
+  async adminDeleteServiceType(id: number): Promise<boolean> {
+    try {
+      return await SupabaseService.adminDeleteServiceType(id);
+    } catch (e) {
+      console.error('[Admin] Failed to delete service type (online required):', e);
+      return false;
+    }
+  }
+
+  /**
+   * Admin: Get all condominiums with real-time statistics (visits today + open incidents)
+   * For analytics dashboard map display
+   */
+  async adminGetCondominiumStats(): Promise<CondominiumStats[]> {
+    try {
+      return await SupabaseService.adminGetCondominiumStats();
+    } catch (e) {
+      console.error('[Admin] Failed to fetch condominium stats (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Get audit logs with optional filters and pagination
+   */
+  async adminGetAuditLogs(filters?: {
+    startDate?: string;
+    endDate?: string;
+    condominiumId?: number;
+    actorId?: number;
+    action?: string;
+    targetTable?: string;
+  }, limit: number = 100, offset: number = 0): Promise<{ logs: AuditLog[], total: number }> {
+    try {
+      return await SupabaseService.adminGetAuditLogs(filters, limit, offset);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch audit logs (online required):', e);
+      return { logs: [], total: 0 };
     }
   }
 }

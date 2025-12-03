@@ -11,12 +11,15 @@
   "dependencies": {
     "@google/genai": "^1.30.0",
     "@supabase/supabase-js": "^2.86.0",
+    "@types/leaflet": "^1.9.21",
     "bcryptjs": "^2.4.3",
     "dexie": "^4.0.1",
     "html5-qrcode": "^2.3.8",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.554.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.9.6"
   },
   "devDependencies": {
@@ -24,6 +27,8 @@
     "@vitejs/plugin-basic-ssl": "^2.1.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vite-plugin-pwa": "^1.2.0",
+    "workbox-window": "^7.4.0"
   }
 }

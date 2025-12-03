@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, Device, Restaurant, Sport } from '../types';
+import { Staff, Visit, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog } from '../types';
 
 /**
  * Serviço Real de API Supabase
@@ -1376,6 +1376,475 @@ export const SupabaseService = {
     } catch (err: any) {
       console.error("[Admin] Error deleting sport:", err.message || JSON.stringify(err));
       return false;
+    }
+  },
+
+  // --- VISIT OPERATIONS ---
+
+  /**
+   * Admin: Update visit status
+   */
+  async adminUpdateVisitStatus(id: number, status: VisitStatus): Promise<Visit | null> {
+    if (!supabase) return null;
+
+    try {
+      const updates: any = { status };
+
+      // If marking as LEFT, set check_out_at
+      if (status === VisitStatus.LEFT && !updates.check_out_at) {
+        updates.check_out_at = new Date().toISOString();
+      }
+
+      const { data, error } = await supabase
+        .from('visits')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Visit;
+    } catch (err: any) {
+      console.error("[Admin] Error updating visit status:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  // --- INCIDENT OPERATIONS ---
+
+  /**
+   * Admin: Acknowledge an incident
+   */
+  async adminAcknowledgeIncident(id: number, guardId: number, notes?: string): Promise<Incident | null> {
+    if (!supabase) return null;
+
+    try {
+      const updates: any = {
+        status: 'ACKNOWLEDGED',
+        acknowledged_at: new Date().toISOString(),
+        acknowledged_by: guardId
+      };
+
+      if (notes) {
+        updates.guard_notes = notes;
+      }
+
+      const { data, error } = await supabase
+        .from('incidents')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Incident;
+    } catch (err: any) {
+      console.error("[Admin] Error acknowledging incident:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Resolve an incident
+   */
+  async adminResolveIncident(id: number, guardId: number, notes?: string): Promise<Incident | null> {
+    if (!supabase) return null;
+
+    try {
+      const updates: any = {
+        status: 'RESOLVED',
+        resolved_at: new Date().toISOString()
+      };
+
+      if (notes) {
+        updates.guard_notes = notes;
+      }
+
+      // If not already acknowledged, set acknowledgment data too
+      const { data: incident } = await supabase
+        .from('incidents')
+        .select('acknowledged_at')
+        .eq('id', id)
+        .single();
+
+      if (incident && !incident.acknowledged_at) {
+        updates.acknowledged_at = new Date().toISOString();
+        updates.acknowledged_by = guardId;
+      }
+
+      const { data, error } = await supabase
+        .from('incidents')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Incident;
+    } catch (err: any) {
+      console.error("[Admin] Error resolving incident:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Update incident notes
+   */
+  async adminUpdateIncidentNotes(id: number, notes: string): Promise<Incident | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('incidents')
+        .update({ guard_notes: notes })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Incident;
+    } catch (err: any) {
+      console.error("[Admin] Error updating incident notes:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  // --- VISIT TYPES CONFIGURATION ---
+
+  /**
+   * Admin: Get all visit types
+   */
+  async adminGetAllVisitTypes(): Promise<VisitTypeConfig[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('visit_types')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      return (data as VisitTypeConfig[]) || [];
+    } catch (err: any) {
+      console.error("[Admin] Error fetching visit types:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  /**
+   * Admin: Create a new visit type
+   */
+  async adminCreateVisitType(visitType: Partial<VisitTypeConfig>): Promise<VisitTypeConfig | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('visit_types')
+        .insert({
+          name: visitType.name,
+          icon_key: visitType.icon_key || 'user',
+          requires_service_type: visitType.requires_service_type || false,
+          requires_restaurant: visitType.requires_restaurant || false,
+          requires_sport: visitType.requires_sport || false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as VisitTypeConfig;
+    } catch (err: any) {
+      console.error("[Admin] Error creating visit type:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Update an existing visit type
+   */
+  async adminUpdateVisitType(id: number, updates: Partial<VisitTypeConfig>): Promise<VisitTypeConfig | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('visit_types')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as VisitTypeConfig;
+    } catch (err: any) {
+      console.error("[Admin] Error updating visit type:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Delete a visit type
+   */
+  async adminDeleteVisitType(id: number): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('visit_types')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("[Admin] Error deleting visit type:", err.message || JSON.stringify(err));
+      return false;
+    }
+  },
+
+  // --- SERVICE TYPES CONFIGURATION ---
+
+  /**
+   * Admin: Get all service types
+   */
+  async adminGetAllServiceTypes(): Promise<ServiceTypeConfig[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('service_types')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      return (data as ServiceTypeConfig[]) || [];
+    } catch (err: any) {
+      console.error("[Admin] Error fetching service types:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  /**
+   * Admin: Create a new service type
+   */
+  async adminCreateServiceType(serviceType: Partial<ServiceTypeConfig>): Promise<ServiceTypeConfig | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('service_types')
+        .insert({
+          name: serviceType.name
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as ServiceTypeConfig;
+    } catch (err: any) {
+      console.error("[Admin] Error creating service type:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Update an existing service type
+   */
+  async adminUpdateServiceType(id: number, updates: Partial<ServiceTypeConfig>): Promise<ServiceTypeConfig | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('service_types')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as ServiceTypeConfig;
+    } catch (err: any) {
+      console.error("[Admin] Error updating service type:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Delete a service type
+   */
+  async adminDeleteServiceType(id: number): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('service_types')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("[Admin] Error deleting service type:", err.message || JSON.stringify(err));
+      return false;
+    }
+  },
+
+  /**
+   * Fetch all condominiums with real-time statistics (visits today + open incidents)
+   * Returns condominiums with latitude/longitude for map display
+   */
+  async adminGetCondominiumStats(): Promise<CondominiumStats[]> {
+    if (!supabase) return [];
+
+    try {
+      // Fetch all active condominiums
+      const { data: condos, error: condoError } = await supabase
+        .from('condominiums')
+        .select('id, name, address, latitude, longitude, status')
+        .eq('status', 'ACTIVE')
+        .order('name');
+
+      if (condoError) throw condoError;
+      if (!condos) return [];
+
+      // Get today's date range
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
+
+      // Fetch stats for each condominium
+      const stats: CondominiumStats[] = await Promise.all(
+        condos.map(async (condo) => {
+          // Count visits today
+          const { count: visitCount, error: visitError } = await supabase
+            .from('visits')
+            .select('id', { count: 'exact', head: true })
+            .eq('condominium_id', condo.id)
+            .gte('check_in_at', startOfDay)
+            .lt('check_in_at', endOfDay);
+
+          // Count open/acknowledged incidents (not resolved)
+          const { count: incidentCount, error: incidentError } = await supabase
+            .from('incidents')
+            .select('id', { count: 'exact', head: true })
+            .eq('condominium_id', condo.id)
+            .in('status', ['PENDING', 'ACKNOWLEDGED']);
+
+          if (visitError) console.warn(`Error counting visits for condo ${condo.id}:`, visitError);
+          if (incidentError) console.warn(`Error counting incidents for condo ${condo.id}:`, incidentError);
+
+          return {
+            id: condo.id,
+            name: condo.name,
+            address: condo.address,
+            latitude: condo.latitude,
+            longitude: condo.longitude,
+            total_visits_today: visitCount || 0,
+            total_incidents_open: incidentCount || 0,
+            status: condo.status as 'ACTIVE' | 'INACTIVE'
+          };
+        })
+      );
+
+      return stats;
+    } catch (err: any) {
+      console.error("[Admin] Error fetching condominium stats:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  // --- AUDIT LOGS ---
+
+  /**
+   * Admin: Get all audit logs with optional filters
+   * @param filters - Optional filters for querying audit logs
+   * @param limit - Maximum number of records to return
+   * @param offset - Number of records to skip (for pagination)
+   */
+  async adminGetAuditLogs(filters?: {
+    startDate?: string;
+    endDate?: string;
+    condominiumId?: number;
+    actorId?: number;
+    action?: string;
+    targetTable?: string;
+  }, limit: number = 100, offset: number = 0): Promise<{ logs: AuditLog[], total: number }> {
+    if (!supabase) return { logs: [], total: 0 };
+
+    try {
+      // Build query with joins for display data
+      let query = supabase
+        .from('audit_logs')
+        .select(`
+          *,
+          condominium:condominiums(id, name),
+          actor:staff(id, first_name, last_name, role)
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+      // Apply filters
+      if (filters?.startDate) {
+        query = query.gte('created_at', filters.startDate);
+      }
+      if (filters?.endDate) {
+        query = query.lte('created_at', filters.endDate);
+      }
+      if (filters?.condominiumId) {
+        query = query.eq('condominium_id', filters.condominiumId);
+      }
+      if (filters?.actorId) {
+        query = query.eq('actor_id', filters.actorId);
+      }
+      if (filters?.action) {
+        query = query.eq('action', filters.action);
+      }
+      if (filters?.targetTable) {
+        query = query.eq('target_table', filters.targetTable);
+      }
+
+      // Apply pagination
+      query = query.range(offset, offset + limit - 1);
+
+      const { data, error, count } = await query;
+
+      if (error) throw error;
+
+      // Transform data to flatten joins
+      const logs: AuditLog[] = (data || []).map((log: any) => ({
+        id: log.id,
+        created_at: log.created_at,
+        condominium_id: log.condominium_id,
+        condominium: log.condominium,
+        actor_id: log.actor_id,
+        actor: log.actor,
+        action: log.action,
+        target_table: log.target_table,
+        target_id: log.target_id,
+        details: log.details
+      }));
+
+      return { logs, total: count || 0 };
+    } catch (err: any) {
+      console.error("[Admin] Error fetching audit logs:", err.message || JSON.stringify(err));
+      return { logs: [], total: 0 };
+    }
+  },
+
+  /**
+   * Admin: Get all condominiums for dropdown filters
+   */
+  async adminGetAllCondominiums(): Promise<Condominium[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('condominiums')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      return (data as Condominium[]) || [];
+    } catch (err: any) {
+      console.error("[Admin] Error fetching all condominiums:", err.message || JSON.stringify(err));
+      return [];
     }
   }
 };

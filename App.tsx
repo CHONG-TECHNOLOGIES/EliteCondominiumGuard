@@ -24,7 +24,10 @@ import AdminIncidents from './pages/admin/AdminIncidents';
 import AdminVisitTypes from './pages/admin/AdminVisitTypes';
 import AdminServiceTypes from './pages/admin/AdminServiceTypes';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
+import AdminAuditLogs from './pages/admin/AdminAuditLogs';
 import { ToastProvider } from './components/Toast';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { PWAUpdateNotification } from './components/PWAUpdateNotification';
 
 // --- Auth Context ---
 interface AuthContextType {
@@ -159,6 +162,8 @@ export default function App() {
   return (
     <ToastProvider>
       <AuthContext.Provider value={{ user, login, logout }}>
+        <PWAUpdateNotification />
+        <PWAInstallPrompt />
         <HashRouter>
           <Routes>
             <Route path="/setup" element={<Setup />} />
@@ -178,6 +183,7 @@ export default function App() {
             <Route path="/admin/config/visit-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisitTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
             <Route path="/admin/config/service-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminServiceTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
             <Route path="/admin/analytics" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAnalytics /></AdminLayout></AdminRoute></ConfigGuard>} />
+            <Route path="/admin/audit-logs" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAuditLogs /></AdminLayout></AdminRoute></ConfigGuard>} />
 
             {/* Guard Routes */}
             <Route path="/" element={<ConfigGuard><ProtectedRoute><Dashboard /></ProtectedRoute></ConfigGuard>} />

@@ -206,12 +206,25 @@ export interface Incident {
 }
 
 export interface AuditLog {
-  id: string;
+  id: number;
   created_at: string;
-  condominium_id: string;
-  actor_id: string | null;
-  action: string;
-  target_table: string;
-  target_id: string | null;
-  details: any;
+  condominium_id: number;
+  condominium?: Condominium;     // Joined condominium data
+  actor_id: number | null;
+  actor?: Staff;                 // Joined staff data (who performed the action)
+  action: string;                // CREATE, UPDATE, DELETE, etc.
+  target_table: string;          // Table name (condominiums, visits, incidents, etc.)
+  target_id: number | null;      // ID of the affected record
+  details: any;                  // JSON details about the change
+}
+
+export interface CondominiumStats {
+  id: number;
+  name: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  total_visits_today: number;       // Count of all visits today
+  total_incidents_open: number;     // Count of open/acknowledged incidents
+  status: 'ACTIVE' | 'INACTIVE';
 }
