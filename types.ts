@@ -52,6 +52,13 @@ export interface Condominium {
   longitude?: number;
   gps_radius_meters?: number;
   status?: 'ACTIVE' | 'INACTIVE';
+  phone_number?: string;
+}
+
+export interface Street {
+  id: number;
+  condominium_id: number;
+  name: string;
 }
 
 export interface Device {

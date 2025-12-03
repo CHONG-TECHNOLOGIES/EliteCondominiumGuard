@@ -1,0 +1,62 @@
+-- Enable Row Level Security
+ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
+
+-- Add RLS policies (adjust based on your auth setup)
+CREATE POLICY "Enable read access for authenticated users" ON public.restaurants
+  FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Enable insert for authenticated users" ON public.restaurants
+  FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Enable update for authenticated users" ON public.restaurants
+  FOR UPDATE
+  USING (auth.role() = 'authenticated');
+```
+
+-- Enable Row Level Security
+ALTER TABLE public.sports ENABLE ROW LEVEL SECURITY;
+
+-- Add RLS policies (adjust based on your auth setup)
+CREATE POLICY "Enable read access for authenticated users" ON public.sports
+  FOR SELECT
+  USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Enable insert for authenticated users" ON public.sports
+  FOR INSERT
+  WITH CHECK (auth.role() = 'authenticated');
+
+CREATE POLICY "Enable update for authenticated users" ON public.sports
+  FOR UPDATE
+  USING (auth.role() = 'authenticated');
+```
+
+-- Allow read access to authenticated users
+CREATE POLICY "Allow read access for authenticated users" ON public.streets
+    FOR SELECT TO authenticated USING (true);
+
+-- Allow write access to admins (assuming admin role check logic exists or open for now based on app logic)
+-- Adjust this policy based on your specific RLS requirements
+CREATE POLICY "Allow write access for authenticated users" ON public.streets
+    FOR ALL TO authenticated USING (true);
+
+
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION admin_get_all_visits TO authenticated;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION admin_get_all_incidents TO authenticated;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION admin_get_all_units TO authenticated;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION admin_get_all_staff TO authenticated;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION admin_get_dashboard_stats TO authenticated;
+
+
+

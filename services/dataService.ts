@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog } from '../types';
+import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, Street } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 
@@ -240,6 +240,26 @@ class DataService {
     this.currentCondoDetails = condo;
     this.currentCondoId = condo.id;
     return { success: true };
+  }
+
+  async forceConfigureDevice(condoId: number, adminAuth: Staff): Promise<{ success: boolean; error?: string }> {
+    if (!this.isBackendHealthy) {
+      return { success: false, error: "Sem conexão com o servidor." };
+    }
+
+    // Verify admin role
+    if (adminAuth.role !== UserRole.ADMIN && adminAuth.role !== UserRole.SUPER_ADMIN) {
+      return { success: false, error: "Apenas administradores podem substituir dispositivos." };
+    }
+
+    // Deactivate old devices
+    const deactivated = await SupabaseService.deactivateCondoDevices(condoId);
+    if (!deactivated) {
+      return { success: false, error: "Falha ao desativar dispositivos antigos." };
+    }
+
+    // Configure new device
+    return this.configureDevice(condoId);
   }
 
   async resetDevice() {
@@ -1116,6 +1136,42 @@ class DataService {
       return await SupabaseService.adminToggleCondominiumStatus(id, status);
     } catch (e) {
       console.error('[Admin] Failed to toggle condominium status (online required):', e);
+      return false;
+    }
+  }
+
+  /**
+   * Admin: Get streets for a condominium
+   */
+  async adminGetStreets(condoId: number): Promise<any[]> {
+    try {
+      return await SupabaseService.getStreets(condoId);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch streets (online required):', e);
+      return [];
+    }
+  }
+
+  /**
+   * Admin: Add a street to a condominium
+   */
+  async adminAddStreet(condoId: number, name: string): Promise<any | null> {
+    try {
+      return await SupabaseService.addStreet(condoId, name);
+    } catch (e) {
+      console.error('[Admin] Failed to add street (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Remove a street from a condominium
+   */
+  async adminRemoveStreet(streetId: number): Promise<boolean> {
+    try {
+      return await SupabaseService.removeStreet(streetId);
+    } catch (e) {
+      console.error('[Admin] Failed to remove street (online required):', e);
       return false;
     }
   }

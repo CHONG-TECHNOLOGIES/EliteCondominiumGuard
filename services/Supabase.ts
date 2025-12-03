@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog } from '../types';
+import { Staff, Visit, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, Street } from '../types';
 
 /**
  * Serviço Real de API Supabase
@@ -47,6 +47,59 @@ export const SupabaseService = {
     } catch (err: any) {
       console.error("Error listing condos:", err.message || JSON.stringify(err));
       return [];
+    }
+  },
+
+  async getStreets(condoId: number): Promise<any[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('streets')
+        .select('*')
+        .eq('condominium_id', condoId)
+        .order('name');
+
+      if (error) throw error;
+      return data || [];
+    } catch (err: any) {
+      console.error("Error getting streets:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
+  async addStreet(condoId: number, name: string): Promise<any | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('streets')
+        .insert({ condominium_id: condoId, name })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      console.error("Error adding street:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  async removeStreet(streetId: number): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('streets')
+        .delete()
+        .eq('id', streetId);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("Error removing street:", err.message || JSON.stringify(err));
+      return false;
     }
   },
 
@@ -495,6 +548,24 @@ export const SupabaseService = {
         .eq('device_identifier', deviceIdentifier);
     } catch (err: any) {
       console.error("Heartbeat update error:", err.message || JSON.stringify(err));
+    }
+  },
+
+  async deactivateCondoDevices(condoId: number): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('devices')
+        .update({ status: 'INACTIVE' })
+        .eq('condominium_id', condoId)
+        .eq('status', 'ACTIVE');
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error("Deactivate devices error:", err.message || JSON.stringify(err));
+      return false;
     }
   },
 

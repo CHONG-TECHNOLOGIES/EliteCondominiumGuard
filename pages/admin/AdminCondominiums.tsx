@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Plus, Edit2, Power, MapPin, Loader2, Search, X } from 'lucide-react';
 import { api } from '../../services/dataService';
-import { Condominium } from '../../types';
+import { Condominium, Street } from '../../types';
 import { useToast } from '../../components/Toast';
+import { Trash2 } from 'lucide-react';
 
 export default function AdminCondominiums() {
   const { showToast, showConfirm } = useToast();
@@ -21,8 +22,14 @@ export default function AdminCondominiums() {
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
     gps_radius_meters: 100,
-    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE'
+    status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
+    phone_number: ''
   });
+
+  // Street management state
+  const [streets, setStreets] = useState<Street[]>([]);
+  const [newStreetName, setNewStreetName] = useState('');
+  const [loadingStreets, setLoadingStreets] = useState(false);
 
   useEffect(() => {
     loadCondominiums();
@@ -118,9 +125,56 @@ export default function AdminCondominiums() {
       latitude: condo.latitude,
       longitude: condo.longitude,
       gps_radius_meters: condo.gps_radius_meters || 100,
-      status: condo.status || 'ACTIVE'
+      status: condo.status || 'ACTIVE',
+      phone_number: condo.phone_number || ''
     });
     setShowEditModal(true);
+    loadStreets(condo.id);
+  };
+
+  const loadStreets = async (condoId: number) => {
+    setLoadingStreets(true);
+    try {
+      const data = await api.adminGetStreets(condoId);
+      setStreets(data);
+    } catch (error) {
+      console.error('Error loading streets:', error);
+    } finally {
+      setLoadingStreets(false);
+    }
+  };
+
+  const handleAddStreet = async () => {
+    if (!selectedCondo || !newStreetName.trim()) return;
+
+    try {
+      const result = await api.adminAddStreet(selectedCondo.id, newStreetName);
+      if (result) {
+        setNewStreetName('');
+        await loadStreets(selectedCondo.id);
+        showToast('success', 'Rua adicionada com sucesso!');
+      } else {
+        showToast('error', 'Erro ao adicionar rua');
+      }
+    } catch (error) {
+      console.error('Error adding street:', error);
+      showToast('error', 'Erro ao adicionar rua');
+    }
+  };
+
+  const handleRemoveStreet = async (streetId: number) => {
+    try {
+      const result = await api.adminRemoveStreet(streetId);
+      if (result) {
+        if (selectedCondo) await loadStreets(selectedCondo.id);
+        showToast('success', 'Rua removida com sucesso!');
+      } else {
+        showToast('error', 'Erro ao remover rua');
+      }
+    } catch (error) {
+      console.error('Error removing street:', error);
+      showToast('error', 'Erro ao remover rua');
+    }
   };
 
   const resetForm = () => {
@@ -131,7 +185,8 @@ export default function AdminCondominiums() {
       latitude: undefined,
       longitude: undefined,
       gps_radius_meters: 100,
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      phone_number: ''
     });
   };
 
@@ -209,11 +264,10 @@ export default function AdminCondominiums() {
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-xl font-bold text-slate-900">{condo.name}</h3>
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          condo.status === 'ACTIVE'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
+                        className={`px-3 py-1 rounded-full text-xs font-bold ${condo.status === 'ACTIVE'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                          }`}
                       >
                         {condo.status === 'ACTIVE' ? 'ATIVO' : 'INATIVO'}
                       </span>
@@ -242,11 +296,10 @@ export default function AdminCondominiums() {
                   </button>
                   <button
                     onClick={() => handleToggleStatus(condo)}
-                    className={`p-2 rounded-lg transition-colors ${
-                      condo.status === 'ACTIVE'
-                        ? 'text-red-600 hover:bg-red-50'
-                        : 'text-green-600 hover:bg-green-50'
-                    }`}
+                    className={`p-2 rounded-lg transition-colors ${condo.status === 'ACTIVE'
+                      ? 'text-red-600 hover:bg-red-50'
+                      : 'text-green-600 hover:bg-green-50'
+                      }`}
                     title={condo.status === 'ACTIVE' ? 'Desativar' : 'Ativar'}
                   >
                     <Power size={20} />
@@ -292,6 +345,16 @@ export default function AdminCondominiums() {
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Endereço completo"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Telefone</label>
+                <input
+                  type="text"
+                  value={formData.phone_number}
+                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="(00) 00000-0000"
                 />
               </div>
               <div>
@@ -414,6 +477,16 @@ export default function AdminCondominiums() {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Telefone</label>
+                <input
+                  type="text"
+                  value={formData.phone_number}
+                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Logo URL</label>
                 <input
                   type="text"
@@ -473,6 +546,52 @@ export default function AdminCondominiums() {
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="100"
                 />
+              </div>
+
+              {/* Streets Management */}
+              <div className="border-t border-slate-200 pt-4 mt-4">
+                <h3 className="text-lg font-bold text-slate-900 mb-4">Ruas do Condomínio</h3>
+
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newStreetName}
+                    onChange={(e) => setNewStreetName(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nome da rua"
+                  />
+                  <button
+                    onClick={handleAddStreet}
+                    disabled={!newStreetName.trim()}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Plus size={20} />
+                    Adicionar
+                  </button>
+                </div>
+
+                {loadingStreets ? (
+                  <div className="text-center py-4">
+                    <Loader2 className="animate-spin text-blue-600 mx-auto" size={24} />
+                  </div>
+                ) : streets.length === 0 ? (
+                  <p className="text-slate-500 text-center py-4">Nenhuma rua cadastrada.</p>
+                ) : (
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {streets.map((street) => (
+                      <div key={street.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <span className="text-slate-700">{street.name}</span>
+                        <button
+                          onClick={() => handleRemoveStreet(street.id)}
+                          className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
+                          title="Remover rua"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
