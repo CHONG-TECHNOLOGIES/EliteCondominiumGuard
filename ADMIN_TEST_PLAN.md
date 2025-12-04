@@ -41,8 +41,8 @@ Este documento serve como um roteiro para validar todas as funcionalidades do Pa
 
 ## 4. Gestão de Residentes (`AdminResidents`)
 ### Listagem e Filtros
-- [ ] **Filtro por Condomínio**: Selecionar um condomínio e verificar se a lista atualiza apenas com residentes daquele condomínio.
-- [ ] **Busca**: Testar busca por nome, email ou telefone.
+- [x] **Filtro por Condomínio**: Selecionar um condomínio e verificar se a lista atualiza apenas com residentes daquele condomínio.
+- [x] **Busca**: Testar busca por nome, email ou telefone.
 
 ### Ações (CRUD)
 - [ ] **Criar Residente**:
@@ -55,11 +55,87 @@ Este documento serve como um roteiro para validar todas as funcionalidades do Pa
 - [ ] **Remover Residente**:
     - [ ] Excluir um residente e confirmar a remoção.
 
+### ⚠️ Issues Identificadas
+
+#### **ISSUE #3: Erro ao criar residente - Violação de constraint NOT NULL**
+**Severidade:** 🔴 Alta (Bloqueante)  
+**Status:** Aberta  
+
+**Erro:**
+```
+[Admin] Error creating resident: null value in column "id" of relation "residents" violates not-null constraint
+```
+
+**Localização:**
+- Arquivo: `src/services/Supabase.ts`
+- Função: `adminCreateResident` (linha 1195)
+
+**Análise Técnica:**  
+O erro indica que a coluna `id` na tabela `residents` não está configurada como `SERIAL` (auto-incremento) ou que o valor padrão não está sendo aplicado corretamente. A função não envia o campo `id` (o que é correto), mas o banco de dados espera que esse valor seja fornecido.
+
+**Código Atual:**
+```typescript
+async adminCreateResident(resident: any): Promise<any | null> {
+  const { data, error } = await supabase
+    .from('residents')
+    .insert({
+      name: resident.name,
+      email: resident.email,
+      phone: resident.phone,
+      condominium_id: resident.condominium_id,
+      unit_id: resident.unit_id
+    })
+    .select()
+    .single();
+}
+```
+
+**Solução Proposta:**  
+Verificar e corrigir o schema da tabela `residents` no Supabase:
+```sql
+ALTER TABLE residents ALTER COLUMN id SET DEFAULT nextval('residents_id_seq');
+```
+
+---
+
+#### **ISSUE #4: Erro ao editar residente - Coluna 'type' não existe**
+**Severidade:** 🔴 Alta (Bloqueante)  
+**Status:** Aberta  
+
+**Erro:**
+```
+[Admin] Error updating resident: Could not find the 'type' column of 'residents' in the schema cache
+```
+
+**Localização:**
+- Arquivo: `src/services/Supabase.ts`
+- Função: `adminUpdateResident` (linha 1222)
+
+**Análise Técnica:**  
+O código está tentando atualizar uma coluna `type` que não existe na tabela `residents` do banco de dados. A interface TypeScript (`types.ts`, linha 94) define `type?: 'OWNER' | 'TENANT'`, mas a coluna não foi criada no schema do Supabase.
+
+**Interface TypeScript:**
+```typescript
+export interface Resident {
+  type?: 'OWNER' | 'TENANT';  // ← Coluna não existe no DB
+}
+```
+
+**Solução Proposta:**  
+Adicionar a coluna `type` à tabela `residents`:
+```sql
+ALTER TABLE residents 
+ADD COLUMN type TEXT CHECK (type IN ('OWNER', 'TENANT'));
+```
+
+**Nota:** A distinção entre Proprietário e Inquilino é importante para a gestão do condomínio, portanto recomenda-se adicionar a coluna ao invés de remover do código.
+
+
 ## 5. Gestão de Dispositivos (`AdminDevices`)
 ### Listagem e Filtros
-- [ ] **Listagem**: Verificar se os dispositivos (tablets) aparecem.
-- [ ] **Status**: Verificar badges (ATIVO, INATIVO, DESATIVADO).
-- [ ] **Último Contacto**: Verificar se o tempo "atrás" (ex: 5m atrás) está coerente.
+- [x] **Listagem**: Verificar se os dispositivos (tablets) aparecem.
+- [x] **Status**: Verificar badges (ATIVO, INATIVO, DESATIVADO).
+- [x] **Último Contacto**: Verificar se o tempo "atrás" (ex: 5m atrás) está coerente.
 
 ### Ações
 - [ ] **Editar Dispositivo**:
@@ -68,6 +144,30 @@ Este documento serve como um roteiro para validar todas as funcionalidades do Pa
 - [ ] **Desativar (Decommission)**:
     - [ ] Testar a desativação de um dispositivo.
     - [ ] Verificar se o status muda para DESATIVADO.
+
+### ⚠️ Issues Identificadas
+
+#### **ISSUE #5: Falta botão para ativar/desativar tablet**
+**Severidade:** 🟡 Média (Funcionalidade em falta)  
+**Status:** Aberta  
+
+**Descrição:**  
+Não existe botão na interface para ativar ou desativar um dispositivo (tablet). A funcionalidade de "Decommission" existe no backend (`adminDecommissionDevice` e `adminUpdateDevice` em `Supabase.ts`), mas não está acessível através do UI.
+
+**Funcionalidades Backend Disponíveis:**
+- `adminUpdateDevice()` - Pode alterar status do dispositivo
+- `adminDecommissionDevice()` - Marca dispositivo como DECOMMISSIONED
+
+**Solução Proposta:**  
+Adicionar botões de ação na listagem de dispositivos:
+1. **Botão Editar** - Para renomear e associar/desassociar condomínio
+2. **Botão Toggle Status** - Para ativar/desativar (ACTIVE ↔ INACTIVE)
+3. **Botão Decommission** - Para desativar permanentemente (com confirmação)
+
+**Localização do Código:**
+- Backend: `src/services/Supabase.ts` (linhas 959-995)
+- Frontend: `src/pages/admin/AdminDevices.tsx` (adicionar botões de ação)
+
 
 ## 6. Gestão de Incidentes (`AdminIncidents`)
 ### Listagem e Filtros

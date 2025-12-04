@@ -60,3 +60,38 @@ GRANT EXECUTE ON FUNCTION admin_get_dashboard_stats TO authenticated;
 
 
 
+
+GRANT EXECUTE ON FUNCTION create_notification TO authenticated;
+
+GRANT EXECUTE ON FUNCTION get_resident_notifications TO authenticated;
+
+GRANT EXECUTE ON FUNCTION mark_notification_read TO authenticated;
+
+GRANT EXECUTE ON FUNCTION mark_all_notifications_read TO authenticated;
+
+GRANT EXECUTE ON FUNCTION get_unread_notification_count TO authenticated;
+
+
+-- Enable RLS on notifications table
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Residents can only view their own notifications
+CREATE POLICY "Residents can view their own notifications" ON notifications
+  FOR SELECT
+  TO authenticated
+  USING (
+    resident_id = auth.uid()::INT
+  );
+
+-- Policy: Allow authenticated users to insert notifications
+CREATE POLICY "Allow authenticated to insert notifications" ON notifications
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (TRUE);
+
+-- Policy: Residents can update their own notifications (mark as read)
+CREATE POLICY "Residents can update their own notifications" ON notifications
+  FOR UPDATE
+  TO authenticated
+  USING (resident_id = auth.uid()::INT);
+

@@ -440,16 +440,23 @@ export const SupabaseService = {
     if (!supabase) return false;
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('incidents')
         .update({
           status: 'acknowledged',
           acknowledged_by: staffId,
           acknowledged_at: new Date().toISOString()
         })
-        .eq('id', id);
+        .eq('id', id)
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Create notification for resident
+      const incident = data as Incident;
+      await this.createIncidentReadNotification(incident);
+
       return true;
     } catch (err: any) {
       console.error("Error acknowledging incident:", err.message || JSON.stringify(err));
@@ -1474,7 +1481,19 @@ export const SupabaseService = {
         .single();
 
       if (error) throw error;
-      return data as Visit;
+
+      const visit = data as Visit;
+
+      // Create notifications based on status change
+      if (status === VisitStatus.INSIDE) {
+        // Visitor entered - create notification
+        await this.createVisitorEnteredNotification(visit);
+      } else if (status === VisitStatus.LEFT) {
+        // Visitor left - create notification
+        await this.createVisitorLeftNotification(visit);
+      }
+
+      return visit;
     } catch (err: any) {
       console.error("[Admin] Error updating visit status:", err.message || JSON.stringify(err));
       return null;
@@ -1959,6 +1978,142 @@ export const SupabaseService = {
     } catch (err: any) {
       console.error("[Admin] Error fetching all condominiums:", err.message || JSON.stringify(err));
       return [];
+    }
+  },
+
+  // --- NOTIFICATIONS ---
+
+  /**
+   * Create notification for visitor entered
+   * Call this after marking visit status as INSIDE
+   */
+  async createVisitorEnteredNotification(visit: Visit): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      // Get all residents of the unit
+      const { data: residents, error: residentError } = await supabase
+        .from('residents')
+        .select('id, condominium_id, unit_id')
+        .eq('unit_id', visit.unit_id)
+        .eq('condominium_id', visit.condominium_id);
+
+      if (residentError) throw residentError;
+      if (!residents || residents.length === 0) return false;
+
+      // Create notification for each resident using direct INSERT
+      for (const resident of residents) {
+        await supabase
+          .from('notifications')
+          .insert({
+            resident_id: resident.id,
+            condominium_id: resident.condominium_id,
+            unit_id: resident.unit_id,
+            title: 'Visitante chegou',
+            body: `${visit.visitor_name || 'Visitante'} entrou no condomínio`,
+            type: 'visitor_entered',
+            data: {
+              visit_id: visit.id,
+              visitor_name: visit.visitor_name,
+              visitor_doc: visit.visitor_doc,
+              visitor_phone: visit.visitor_phone,
+              check_in_at: visit.check_in_at
+            }
+          });
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error('[Notifications] Error creating visitor entered notification:', err.message);
+      return false;
+    }
+  },
+
+  /**
+   * Create notification for visitor left
+   * Call this after marking visit status as LEFT
+   */
+  async createVisitorLeftNotification(visit: Visit): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      // Get all residents of the unit
+      const { data: residents, error: residentError } = await supabase
+        .from('residents')
+        .select('id, condominium_id, unit_id')
+        .eq('unit_id', visit.unit_id)
+        .eq('condominium_id', visit.condominium_id);
+
+      if (residentError) throw residentError;
+      if (!residents || residents.length === 0) return false;
+
+      // Create notification for each resident using direct INSERT
+      for (const resident of residents) {
+        await supabase
+          .from('notifications')
+          .insert({
+            resident_id: resident.id,
+            condominium_id: resident.condominium_id,
+            unit_id: resident.unit_id,
+            title: 'Visitante saiu',
+            body: `${visit.visitor_name || 'Visitante'} saiu do condomínio`,
+            type: 'visitor_left',
+            data: {
+              visit_id: visit.id,
+              visitor_name: visit.visitor_name,
+              check_in_at: visit.check_in_at,
+              check_out_at: visit.check_out_at
+            }
+          });
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error('[Notifications] Error creating visitor left notification:', err.message);
+      return false;
+    }
+  },
+
+  /**
+   * Create notification for incident read
+   * Call this after acknowledging an incident
+   */
+  async createIncidentReadNotification(incident: Incident): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      // Get resident info
+      const { data: resident, error: residentError } = await supabase
+        .from('residents')
+        .select('id, condominium_id, unit_id')
+        .eq('id', incident.resident_id)
+        .single();
+
+      if (residentError) throw residentError;
+      if (!resident) return false;
+
+      // Create notification using direct INSERT
+      await supabase
+        .from('notifications')
+        .insert({
+          resident_id: resident.id,
+          condominium_id: resident.condominium_id,
+          unit_id: resident.unit_id,
+          title: 'Incidente visualizado',
+          body: 'Seu incidente foi lido pela segurança',
+          type: 'incident_read',
+          data: {
+            incident_id: incident.id,
+            incident_type: incident.type,
+            acknowledged_at: incident.acknowledged_at,
+            acknowledged_by: incident.acknowledged_by
+          }
+        });
+
+      return true;
+    } catch (err: any) {
+      console.error('[Notifications] Error creating incident read notification:', err.message);
+      return false;
     }
   }
 };
