@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Download, X } from 'lucide-react';
+import { Download, X, Smartphone, Chrome, Info } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -10,15 +10,17 @@ export const PWAInstallPrompt: React.FC = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [showManualInstructions, setShowManualInstructions] = useState(false);
 
   useEffect(() => {
     console.log('[PWA Install] Initializing install prompt component...');
 
     // Check if already installed
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    console.log('[PWA Install] Running in standalone mode:', isStandalone);
+    const isIOSStandalone = (window.navigator as any).standalone === true;
+    console.log('[PWA Install] Running in standalone mode:', isStandalone || isIOSStandalone);
 
-    if (isStandalone) {
+    if (isStandalone || isIOSStandalone) {
       setIsInstalled(true);
       console.log('[PWA Install] App already installed, hiding prompt');
       return;
@@ -38,20 +40,27 @@ export const PWAInstallPrompt: React.FC = () => {
       }
     }
 
-    console.log('[PWA Install] Waiting for beforeinstallprompt event...');
+    // Show manual prompt immediately if browser event doesn't fire quickly
+    const earlyPromptTimer = setTimeout(() => {
+      if (!deferredPrompt) {
+        console.log('[PWA Install] Browser event not fired yet, showing manual instructions');
+        setShowPrompt(true);
+      }
+    }, 3000); // Show after 3 seconds if no browser event
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       const promptEvent = e as BeforeInstallPromptEvent;
       setDeferredPrompt(promptEvent);
+      clearTimeout(earlyPromptTimer);
 
       console.log('[PWA Install] beforeinstallprompt event fired!');
 
-      // Show prompt immediately (after 2 seconds for smooth UX)
+      // Show prompt immediately
       setTimeout(() => {
-        console.log('[PWA Install] Showing install prompt');
+        console.log('[PWA Install] Showing native install prompt');
         setShowPrompt(true);
-      }, 2000);
+      }, 1000);
     };
 
     const handleAppInstalled = () => {
@@ -65,37 +74,143 @@ export const PWAInstallPrompt: React.FC = () => {
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      clearTimeout(earlyPromptTimer);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, []);
+  }, [deferredPrompt]);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-
-    if (outcome === 'accepted') {
-      console.log('PWA installation accepted');
-    } else {
-      console.log('PWA installation dismissed');
-      localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+    if (!deferredPrompt) {
+      // No browser API available, show manual instructions
+      setShowManualInstructions(true);
+      return;
     }
 
-    setDeferredPrompt(null);
-    setShowPrompt(false);
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+
+      if (outcome === 'accepted') {
+        console.log('PWA installation accepted');
+      } else {
+        console.log('PWA installation dismissed');
+        localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+      }
+
+      setDeferredPrompt(null);
+      setShowPrompt(false);
+    } catch (error) {
+      console.error('Error prompting install:', error);
+      setShowManualInstructions(true);
+    }
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
+    setShowManualInstructions(false);
     localStorage.setItem('pwa-install-dismissed', Date.now().toString());
   };
 
-  if (isInstalled || !showPrompt || !deferredPrompt) {
+  const getBrowserInstructions = () => {
+    const userAgent = navigator.userAgent.toLowerCase();
+
+    if (userAgent.includes('chrome') && !userAgent.includes('edg')) {
+      return {
+        browser: 'Chrome',
+        icon: <Chrome size={20} className="text-blue-500" />,
+        steps: [
+          'Clique no menu (⋮) no canto superior direito',
+          'Selecione "Instalar aplicação" ou "Adicionar ao ecrã inicial"',
+          'Clique em "Instalar" na janela que aparecer'
+        ]
+      };
+    } else if (userAgent.includes('safari') && !userAgent.includes('chrome')) {
+      return {
+        browser: 'Safari (iOS)',
+        icon: <Smartphone size={20} className="text-gray-600" />,
+        steps: [
+          'Toque no ícone de partilha (□↑) na parte inferior',
+          'Role para baixo e selecione "Adicionar ao Ecrã Início"',
+          'Toque em "Adicionar" no canto superior direito'
+        ]
+      };
+    } else if (userAgent.includes('edg')) {
+      return {
+        browser: 'Edge',
+        icon: <Download size={20} className="text-blue-600" />,
+        steps: [
+          'Clique no menu (⋯) no canto superior direito',
+          'Selecione "Aplicações" → "Instalar este site como aplicação"',
+          'Clique em "Instalar"'
+        ]
+      };
+    }
+
+    return {
+      browser: 'Seu navegador',
+      icon: <Info size={20} className="text-slate-500" />,
+      steps: [
+        'Procure a opção "Instalar" ou "Adicionar ao ecrã inicial" no menu do navegador',
+        'Confirme a instalação quando solicitado'
+      ]
+    };
+  };
+
+  if (isInstalled || !showPrompt) {
     return null;
   }
 
+  const instructions = getBrowserInstructions();
+
+  // Show manual instructions
+  if (showManualInstructions || !deferredPrompt) {
+    return (
+      <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-50 animate-slide-up">
+        <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-3 bg-blue-50 rounded-lg shrink-0">
+              {instructions.icon}
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-slate-900 mb-1 flex items-center gap-2">
+                <Download size={18} />
+                Instalar Elite AccesControl
+              </h3>
+              <p className="text-xs text-slate-500 mb-3">
+                Para instalar no <strong>{instructions.browser}</strong>:
+              </p>
+              <ol className="text-sm text-slate-700 space-y-2 mb-3 list-decimal list-inside">
+                {instructions.steps.map((step, idx) => (
+                  <li key={idx} className="leading-snug">{step}</li>
+                ))}
+              </ol>
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 text-xs text-blue-800">
+                <strong>Dica:</strong> A instalação permite acesso rápido e funcionamento offline completo.
+              </div>
+              <div className="mt-3">
+                <button
+                  onClick={handleDismiss}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={handleDismiss}
+              className="p-1 hover:bg-slate-100 rounded transition-colors shrink-0"
+              aria-label="Fechar"
+            >
+              <X size={20} className="text-slate-400" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show native install prompt
   return (
     <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-50 animate-slide-up">
       <div className="bg-white rounded-xl shadow-2xl border border-slate-200 p-4">
