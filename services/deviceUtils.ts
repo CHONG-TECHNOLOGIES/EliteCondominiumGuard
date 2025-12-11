@@ -19,13 +19,18 @@ function generateUUID(): string {
 /**
  * Gets or creates a unique device identifier.
  * The identifier is stored in localStorage and persists across sessions.
+ *
+ * IMPORTANT: This should only generate a NEW UUID during initial device setup.
+ * After configuration, the device ID from the central database should be used.
  */
 export function getDeviceIdentifier(): string {
     let deviceId = localStorage.getItem(DEVICE_ID_KEY);
 
     if (!deviceId) {
+        // Generate a temporary UUID (will be replaced by central DB ID after configuration)
         deviceId = generateUUID();
         localStorage.setItem(DEVICE_ID_KEY, deviceId);
+        console.log('[DeviceUtils] Generated NEW device ID (temporary until configured):', deviceId);
     }
 
     return deviceId;

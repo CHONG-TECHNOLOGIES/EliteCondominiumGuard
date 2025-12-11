@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { Visit, Unit, VisitTypeConfig, ServiceTypeConfig, Staff, Condominium, Restaurant, Sport, Incident, IncidentType, IncidentStatus } from '../types';
+import { Visit, Unit, VisitTypeConfig, ServiceTypeConfig, Staff, Condominium, Restaurant, Sport, Incident, IncidentType, IncidentStatus, Device } from '../types';
 
 export interface AppSetting {
   key: string;
@@ -19,6 +19,7 @@ export class CondoDatabase extends Dexie {
   incidents!: Table<Incident>;
   incidentTypes!: Table<IncidentType>;
   incidentStatuses!: Table<IncidentStatus>;
+  devices!: Table<Device>;
 
   constructor() {
     super('CondoGuardDB');
@@ -56,6 +57,11 @@ export class CondoDatabase extends Dexie {
       incidentTypes: 'code, sort_order',
       incidentStatuses: 'code, sort_order'
     });
+
+    // Version 7: Add devices table (synced with central database)
+    (this as Dexie).version(7).stores({
+      devices: 'id, device_identifier, condominium_id, status'
+    });
   }
 
   async clearAllData() {
@@ -71,6 +77,7 @@ export class CondoDatabase extends Dexie {
     await this.incidents.clear();
     await this.incidentTypes.clear();
     await this.incidentStatuses.clear();
+    await this.devices.clear();
   }
 }
 

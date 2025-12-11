@@ -121,29 +121,30 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       {/* Confirm Dialog */}
       {confirmDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full animate-scale-in">
-            <div className="p-6">
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-amber-100 rounded-full">
-                  <AlertCircle className="text-amber-600" size={24} />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-900 mb-2">Confirmar Ação</h3>
-                  <p className="text-slate-600">{confirmDialog.message}</p>
-                </div>
+        <div
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"
+          onClick={handleCancel}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 text-center">
+              <div className="mx-auto w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mb-4">
+                <AlertCircle className="text-amber-600" size={28} />
               </div>
+              <p className="text-lg font-semibold text-slate-800 leading-relaxed">{confirmDialog.message}</p>
             </div>
-            <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3 rounded-b-xl">
+            <div className="p-4 flex gap-3">
               <button
                 onClick={handleCancel}
-                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-white transition-colors font-medium"
+                className="flex-1 px-5 py-3 border-2 border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 active:scale-95 transition-all font-bold"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirm}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                className="flex-1 px-5 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 active:scale-95 transition-all font-bold shadow-lg shadow-red-600/20"
               >
                 Confirmar
               </button>

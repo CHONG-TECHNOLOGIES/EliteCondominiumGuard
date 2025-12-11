@@ -162,12 +162,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     <div className="flex h-screen bg-slate-100 overflow-hidden">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-white transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 flex flex-col ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Sidebar Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
             <div className="bg-slate-800 p-2 rounded-lg border border-slate-700">
               <ShieldCheck className="text-accent w-6 h-6" />
@@ -186,7 +186,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
+        <nav className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">
           {navItems.map((item) => (
             <div key={item.label}>
               {item.children ? (
@@ -249,7 +249,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className="border-t border-slate-800 p-4 space-y-2">
+        <div className="border-t border-slate-800 p-4 space-y-2 shrink-0">
           {/* User Info */}
           <div className="px-4 py-3 bg-slate-800 rounded-lg">
             <p className="text-sm font-bold text-white">

@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Staff, UserRole } from './types';
 import { api } from './services/dataService';
+import { getDeviceIdentifier } from './services/deviceUtils';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import NewEntry from './pages/NewEntry';
 import DailyList from './pages/DailyList';
 import Incidents from './pages/Incidents';
 import Setup from './pages/Setup';
-import { Wifi, WifiOff, LogOut, ShieldCheck, Loader2 } from 'lucide-react';
+import { Wifi, WifiOff, LogOut, ShieldCheck, Loader2, RefreshCw, KeyRound, Copy, Check } from 'lucide-react';
 import { AdminRoute } from './components/AdminRoute';
 import { AdminLayout } from './components/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -129,13 +130,76 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 const ConfigGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isConfigured, setIsConfigured] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [showOfflineConfig, setShowOfflineConfig] = useState(false);
+  const [condoId, setCondoId] = useState('');
+  const [condoName, setCondoName] = useState('');
+  const [configuring, setConfiguring] = useState(false);
+  const [error, setError] = useState('');
+  const [deviceId, setDeviceId] = useState<string>('');
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      // Retry configuration when coming back online
+      window.location.reload();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Load device identifier
+    const id = getDeviceIdentifier();
+    setDeviceId(id);
+
     api.isDeviceConfigured().then(configured => {
       setIsConfigured(configured);
       setLoading(false);
     });
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
+
+  const copyDeviceId = () => {
+    navigator.clipboard.writeText(deviceId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleOfflineConfiguration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setConfiguring(true);
+
+    const id = parseInt(condoId);
+    if (isNaN(id) || id <= 0) {
+      setError('ID do condomínio inválido');
+      setConfiguring(false);
+      return;
+    }
+
+    if (!condoName.trim()) {
+      setError('Nome do condomínio é obrigatório');
+      setConfiguring(false);
+      return;
+    }
+
+    const result = await api.configureDeviceOffline(id, condoName.trim());
+
+    if (result.success) {
+      setIsConfigured(true);
+      window.location.reload();
+    } else {
+      setError(result.error || 'Erro ao configurar dispositivo');
+    }
+
+    setConfiguring(false);
+  };
 
   if (loading) {
     return (
@@ -147,9 +211,145 @@ const ConfigGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
 
   if (!isConfigured) {
+    // OFFLINE + NOT CONFIGURED → Show offline emergency configuration
+    if (!isOnline && !showOfflineConfig) {
+      return (
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white p-8">
+          <WifiOff className="text-red-500 mb-6" size={64} />
+          <h1 className="text-3xl font-bold mb-4 text-center">Dispositivo Não Configurado</h1>
+          <p className="text-lg text-slate-300 text-center mb-6 max-w-md">
+            Este dispositivo não está configurado e não há conexão à internet.
+          </p>
+
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 max-w-md mb-6">
+            <h2 className="text-xl font-semibold mb-3 text-amber-400">Instruções:</h2>
+            <ol className="list-decimal list-inside space-y-2 text-slate-300">
+              <li>Contacte o <strong className="text-white">administrador da aplicação</strong></li>
+              <li>Informe o <strong className="text-white">device_identifier</strong> deste tablet ao admin:
+                <div className="mt-2 bg-slate-900 border border-slate-600 rounded p-3 flex items-center justify-between">
+                  <code className="text-sky-400 text-xs font-mono break-all">{deviceId}</code>
+                  <button
+                    onClick={copyDeviceId}
+                    className="ml-2 p-2 bg-slate-700 hover:bg-slate-600 rounded flex-shrink-0"
+                    title="Copiar ID"
+                  >
+                    {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
+                  </button>
+                </div>
+              </li>
+              <li>O admin verificará na base de dados central:
+                <ul className="list-disc list-inside ml-4 mt-1 text-sm">
+                  <li><strong className="text-green-400">Se JÁ ATRIBUÍDO:</strong> fornecerá ID e nome do condomínio</li>
+                  <li><strong className="text-blue-400">Se NOVO:</strong> atribuirá o dispositivo e fornecerá os dados</li>
+                </ul>
+              </li>
+              <li>Clique em "Configuração Manual" e insira os dados fornecidos pelo admin</li>
+            </ol>
+          </div>
+
+          <div className="flex gap-4">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold flex items-center gap-2"
+            >
+              <RefreshCw size={20} />
+              Tentar Novamente
+            </button>
+            <button
+              onClick={() => setShowOfflineConfig(true)}
+              className="px-6 py-3 bg-amber-600 hover:bg-amber-700 rounded-lg font-semibold flex items-center gap-2"
+            >
+              <KeyRound size={20} />
+              Configuração Manual
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // OFFLINE MANUAL CONFIGURATION FORM
+    if (!isOnline && showOfflineConfig) {
+      return (
+        <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white p-8">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-8 max-w-md w-full">
+            <h1 className="text-2xl font-bold mb-6 text-center">Configuração Manual (Offline)</h1>
+
+            <form onSubmit={handleOfflineConfiguration} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-300">
+                  ID do Condomínio <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={condoId}
+                  onChange={(e) => setCondoId(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-sky-500 focus:outline-none"
+                  placeholder="Ex: 123"
+                  required
+                />
+                <p className="text-xs text-slate-400 mt-1">Fornecido pelo administrador</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2 text-slate-300">
+                  Nome do Condomínio <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={condoName}
+                  onChange={(e) => setCondoName(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:border-sky-500 focus:outline-none"
+                  placeholder="Ex: Condomínio Elite"
+                  required
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-500/10 border border-red-500 rounded-lg p-3">
+                  <p className="text-red-400 text-sm">{error}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowOfflineConfig(false)}
+                  className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold"
+                  disabled={configuring}
+                >
+                  Voltar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-sky-600 hover:bg-sky-700 rounded-lg font-semibold flex items-center justify-center gap-2"
+                  disabled={configuring}
+                >
+                  {configuring ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      A configurar...
+                    </>
+                  ) : (
+                    'Configurar'
+                  )}
+                </button>
+              </div>
+            </form>
+
+            <div className="mt-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <p className="text-xs text-amber-300">
+                ⚠️ Esta configuração será sincronizada com o servidor quando a internet for restaurada.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ONLINE BUT NOT CONFIGURED → Proceed to normal setup
     return <Navigate to="/setup" replace />;
   }
-  
+
   return <>{children}</>;
 };
 

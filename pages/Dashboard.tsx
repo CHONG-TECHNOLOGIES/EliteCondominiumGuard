@@ -6,13 +6,15 @@ import { api } from '../services/dataService';
 import { askConcierge } from '../services/geminiService';
 import { Visit, VisitStatus } from '../types';
 import { AuthContext } from '../App';
+import { useToast } from '../components/Toast';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+  const { showToast, showConfirm } = useToast();
   const [syncing, setSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  
+
   // AI State
   const [showAI, setShowAI] = useState(false);
   const [aiQuery, setAiQuery] = useState('');
@@ -85,12 +87,17 @@ export default function Dashboard() {
   const handleQuickAction = async (visit: Visit, action: 'APPROVE' | 'CHECKOUT') => {
     if (action === 'APPROVE') {
       await api.updateVisitStatus(visit.id, VisitStatus.APPROVED);
+      loadQuickActions();
     } else {
-      if (confirm(`Marcar saída para ${visit.visitor_name}?`)) {
-        await api.updateVisitStatus(visit.id, VisitStatus.LEFT);
-      }
+      showConfirm(
+        `Marcar saída para ${visit.visitor_name}?`,
+        async () => {
+          await api.updateVisitStatus(visit.id, VisitStatus.LEFT);
+          loadQuickActions();
+          showToast('success', 'Saída registada com sucesso!');
+        }
+      );
     }
-    loadQuickActions();
   };
 
   const handleContactResident = (visit: Visit) => {
@@ -112,7 +119,7 @@ export default function Dashboard() {
 
   return (
     <div className="h-full flex flex-col bg-slate-50">
-      
+
       {/* --- Header Section with Greeting --- */}
       <div className="px-4 md:px-6 pt-6 md:pt-8 pb-4 max-w-7xl mx-auto w-full">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
@@ -134,26 +141,26 @@ export default function Dashboard() {
 
       {/* --- Scrollable Content --- */}
       <div className="flex-1 overflow-y-auto px-4 pb-24 md:px-6 max-w-7xl mx-auto w-full space-y-8">
-        
+
         {/* 1. Primary Actions Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
+
           {/* Hero Button: New Entry */}
-          <button 
+          <button
             onClick={() => navigate('/new-entry')}
             className="group relative col-span-1 overflow-hidden rounded-3xl bg-gradient-to-br from-sky-500 to-blue-600 p-8 text-white shadow-xl shadow-blue-500/20 transition-all hover:-translate-y-1 hover:shadow-2xl md:min-h-[220px] flex flex-col justify-between text-left"
           >
             <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-white/10 blur-2xl transition-all group-hover:scale-150"></div>
-            
+
             <div className="bg-white/20 w-14 h-14 rounded-2xl flex items-center justify-center backdrop-blur-md mb-4 group-hover:bg-white/30 transition-colors">
               <UserPlus size={28} />
             </div>
-            
+
             <div className="relative z-10">
               <h2 className="text-3xl font-bold mb-1">Nova Entrada</h2>
               <p className="text-sky-100 font-medium">Registar visitante, entregas ou serviços.</p>
             </div>
-            
+
             <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-4 group-hover:translate-x-0">
               <ChevronRight size={24} />
             </div>
@@ -171,7 +178,7 @@ export default function Dashboard() {
               </div>
             )}
 
-             <div className="bg-indigo-50 text-indigo-600 w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
+            <div className="bg-indigo-50 text-indigo-600 w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-indigo-100 transition-colors">
               <List size={28} />
             </div>
             <div>
@@ -192,7 +199,7 @@ export default function Dashboard() {
               </div>
             )}
 
-             <div className="bg-amber-50 text-amber-600 w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-amber-100 transition-colors">
+            <div className="bg-amber-50 text-amber-600 w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-amber-100 transition-colors">
               <AlertTriangle size={28} />
             </div>
             <div>
@@ -221,7 +228,7 @@ export default function Dashboard() {
             ) : (
               activeVisits.map(visit => (
                 <div key={visit.id} className="group bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex flex-col md:flex-row items-start md:items-center gap-4 transition-all hover:shadow-md">
-                  
+
                   {/* Avatar & Info */}
                   <div className="flex items-center gap-4 flex-1">
                     <div className="relative">
@@ -235,7 +242,7 @@ export default function Dashboard() {
                       {/* Status Indicator Dot */}
                       <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${visit.status === VisitStatus.PENDING ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
                     </div>
-                    
+
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <h4 className="font-bold text-lg text-slate-800">{visit.visitor_name}</h4>
@@ -245,11 +252,11 @@ export default function Dashboard() {
                       </div>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 font-medium">
                         <span className="flex items-center gap-1">
-                          <MapPin size={14} className="text-slate-400"/>
+                          <MapPin size={14} className="text-slate-400" />
                           {visit.restaurant_name || visit.sport_name || (visit.unit_block && visit.unit_number ? `${visit.unit_block} - ${visit.unit_number}` : `Uni. ${visit.unit_id}`)}
                         </span>
-                        <span className="flex items-center gap-1"><User size={14} className="text-slate-400"/> {visit.visit_type}</span>
-                        <span className="flex items-center gap-1"><Clock size={14} className="text-slate-400"/> {new Date(visit.check_in_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        <span className="flex items-center gap-1"><User size={14} className="text-slate-400" /> {visit.visit_type}</span>
+                        <span className="flex items-center gap-1"><Clock size={14} className="text-slate-400" /> {new Date(visit.check_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
                   </div>

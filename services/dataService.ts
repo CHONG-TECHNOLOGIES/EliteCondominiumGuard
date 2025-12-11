@@ -19,6 +19,9 @@ class DataService {
   }
 
   private async init() {
+    // Request persistent storage to prevent browser auto-deletion
+    await this.requestPersistentStorage();
+
     const condoDetails = await this.getDeviceCondoDetails();
     if (condoDetails) {
       this.currentCondoId = condoDetails.id;
@@ -26,6 +29,48 @@ class DataService {
     }
     this.startHealthCheck();
     this.startHeartbeat();
+  }
+
+  /**
+   * Request persistent storage to prevent browser from auto-deleting IndexedDB
+   * when disk space is low. Critical for kiosk tablets!
+   */
+  private async requestPersistentStorage() {
+    if (!navigator.storage || !navigator.storage.persist) {
+      console.warn('[DataService] Persistent storage API not supported');
+      return;
+    }
+
+    try {
+      const isPersisted = await navigator.storage.persisted();
+
+      if (!isPersisted) {
+        console.log('[DataService] Requesting persistent storage...');
+        const granted = await navigator.storage.persist();
+
+        if (granted) {
+          console.log('[DataService] ✅ Persistent storage GRANTED - data won\'t be auto-deleted');
+        } else {
+          console.warn('[DataService] ⚠️ Persistent storage DENIED - data may be deleted if disk is low');
+        }
+      } else {
+        console.log('[DataService] ✅ Persistent storage already granted');
+      }
+
+      // Log storage quota info
+      const estimate = await navigator.storage.estimate();
+      const usedMB = (estimate.usage || 0) / 1024 / 1024;
+      const quotaMB = (estimate.quota || 0) / 1024 / 1024;
+      const percentUsed = ((estimate.usage || 0) / (estimate.quota || 1) * 100).toFixed(2);
+
+      console.log('[DataService] Storage usage:', {
+        used: `${usedMB.toFixed(2)} MB`,
+        quota: `${quotaMB.toFixed(2)} MB`,
+        percentage: `${percentUsed}%`
+      });
+    } catch (err) {
+      console.error('[DataService] Error requesting persistent storage:', err);
+    }
   }
 
   private setOnlineStatus(isOnline: boolean) {
@@ -59,66 +104,132 @@ class DataService {
   // --- Device Configuration (Setup) ---
 
   async isDeviceConfigured(): Promise<boolean> {
-    const localSetting = await db.settings.get('device_condo_details');
+    // PRIORITY 1: If ONLINE, central database is the source of truth
+    if (this.isBackendHealthy) {
+      console.log('[DataService] Online - checking central database first...');
 
-    // Case 1: IndexedDB has configuration
-    if (localSetting) {
-      console.log('[DataService] Local device configuration found for condo:', localSetting.value);
-
-      // Save to localStorage as backup
       try {
-        localStorage.setItem('device_condo_backup', JSON.stringify(localSetting.value));
-      } catch (e) {
-        console.warn('[DataService] Failed to save localStorage backup:', e);
-      }
+        // Get local device identifier (or generate temporary one)
+        let localDeviceId = localStorage.getItem('condo_guard_device_id');
+        console.log('[DataService] Local device ID from localStorage:', localDeviceId || 'EMPTY');
 
-      // Cross-check with central database if online
-      if (this.isBackendHealthy) {
-        try {
-          const deviceId = getDeviceIdentifier();
-          const centralDevice = await SupabaseService.getDeviceByIdentifier(deviceId);
+        // Try to find device in central database by local device ID
+        let centralDevice = null;
+        if (localDeviceId) {
+          centralDevice = await SupabaseService.getDeviceByIdentifier(localDeviceId);
+        }
 
-          if (!centralDevice) {
-            console.warn('[DataService] Device not found in central database');
-            return true; // Still allow with local config
-          }
+        // If no device found by local ID, check if there's a device configured for this browser
+        // by checking IndexedDB for a previous condominium assignment
+        if (!centralDevice) {
+          const localSetting = await db.settings.get('device_condo_details');
+          if (localSetting) {
+            const condoId = (localSetting.value as Condominium).id;
+            console.log('[DataService] No central device found by local ID, checking by condominium:', condoId);
 
-          if (centralDevice.status !== 'ACTIVE') {
-            console.warn('[DataService] Device status is not ACTIVE:', centralDevice.status);
-            return false; // Block if device is inactive
-          }
-
-          // Verify condominium ID matches
-          const localCondoId = (localSetting.value as Condominium).id;
-          if (String(centralDevice.condominium_id) !== String(localCondoId)) {
-            console.warn('[DataService] Condominium ID mismatch - updating from central');
-            // Update local config to match central
-            const correctCondo = await SupabaseService.getCondominium(centralDevice.condominium_id);
-            if (correctCondo) {
-              await db.settings.put({ key: 'device_condo_details', value: correctCondo });
-              localStorage.setItem('device_condo_backup', JSON.stringify(correctCondo));
-              this.currentCondoDetails = correctCondo;
-              this.currentCondoId = correctCondo.id;
+            // Find active device for this condominium
+            const devicesForCondo = await SupabaseService.getActiveDevicesByCondominium(condoId);
+            if (devicesForCondo.length === 1) {
+              centralDevice = devicesForCondo[0];
+              console.log('[DataService] Found single active device for this condominium:', centralDevice.device_identifier);
             }
           }
-
-          console.log('[DataService] Device configuration verified with central database');
-        } catch (err) {
-          console.error('[DataService] Error checking central database:', err);
         }
-      }
 
-      return true; // Local config exists, allow access
+        if (!centralDevice) {
+          console.warn('[DataService] No device found in central database - needs configuration');
+          return false; // No device registered in central DB
+        }
+
+        if (centralDevice.status !== 'ACTIVE') {
+          console.warn('[DataService] Device status is not ACTIVE:', centralDevice.status);
+          return false; // Device is inactive
+        }
+
+        // SYNC: Get condominium details from central database
+        const correctCondo = await SupabaseService.getCondominium(centralDevice.condominium_id);
+        if (!correctCondo) {
+          console.error('[DataService] Condominium not found in central database');
+          return false;
+        }
+
+        // SYNC: Update ALL storage layers with central data (source of truth)
+        const centralDeviceId = centralDevice.device_identifier;
+
+        // Update IndexedDB (main database)
+        await db.settings.put({ key: 'device_condo_details', value: correctCondo });
+        await db.settings.put({ key: 'device_id', value: centralDeviceId });
+
+        // Update localStorage (backup + fast access)
+        localStorage.setItem('condo_guard_device_id', centralDeviceId);
+        localStorage.setItem('device_condo_backup', JSON.stringify(correctCondo));
+
+        console.log('[DataService] Synced from central DB → IndexedDB + localStorage:', {
+          deviceId: centralDeviceId,
+          condo: correctCondo.name
+        });
+
+        this.currentCondoDetails = correctCondo;
+        this.currentCondoId = correctCondo.id;
+
+        console.log('[DataService] ✓ Device configured from central database:', correctCondo.name);
+        return true;
+
+      } catch (err) {
+        console.error('[DataService] Error checking central database:', err);
+        // Fall through to offline checks
+      }
     }
 
-    // Case 2: IndexedDB is empty - try to recover from localStorage backup
+    // PRIORITY 2: OFFLINE - Check local cache (IndexedDB)
+    console.log('[DataService] Offline or central check failed - checking local cache...');
+    const localSetting = await db.settings.get('device_condo_details');
+
+    if (localSetting) {
+      console.log('[DataService] ✓ Local device configuration found for condo:', (localSetting.value as Condominium).name);
+
+      // OFFLINE: Restore device ID from IndexedDB to localStorage if missing
+      try {
+        const localDeviceId = localStorage.getItem('condo_guard_device_id');
+        if (!localDeviceId) {
+          const storedDeviceId = await db.settings.get('device_id');
+          if (storedDeviceId && storedDeviceId.value) {
+            console.log('[DataService] [OFFLINE] Restoring device ID from IndexedDB to localStorage:', storedDeviceId.value);
+            localStorage.setItem('condo_guard_device_id', storedDeviceId.value as string);
+          } else {
+            console.warn('[DataService] [OFFLINE] No device ID in IndexedDB - device will need to sync when online');
+          }
+        }
+
+        // Save condominium data to localStorage as backup
+        localStorage.setItem('device_condo_backup', JSON.stringify(localSetting.value));
+      } catch (e) {
+        console.warn('[DataService] Failed to sync localStorage:', e);
+      }
+
+      this.currentCondoDetails = localSetting.value as Condominium;
+      this.currentCondoId = this.currentCondoDetails.id;
+      return true;
+    }
+
+    // PRIORITY 3: Try localStorage backup as last resort
     console.log('[DataService] No IndexedDB configuration - checking localStorage backup');
     try {
       const backupData = localStorage.getItem('device_condo_backup');
       if (backupData) {
         const condoData = JSON.parse(backupData) as Condominium;
-        console.log('[DataService] Restoring from localStorage backup:', condoData);
+        console.log('[DataService] ✓ Restored from localStorage backup:', condoData.name);
+
+        // SYNC: Restore to IndexedDB (keep them in sync)
         await db.settings.put({ key: 'device_condo_details', value: condoData });
+
+        // Also restore device_id if available in localStorage
+        const localDeviceId = localStorage.getItem('condo_guard_device_id');
+        if (localDeviceId) {
+          await db.settings.put({ key: 'device_id', value: localDeviceId });
+          console.log('[DataService] Also restored device_id to IndexedDB:', localDeviceId);
+        }
+
         this.currentCondoDetails = condoData;
         this.currentCondoId = condoData.id;
         return true;
@@ -127,45 +238,8 @@ class DataService {
       console.warn('[DataService] Failed to restore from localStorage:', e);
     }
 
-    // Case 3: No local data - try to recover from central database if online
-    console.log('[DataService] No local configuration - checking central database');
-
-    if (this.isBackendHealthy) {
-      try {
-        const deviceId = getDeviceIdentifier();
-        const centralDevice = await SupabaseService.getDeviceByIdentifier(deviceId);
-
-        if (!centralDevice) {
-          console.warn('[DataService] Device not found in central database');
-          return false; // No device registered
-        }
-
-        if (centralDevice.status !== 'ACTIVE') {
-          console.warn('[DataService] Device status is not ACTIVE:', centralDevice.status);
-          return false; // Device is inactive
-        }
-
-        // Restore configuration from central database
-        const correctCondo = await SupabaseService.getCondominium(centralDevice.condominium_id);
-        if (correctCondo) {
-          console.log('[DataService] Restored configuration from central database');
-          await db.settings.put({ key: 'device_condo_details', value: correctCondo });
-          localStorage.setItem('device_condo_backup', JSON.stringify(correctCondo));
-          this.currentCondoDetails = correctCondo;
-          this.currentCondoId = correctCondo.id;
-          return true;
-        }
-
-        console.error('[DataService] Condominium not found in central database');
-        return false;
-      } catch (err) {
-        console.error('[DataService] Error checking central database:', err);
-        return false;
-      }
-    }
-
-    // Case 4: Offline and no local data - device is not configured
-    console.warn('[DataService] Device not configured - no local data and offline');
+    // No configuration found anywhere
+    console.warn('[DataService] ✗ Device not configured - no data found');
     return false;
   }
 
@@ -183,12 +257,32 @@ class DataService {
   async getAvailableCondominiums(): Promise<Condominium[]> {
     if (this.isBackendHealthy) {
       try {
-        const list = await SupabaseService.listActiveCondominiums();
-        if (list.length > 0) {
-          await db.condominiums.bulkPut(list);
+        // 1. Get all active condominiums
+        const allCondos = await SupabaseService.listActiveCondominiums();
+
+        // 2. Get all active devices to check which condos are already assigned
+        const allDevices = await SupabaseService.adminGetAllDevices();
+
+        // 3. Create a Set of condominium IDs that already have active devices
+        const assignedCondoIds = new Set(
+          allDevices
+            .filter(d => d.status === 'ACTIVE')
+            .map(d => d.condominium_id)
+        );
+
+        // 4. Filter out condominiums that are already assigned to active devices
+        const availableCondos = allCondos.filter(c => !assignedCondoIds.has(c.id));
+
+        console.log(`[DataService] Found ${allCondos.length} active condos, ${assignedCondoIds.size} already assigned, ${availableCondos.length} available for setup`);
+
+        // 5. Cache available condominiums for offline use
+        if (availableCondos.length > 0) {
+          await db.condominiums.bulkPut(availableCondos);
         }
-        return list;
+
+        return availableCondos;
       } catch (e) {
+        console.error('[DataService] Error fetching available condominiums:', e);
         this.backendHealthScore--;
       }
     }
@@ -233,9 +327,14 @@ class DataService {
       console.warn("Failed to register device with Supabase, but continuing with local setup");
     }
 
-    // Save configuration locally
+    // Save configuration locally (IndexedDB + localStorage sync)
     await db.settings.put({ key: 'device_condo_details', value: condo });
     await db.settings.put({ key: 'device_id', value: deviceId });
+
+    // SYNC: Also save to localStorage for redundancy and fast access
+    localStorage.setItem('condo_guard_device_id', deviceId);
+    localStorage.setItem('device_condo_backup', JSON.stringify(condo));
+    console.log('[DataService] Device configured - synced to IndexedDB + localStorage');
 
     this.currentCondoDetails = condo;
     this.currentCondoId = condo.id;
@@ -260,6 +359,61 @@ class DataService {
 
     // Configure new device
     return this.configureDevice(condoId);
+  }
+
+  /**
+   * OFFLINE EMERGENCY CONFIGURATION
+   * Allows admin to manually configure device when offline by providing condominium ID
+   * This creates a minimal local configuration that will sync when online
+   */
+  async configureDeviceOffline(condoId: number, condoName: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const deviceId = getDeviceIdentifier();
+
+      // Create minimal condominium object for offline use
+      const offlineCondo: Condominium = {
+        id: condoId,
+        name: condoName,
+        status: 'ACTIVE',
+        created_at: new Date().toISOString()
+      };
+
+      // Save to IndexedDB
+      await db.settings.put({ key: 'device_condo_details', value: offlineCondo });
+      await db.settings.put({ key: 'device_id', value: deviceId });
+      await db.condominiums.put(offlineCondo);
+
+      // Create device record in local IndexedDB (will sync to central DB when online)
+      // Note: id will be auto-generated by Supabase when synced
+      const deviceRecord: Device = {
+        device_identifier: deviceId,
+        device_name: `Tablet - ${condoName} (Offline Setup)`,
+        condominium_id: condoId,
+        configured_at: new Date().toISOString(),
+        last_seen_at: new Date().toISOString(),
+        status: 'ACTIVE',
+        metadata: getDeviceMetadata()
+      };
+      await db.devices.put(deviceRecord);
+
+      // Save to localStorage
+      localStorage.setItem('condo_guard_device_id', deviceId);
+      localStorage.setItem('device_condo_backup', JSON.stringify(offlineCondo));
+
+      this.currentCondoDetails = offlineCondo;
+      this.currentCondoId = condoId;
+
+      console.log('[DataService] ⚠️ OFFLINE configuration saved - will sync when online:', {
+        condoId,
+        condoName,
+        deviceId
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('[DataService] Offline configuration failed:', error);
+      return { success: false, error: "Falha ao configurar dispositivo offline" };
+    }
   }
 
   async resetDevice() {
