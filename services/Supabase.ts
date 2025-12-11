@@ -654,13 +654,13 @@ export const SupabaseService = {
     }
   },
 
-  async getDeviceByIdentifier(deviceIdentifier: string): Promise<{ condominium_id: number; status: string } | null> {
+  async getDeviceByIdentifier(deviceIdentifier: string): Promise<Device | null> {
     if (!supabase) return null;
 
     try {
       const { data, error } = await supabase
         .from('devices')
-        .select('condominium_id, status')
+        .select('*')
         .eq('device_identifier', deviceIdentifier)
         .single();
 
@@ -672,7 +672,7 @@ export const SupabaseService = {
         throw error;
       }
 
-      return data;
+      return data as Device;
     } catch (err: any) {
       console.error("Get device error:", err.message || JSON.stringify(err));
       return null;
