@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus, List, AlertTriangle, RefreshCw, MessageSquare, Send, X, Clock, CheckCircle, LogOut, User, MapPin, ShieldCheck, ChevronRight, Phone } from 'lucide-react';
 import { api } from '../services/dataService';
@@ -7,6 +7,7 @@ import { askConcierge } from '../services/geminiService';
 import { Visit, VisitStatus } from '../types';
 import { AuthContext } from '../App';
 import { useToast } from '../components/Toast';
+import { audioService } from '../services/audioService';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const [activeVisits, setActiveVisits] = useState<Visit[]>([]);
   const [todaysVisitsCount, setTodaysVisitsCount] = useState(0);
   const [incidentsCount, setIncidentsCount] = useState(0);
+  const previousIncidentCountRef = useRef<number>(0);
 
   const loadQuickActions = async () => {
     const data = await api.getTodaysVisits();
@@ -38,12 +40,42 @@ export default function Dashboard() {
     setActiveVisits(actionable);
   };
 
+  const playAlertSound = () => {
+    const played = audioService.playAlertSound();
+    if (!played) {
+      console.warn('[Dashboard] Audio not enabled - user must enable it first');
+    }
+  };
+
+  const vibrateDevice = () => {
+    if ('vibrate' in navigator) {
+      navigator.vibrate([200, 100, 200, 100, 200]);
+      console.log('[Dashboard] Device vibrated');
+    }
+  };
+
   const loadIncidentsCount = async () => {
     try {
       const incidents = await api.getIncidents();
       // Count only new/unacknowledged incidents
       const newIncidents = incidents.filter(inc => inc.status === 'new');
-      setIncidentsCount(newIncidents.length);
+      const currentCount = newIncidents.length;
+
+      // Detect if new incidents appeared (only if we have previous data)
+      if (previousIncidentCountRef.current > 0 && currentCount > previousIncidentCountRef.current) {
+        const newIncidentCount = currentCount - previousIncidentCountRef.current;
+        console.log(`[Dashboard] 🚨 ${newIncidentCount} NEW INCIDENT(S) DETECTED!`);
+
+        // Play alert sound and vibrate
+        playAlertSound();
+        vibrateDevice();
+
+        // Show toast notification
+        showToast('error', `🚨 ${newIncidentCount} novo(s) incidente(s) reportado(s)!`);
+      }
+
+      previousIncidentCountRef.current = currentCount;
+      setIncidentsCount(currentCount);
     } catch (error) {
       console.error('Error loading incidents count:', error);
     }
