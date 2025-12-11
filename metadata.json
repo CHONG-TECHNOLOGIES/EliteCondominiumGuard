@@ -1,6 +1,6 @@
 {
   "name": "Elite AccesControl",
-  "description": "High-performance PWA for Condominium Access Control in Kiosk Mode.",
+  "description": "High-performance PWA for Condominium and Buildings Access Control in Kiosk Mode.",
   "requestFramePermissions": [
     "camera",
     "microphone"

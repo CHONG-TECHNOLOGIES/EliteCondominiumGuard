@@ -12,9 +12,15 @@ export const PWAInstallPrompt: React.FC = () => {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
+    console.log('[PWA Install] Initializing install prompt component...');
+
     // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    console.log('[PWA Install] Running in standalone mode:', isStandalone);
+
+    if (isStandalone) {
       setIsInstalled(true);
+      console.log('[PWA Install] App already installed, hiding prompt');
       return;
     }
 
@@ -23,22 +29,29 @@ export const PWAInstallPrompt: React.FC = () => {
     if (dismissed) {
       const dismissedTime = parseInt(dismissed);
       const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
+      console.log('[PWA Install] Days since dismissed:', daysSinceDismissed.toFixed(1));
 
       // Show again after 7 days
       if (daysSinceDismissed < 7) {
+        console.log('[PWA Install] Recently dismissed, not showing prompt yet');
         return;
       }
     }
+
+    console.log('[PWA Install] Waiting for beforeinstallprompt event...');
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       const promptEvent = e as BeforeInstallPromptEvent;
       setDeferredPrompt(promptEvent);
 
-      // Show prompt after 30 seconds to avoid being intrusive
+      console.log('[PWA Install] beforeinstallprompt event fired!');
+
+      // Show prompt immediately (after 2 seconds for smooth UX)
       setTimeout(() => {
+        console.log('[PWA Install] Showing install prompt');
         setShowPrompt(true);
-      }, 30000);
+      }, 2000);
     };
 
     const handleAppInstalled = () => {
