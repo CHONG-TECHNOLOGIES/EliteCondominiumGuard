@@ -14,6 +14,12 @@ export const PWAInstallPrompt: React.FC = () => {
   useEffect(() => {
     console.log('[PWA Install] Initializing install prompt component...');
 
+    // Debug helper - expose reset function globally
+    (window as any).resetPWAInstall = () => {
+      localStorage.removeItem('pwa-install-dismissed');
+      console.log('[PWA Install] Reset complete! Reload page to see install prompt.');
+    };
+
     // Check if already installed
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     console.log('[PWA Install] Running in standalone mode:', isStandalone);
