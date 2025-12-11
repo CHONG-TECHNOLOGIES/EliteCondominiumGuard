@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0f172a" rx="0"/>
+
+  <!-- Gradient Definitions -->
+  <defs>
+    <linearGradient id="gradient5" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a8a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="badgeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+
+    <filter id="glow5">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Building Silhouette -->
+  <g fill="url(#gradient5)" filter="url(#glow5)">
+    <!-- Main tower -->
+    <rect x="200" y="150" width="112" height="290" rx="8"/>
+
+    <!-- Left wing -->
+    <rect x="140" y="220" width="60" height="220" rx="6"/>
+
+    <!-- Right wing -->
+    <rect x="312" y="220" width="60" height="220" rx="6"/>
+
+    <!-- Windows - Main building -->
+    <g fill="rgba(14, 165, 233, 0.6)">
+      <rect x="220" y="170" width="20" height="25" rx="2"/>
+      <rect x="252" y="170" width="20" height="25" rx="2"/>
+      <rect x="284" y="170" width="20" height="25" rx="2"/>
+
+      <rect x="220" y="210" width="20" height="25" rx="2"/>
+      <rect x="252" y="210" width="20" height="25" rx="2"/>
+      <rect x="284" y="210" width="20" height="25" rx="2"/>
+
+      <rect x="220" y="250" width="20" height="25" rx="2"/>
+      <rect x="252" y="250" width="20" height="25" rx="2"/>
+      <rect x="284" y="250" width="20" height="25" rx="2"/>
+
+      <rect x="220" y="290" width="20" height="25" rx="2"/>
+      <rect x="252" y="290" width="20" height="25" rx="2"/>
+      <rect x="284" y="290" width="20" height="25" rx="2"/>
+    </g>
+
+    <!-- Windows - Left wing -->
+    <g fill="rgba(14, 165, 233, 0.4)">
+      <rect x="150" y="240" width="15" height="20" rx="2"/>
+      <rect x="175" y="240" width="15" height="20" rx="2"/>
+
+      <rect x="150" y="280" width="15" height="20" rx="2"/>
+      <rect x="175" y="280" width="15" height="20" rx="2"/>
+
+      <rect x="150" y="320" width="15" height="20" rx="2"/>
+      <rect x="175" y="320" width="15" height="20" rx="2"/>
+    </g>
+
+    <!-- Windows - Right wing -->
+    <g fill="rgba(14, 165, 233, 0.4)">
+      <rect x="322" y="240" width="15" height="20" rx="2"/>
+      <rect x="347" y="240" width="15" height="20" rx="2"/>
+
+      <rect x="322" y="280" width="15" height="20" rx="2"/>
+      <rect x="347" y="280" width="15" height="20" rx="2"/>
+
+      <rect x="322" y="320" width="15" height="20" rx="2"/>
+      <rect x="347" y="320" width="15" height="20" rx="2"/>
+    </g>
+
+    <!-- Entrance -->
+    <rect x="236" y="380" width="40" height="60" fill="rgba(15, 23, 42, 0.8)"/>
+    <circle cx="256" cy="410" r="3" fill="#60a5fa"/>
+  </g>
+
+  <!-- Shield Badge Overlay -->
+  <g transform="translate(340, 180)">
+    <!-- Badge circle background -->
+    <circle cx="0" cy="0" r="70" fill="url(#badgeGradient)" filter="url(#glow5)"/>
+
+    <!-- Badge inner circle -->
+    <circle cx="0" cy="0" r="58" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+
+    <!-- Shield icon inside badge -->
+    <path
+      d="M 0 -30
+         L -25 -20
+         L -25 0
+         Q -25 15 0 30
+         Q 25 15 25 0
+         L 25 -20
+         Z"
+      fill="#0f172a"
+      opacity="0.8"
+    />
+
+    <!-- Checkmark on shield -->
+    <path
+      d="M -10 0 L -3 7 L 12 -8"
+      fill="none"
+      stroke="#10b981"
+      stroke-width="4"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <!-- Ground line -->
+  <rect x="120" y="440" width="272" height="4" fill="rgba(14, 165, 233, 0.3)" rx="2"/>
+</svg>

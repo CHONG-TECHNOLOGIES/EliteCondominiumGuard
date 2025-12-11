@@ -12,11 +12,12 @@ export const PWAUpdateNotification: React.FC = () => {
     onRegistered(registration) {
       console.log('Service Worker registered:', registration);
 
-      // Check for updates every hour
+      // Check for updates every 5 minutes
       if (registration) {
         setInterval(() => {
+          console.log('Checking for updates...');
           registration.update();
-        }, 60 * 60 * 1000); // 1 hour
+        }, 5 * 60 * 1000); // 5 minutes
       }
     },
     onRegisterError(error) {

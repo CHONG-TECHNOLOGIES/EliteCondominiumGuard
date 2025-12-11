@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'r
 import { Staff, UserRole } from './types';
 import { api } from './services/dataService';
 import { getDeviceIdentifier } from './services/deviceUtils';
+import { audioService } from './services/audioService';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import NewEntry from './pages/NewEntry';
@@ -358,6 +359,32 @@ export default function App() {
 
   const login = (staff: Staff) => setUser(staff);
   const logout = () => setUser(null);
+
+  useEffect(() => {
+    // Initialize audio service on any user interaction
+    const initAudio = () => {
+      audioService.initialize().then(success => {
+        if (success) {
+          console.log('[App] ✅ Audio service initialized successfully');
+        }
+      });
+      // Remove listeners after first interaction
+      document.removeEventListener('click', initAudio);
+      document.removeEventListener('touchstart', initAudio);
+      document.removeEventListener('keydown', initAudio);
+    };
+
+    // Add listeners for first user interaction
+    document.addEventListener('click', initAudio);
+    document.addEventListener('touchstart', initAudio);
+    document.addEventListener('keydown', initAudio);
+
+    return () => {
+      document.removeEventListener('click', initAudio);
+      document.removeEventListener('touchstart', initAudio);
+      document.removeEventListener('keydown', initAudio);
+    };
+  }, []);
 
   return (
     <ToastProvider>

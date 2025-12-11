@@ -15,11 +15,13 @@ export default defineConfig(({ mode }) => {
         react(),
         basicSsl(), // HTTPS for tablet camera access
         VitePWA({
-          registerType: 'autoUpdate',
+          registerType: 'prompt',
           includeAssets: ['icon.svg', 'icons/*.png'],
           manifest: false, // We have our own manifest.json
+          injectRegister: 'auto',
           workbox: {
             globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+            navigateFallback: null,
             runtimeCaching: [
               {
                 urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
