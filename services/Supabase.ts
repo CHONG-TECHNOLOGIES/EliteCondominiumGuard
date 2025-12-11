@@ -558,6 +558,32 @@ export const SupabaseService = {
     }
   },
 
+  /**
+   * Decommission current device (self-decommission)
+   * Sets device status to DECOMMISSIONED and removes condominium association
+   */
+  async decommissionDevice(deviceIdentifier: string): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .from('devices')
+        .update({
+          status: 'DECOMMISSIONED',
+          condominium_id: null,
+          last_seen_at: new Date().toISOString()
+        })
+        .eq('device_identifier', deviceIdentifier);
+
+      if (error) throw error;
+      console.log('[Supabase] Device decommissioned:', deviceIdentifier);
+      return true;
+    } catch (err: any) {
+      console.error("Decommission device error:", err.message || JSON.stringify(err));
+      return false;
+    }
+  },
+
   async deactivateCondoDevices(condoId: number): Promise<boolean> {
     if (!supabase) return false;
 

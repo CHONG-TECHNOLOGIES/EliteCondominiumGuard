@@ -4,12 +4,14 @@ import { Staff, UserRole } from './types';
 import { api } from './services/dataService';
 import { getDeviceIdentifier } from './services/deviceUtils';
 import { audioService } from './services/audioService';
+import { pwaLifecycleService } from './services/pwaLifecycleService';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import NewEntry from './pages/NewEntry';
 import DailyList from './pages/DailyList';
 import Incidents from './pages/Incidents';
 import Setup from './pages/Setup';
+import Settings from './pages/Settings';
 import { Wifi, WifiOff, LogOut, ShieldCheck, Loader2, RefreshCw, KeyRound, Copy, Check } from 'lucide-react';
 import { AdminRoute } from './components/AdminRoute';
 import { AdminLayout } from './components/AdminLayout';
@@ -69,6 +71,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       case '/new-entry': return 'Nova Entrada';
       case '/day-list': return 'Atividade Diária';
       case '/incidents': return 'Incidentes';
+      case '/settings': return 'Configurações';
       default: return '';
     }
   };
@@ -361,6 +364,14 @@ export default function App() {
   const logout = () => setUser(null);
 
   useEffect(() => {
+    // Initialize PWA lifecycle tracking
+    pwaLifecycleService.init();
+    pwaLifecycleService.checkInactivityDecommission();
+
+    // Log installation status
+    const status = pwaLifecycleService.getInstallationStatus();
+    console.log('[App] PWA Installation Status:', status);
+
     // Initialize audio service on any user interaction
     const initAudio = () => {
       audioService.initialize().then(success => {
@@ -417,6 +428,7 @@ export default function App() {
             <Route path="/new-entry" element={<ConfigGuard><ProtectedRoute><NewEntry /></ProtectedRoute></ConfigGuard>} />
             <Route path="/day-list" element={<ConfigGuard><ProtectedRoute><DailyList /></ProtectedRoute></ConfigGuard>} />
             <Route path="/incidents" element={<ConfigGuard><ProtectedRoute><Incidents /></ProtectedRoute></ConfigGuard>} />
+            <Route path="/settings" element={<ConfigGuard><ProtectedRoute><Settings /></ProtectedRoute></ConfigGuard>} />
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

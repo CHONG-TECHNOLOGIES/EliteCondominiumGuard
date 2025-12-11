@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, List, AlertTriangle, RefreshCw, MessageSquare, Send, X, Clock, CheckCircle, LogOut, User, MapPin, ShieldCheck, ChevronRight, Phone } from 'lucide-react';
+import { UserPlus, List, AlertTriangle, RefreshCw, MessageSquare, Send, X, Clock, CheckCircle, LogOut, User, MapPin, ShieldCheck, ChevronRight, Phone, Settings } from 'lucide-react';
 import { api } from '../services/dataService';
 import { askConcierge } from '../services/geminiService';
 import { Visit, VisitStatus } from '../types';
@@ -175,7 +175,7 @@ export default function Dashboard() {
       <div className="flex-1 overflow-y-auto px-4 pb-24 md:px-6 max-w-7xl mx-auto w-full space-y-8">
 
         {/* 1. Primary Actions Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 
           {/* Hero Button: New Entry */}
           <button
@@ -237,6 +237,20 @@ export default function Dashboard() {
             <div>
               <h2 className="text-2xl font-bold mb-1">Incidentes</h2>
               <p className="text-slate-500 font-medium">Reportar ou ver ocorrências.</p>
+            </div>
+          </button>
+
+          {/* Secondary Button: Settings */}
+          <button
+            onClick={() => navigate('/settings')}
+            className="group col-span-1 rounded-3xl bg-white p-8 text-slate-800 shadow-lg shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-xl md:min-h-[220px] flex flex-col justify-between text-left border border-slate-100 relative"
+          >
+            <div className="bg-slate-50 text-slate-600 w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-slate-100 transition-colors">
+              <Settings size={28} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold mb-1">Configurações</h2>
+              <p className="text-slate-500 font-medium">Gerir dispositivo e preferências.</p>
             </div>
           </button>
         </div>

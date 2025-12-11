@@ -423,6 +423,79 @@ class DataService {
     window.location.hash = '/setup';
   }
 
+  /**
+   * Decommissions the current device:
+   * 1. Updates device status to DECOMMISSIONED in backend (if online)
+   * 2. Clears all local data (IndexedDB + localStorage)
+   * 3. Unregisters service worker
+   * 4. Redirects to setup page
+   */
+  async decommissionDevice(): Promise<{ success: boolean; error?: string }> {
+    try {
+      const deviceId = getDeviceIdentifier();
+      const condoDetails = await this.getDeviceCondoDetails();
+
+      console.log('[DataService] Starting device decommission...', {
+        deviceId,
+        condominium: condoDetails?.name
+      });
+
+      // Step 1: Update backend if online
+      if (this.isBackendHealthy) {
+        try {
+          await SupabaseService.decommissionDevice(deviceId);
+          console.log('[DataService] ✓ Device marked as DECOMMISSIONED in backend');
+        } catch (err) {
+          console.error('[DataService] Failed to update backend (continuing with local cleanup):', err);
+          // Continue with local cleanup even if backend fails
+        }
+      } else {
+        console.warn('[DataService] Offline - skipping backend update. Device will remain in previous state in central database.');
+      }
+
+      // Step 2: Clear IndexedDB
+      await db.clearAllData();
+      console.log('[DataService] ✓ IndexedDB cleared');
+
+      // Step 3: Clear localStorage
+      localStorage.removeItem('condo_guard_device_id');
+      localStorage.removeItem('device_condo_backup');
+      localStorage.clear();
+      console.log('[DataService] ✓ localStorage cleared');
+
+      // Step 4: Unregister service worker
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+          console.log('[DataService] ✓ Service worker unregistered');
+        }
+      }
+
+      // Step 5: Clear cache storage
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+        console.log('[DataService] ✓ Cache storage cleared');
+      }
+
+      // Reset internal state
+      this.currentCondoId = null;
+      this.currentCondoDetails = null;
+      this.backendHealthScore = 3;
+
+      console.log('[DataService] ✅ Device decommission complete');
+
+      return { success: true };
+    } catch (error) {
+      console.error('[DataService] Decommission failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro desconhecido'
+      };
+    }
+  }
+
   // --- Auth & Staff ---
   private async syncStaff(condoId: number) {
     if (!this.isBackendHealthy) return;
