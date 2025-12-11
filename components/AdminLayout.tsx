@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../App';
+import { useToast } from './Toast';
 import {
   LayoutDashboard,
   Building2,
@@ -36,6 +37,7 @@ interface NavItem {
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { user, logout } = useContext(AuthContext);
+  const { showConfirm } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -152,10 +154,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   };
 
   const handleLogout = () => {
-    if (window.confirm('Tem certeza que deseja sair?')) {
-      logout();
-      navigate('/login');
-    }
+    showConfirm(
+      'Tem certeza que deseja sair?',
+      () => {
+        logout();
+        navigate('/login');
+      }
+    );
   };
 
   return (
