@@ -22,7 +22,7 @@ export class CondoDatabase extends Dexie {
   devices!: Table<Device>;
 
   constructor() {
-    super('CondoGuardDB');
+    super('AccesControlDB');
     // FIX: Cast `this` to Dexie to resolve a potential TypeScript type inference error where `version` is not found on the subclass type.
     (this as Dexie).version(1).stores({
       visits: 'id, condominium_id, status, sync_status, check_in_at',

@@ -14,7 +14,7 @@ export const askConcierge = async (question: string, condoContext: string): Prom
   try {
     const model = "gemini-2.5-flash";
     const systemInstruction = `
-      Você é um Assistente de Portaria prestável para o 'Elite CondoGuard'.
+      Você é um Assistente de Portaria prestável para o 'Elite AccesControl'.
       O seu objetivo é ajudar o porteiro a esclarecer regras ou redigir mensagens educadas para os moradores.
       
       Contexto do Condomínio: ${condoContext}

@@ -72,7 +72,7 @@ BEGIN
 
   -- TODO: Integração com serviço de SMS (Twilio, AWS SNS, etc.)
   -- Por ora, apenas retorna o código (em produção, remover isso!)
-  -- PERFORM send_sms(v_normalized_phone, 'Seu código de verificação Elite CondoGuard: ' || v_otp_code);
+  -- PERFORM send_sms(v_normalized_phone, 'Seu código de verificação Elite AccesControl: ' || v_otp_code);
 
   -- Log (opcional)
   RAISE NOTICE 'OTP gerado para telefone %: % (ID: %)', v_normalized_phone, v_otp_code, v_otp_id;

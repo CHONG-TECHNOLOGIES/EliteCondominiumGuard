@@ -174,7 +174,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </div>
             <div>
               <h1 className="text-lg font-bold">Admin Panel</h1>
-              <p className="text-xs text-slate-400">Elite CondoGuard</p>
+              <p className="text-xs text-slate-400">Elite AccesControl</p>
             </div>
           </div>
           <button

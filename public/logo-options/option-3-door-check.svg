@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0f172a" rx="0"/>
+
+  <!-- Gradient Definitions -->
+  <defs>
+    <linearGradient id="gradient3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e40af;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e3a8a;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="checkGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+
+    <filter id="glow3">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Door Frame -->
+  <rect
+    x="150"
+    y="80"
+    width="212"
+    height="360"
+    rx="12"
+    fill="url(#gradient3)"
+    stroke="rgba(255,255,255,0.1)"
+    stroke-width="3"
+    filter="url(#glow3)"
+  />
+
+  <!-- Door -->
+  <rect
+    x="170"
+    y="100"
+    width="172"
+    height="320"
+    rx="8"
+    fill="#0ea5e9"
+    opacity="0.9"
+  />
+
+  <!-- Door panels (detail) -->
+  <rect x="190" y="120" width="132" height="100" rx="6" fill="rgba(15, 23, 42, 0.2)"/>
+  <rect x="190" y="240" width="132" height="100" rx="6" fill="rgba(15, 23, 42, 0.2)"/>
+
+  <!-- Door handle -->
+  <circle cx="300" cy="290" r="8" fill="#334155"/>
+  <rect x="300" y="286" width="20" height="8" rx="4" fill="#334155"/>
+
+  <!-- Check Mark Badge -->
+  <circle
+    cx="340"
+    cy="160"
+    r="60"
+    fill="url(#checkGradient)"
+    filter="url(#glow3)"
+  />
+
+  <!-- Check mark inner circle -->
+  <circle
+    cx="340"
+    cy="160"
+    r="50"
+    fill="none"
+    stroke="rgba(255,255,255,0.2)"
+    stroke-width="2"
+  />
+
+  <!-- Check mark symbol -->
+  <path
+    d="M 315 160 L 330 175 L 365 140"
+    fill="none"
+    stroke="white"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Subtle shine on door -->
+  <rect
+    x="180"
+    y="110"
+    width="30"
+    height="300"
+    fill="rgba(255,255,255,0.1)"
+    rx="4"
+  />
+</svg>

@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0f172a" rx="0"/>
+
+  <!-- Gradient Definition -->
+  <defs>
+    <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0ea5e9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2563eb;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Glow effect -->
+    <filter id="glow1">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Shield Shape -->
+  <path
+    d="M 256 80
+       L 140 120
+       L 140 240
+       Q 140 300 180 350
+       Q 220 400 256 432
+       Q 292 400 332 350
+       Q 372 300 372 240
+       L 372 120
+       Z"
+    fill="url(#gradient1)"
+    filter="url(#glow1)"
+  />
+
+  <!-- Inner Shield Border (depth effect) -->
+  <path
+    d="M 256 100
+       L 160 132
+       L 160 240
+       Q 160 292 195 336
+       Q 230 380 256 408
+       Q 282 380 317 336
+       Q 352 292 352 240
+       L 352 132
+       Z"
+    fill="none"
+    stroke="rgba(255,255,255,0.15)"
+    stroke-width="2"
+  />
+
+  <!-- Keyhole -->
+  <g transform="translate(256, 240)">
+    <!-- Keyhole Circle (top) -->
+    <circle
+      cx="0"
+      cy="-20"
+      r="24"
+      fill="#0f172a"
+      opacity="0.9"
+    />
+
+    <!-- Keyhole Slot (bottom) -->
+    <rect
+      x="-12"
+      y="-20"
+      width="24"
+      height="60"
+      rx="4"
+      fill="#0f172a"
+      opacity="0.9"
+    />
+
+    <!-- Keyhole highlight -->
+    <circle
+      cx="-6"
+      cy="-28"
+      r="4"
+      fill="rgba(255,255,255,0.3)"
+    />
+  </g>
+
+  <!-- Accent dots (modern tech feel) -->
+  <circle cx="256" cy="140" r="3" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="240" cy="148" r="2" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="272" cy="148" r="2" fill="rgba(255,255,255,0.3)"/>
+</svg>

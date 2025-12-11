@@ -105,7 +105,7 @@ export default function Login() {
           >
             <ShieldCheck className="text-white w-8 h-8 md:w-12 md:h-12" />
           </div>
-          <h1 className="text-2xl md:text-5xl font-black text-white mb-2 md:mb-4 tracking-tight">Elite CondoGuard</h1>
+          <h1 className="text-2xl md:text-5xl font-black text-white mb-2 md:mb-4 tracking-tight">Elite AccesControl</h1>
           <p className="text-sm md:text-xl text-blue-100 font-light max-w-md hidden md:block">
             Sistema Inteligente de Controlo de Acessos.
           </p>

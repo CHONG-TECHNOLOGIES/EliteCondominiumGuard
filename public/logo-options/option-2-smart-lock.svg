@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0f172a" rx="0"/>
+
+  <!-- Gradient Definitions -->
+  <defs>
+    <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0ea5e9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2563eb;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="greenAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+
+    <filter id="glow2">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Padlock Body -->
+  <rect
+    x="180"
+    y="240"
+    width="152"
+    height="180"
+    rx="20"
+    fill="url(#gradient2)"
+    filter="url(#glow2)"
+  />
+
+  <!-- Padlock Shackle -->
+  <path
+    d="M 216 240
+       L 216 180
+       Q 216 120 256 120
+       Q 296 120 296 180
+       L 296 240"
+    fill="none"
+    stroke="url(#gradient2)"
+    stroke-width="24"
+    stroke-linecap="round"
+    filter="url(#glow2)"
+  />
+
+  <!-- Digital Display (circuit pattern) -->
+  <rect
+    x="200"
+    y="270"
+    width="112"
+    height="60"
+    rx="8"
+    fill="rgba(15, 23, 42, 0.6)"
+  />
+
+  <!-- Circuit lines (tech feel) -->
+  <g stroke="#10b981" stroke-width="2" fill="none" opacity="0.8">
+    <line x1="220" y1="290" x2="240" y2="290"/>
+    <line x1="240" y1="290" x2="240" y2="310"/>
+    <line x1="240" y1="310" x2="272" y2="310"/>
+    <circle cx="272" cy="310" r="3" fill="#10b981"/>
+
+    <line x1="220" y1="300" x2="250" y2="300"/>
+    <circle cx="250" cy="300" r="3" fill="#10b981"/>
+
+    <line x1="272" y1="290" x2="292" y2="290"/>
+    <line x1="292" y1="290" x2="292" y2="300"/>
+    <circle cx="292" cy="300" r="3" fill="#10b981"/>
+  </g>
+
+  <!-- Keyhole (digital style) -->
+  <g transform="translate(256, 360)">
+    <circle cx="0" cy="0" r="16" fill="#10b981" opacity="0.9"/>
+    <rect x="-6" y="0" width="12" height="30" rx="3" fill="#10b981" opacity="0.9"/>
+  </g>
+
+  <!-- Light indicator -->
+  <circle cx="256" cy="390" r="6" fill="#10b981" opacity="0.8">
+    <animate attributeName="opacity" values="0.4;1;0.4" dur="2s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Corner details -->
+  <rect x="190" y="250" width="20" height="3" fill="rgba(255,255,255,0.2)"/>
+  <rect x="302" y="250" width="20" height="3" fill="rgba(255,255,255,0.2)"/>
+</svg>

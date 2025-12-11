@@ -1,8 +1,8 @@
-# Elite CondoGuard - Documentação do Projeto
+# Elite AccesControl - Documentação do Projeto
 
 ## Visão Geral
 
-**Elite CondoGuard** é uma aplicação Progressive Web App (PWA) para gestão de portaria de condomínios. A aplicação funciona em modo offline-first, permitindo que guardas de segurança registrem visitas, entregas e incidentes mesmo sem conexão à internet, sincronizando automaticamente quando a conexão é restaurada.
+**Elite AccesControl** é uma aplicação Progressive Web App (PWA) para gestão de portaria de condomínios. A aplicação funciona em modo offline-first, permitindo que guardas de segurança registrem visitas, entregas e incidentes mesmo sem conexão à internet, sincronizando automaticamente quando a conexão é restaurada.
 
 ### Tecnologias Principais
 - **React 19.2** com TypeScript
@@ -666,7 +666,7 @@ npm run preview
 ## Contato e Suporte
 
 **Desenvolvedor**: Chong Technologies
-**Projeto**: Elite CondoGuard
+**Projeto**: Elite AccesControl
 **Versão**: 0.0.0 (Alpha)
 **Última Atualização**: 2025
 

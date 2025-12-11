@@ -1,6 +1,6 @@
 {
-  "name": "Elite CondoGuard",
-  "short_name": "CondoGuard",
+  "name": "Elite AccesControl",
+  "short_name": "AccesControl",
   "description": "Sistema de gestão de portaria para condomínios - Modo offline-first",
   "start_url": "/",
   "display": "standalone",
