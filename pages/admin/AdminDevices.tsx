@@ -160,6 +160,59 @@ export default function AdminDevices() {
     return `${diffDays}d atrás`;
   };
 
+  // Device health based on heartbeat interval (5 minutes)
+  const getDeviceHealth = (lastSeen?: string, status?: string) => {
+    if (status === 'DECOMMISSIONED') {
+      return {
+        status: 'decommissioned',
+        label: 'Desativado',
+        color: 'bg-gray-500',
+        icon: WifiOff
+      };
+    }
+
+    if (!lastSeen) {
+      return {
+        status: 'unknown',
+        label: 'Desconhecido',
+        color: 'bg-gray-400',
+        icon: WifiOff
+      };
+    }
+
+    const date = new Date(lastSeen);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    // Heartbeat is every 5 minutes
+    if (diffMins < 7) {
+      // Within 7 minutes = healthy (allows 2 min margin)
+      return {
+        status: 'online',
+        label: 'Online',
+        color: 'bg-green-500',
+        icon: Wifi
+      };
+    } else if (diffMins < 15) {
+      // 7-15 minutes = warning (missed 1 heartbeat)
+      return {
+        status: 'warning',
+        label: 'Conexão Instável',
+        color: 'bg-yellow-500',
+        icon: Wifi
+      };
+    } else {
+      // > 15 minutes = offline (missed 2+ heartbeats)
+      return {
+        status: 'offline',
+        label: 'Offline',
+        color: 'bg-red-500',
+        icon: WifiOff
+      };
+    }
+  };
+
   const filteredDevices = devices.filter(device =>
     (device.device_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
      device.device_identifier?.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -230,6 +283,20 @@ export default function AdminDevices() {
                         {device.device_name || 'Dispositivo Sem Nome'}
                       </h3>
                       {getStatusBadge(device.status)}
+                      {/* Health Indicator */}
+                      {(() => {
+                        const health = getDeviceHealth(device.last_seen_at, device.status);
+                        const HealthIcon = health.icon;
+                        return (
+                          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${health.color} bg-opacity-10 border border-current`}
+                               title={`Status: ${health.label} - Último contacto: ${formatLastSeen(device.last_seen_at)}`}>
+                            <HealthIcon size={14} className={health.color.replace('bg-', 'text-')} />
+                            <span className={`text-xs font-semibold ${health.color.replace('bg-', 'text-')}`}>
+                              {health.label}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                     <p className="text-sm text-slate-500 mb-2">
                       ID: {device.device_identifier}
@@ -326,17 +393,24 @@ export default function AdminDevices() {
                   <div className="bg-slate-700/50 rounded-lg p-4">
                     <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">ESTADO DE CONEXÃO</p>
                     <div className="flex items-center gap-2">
-                      {selectedDevice.status === 'ACTIVE' ? (
-                        <>
-                          <Wifi className="text-green-400" size={18} />
-                          <span className="text-lg font-bold text-green-400">Online</span>
-                        </>
-                      ) : (
-                        <>
-                          <WifiOff className="text-red-400" size={18} />
-                          <span className="text-lg font-bold text-red-400">Offline</span>
-                        </>
-                      )}
+                      {(() => {
+                        const health = getDeviceHealth(selectedDevice.last_seen_at, selectedDevice.status);
+                        const HealthIcon = health.icon;
+                        const colorMap: Record<string, string> = {
+                          'bg-green-500': 'text-green-400',
+                          'bg-yellow-500': 'text-yellow-400',
+                          'bg-red-500': 'text-red-400',
+                          'bg-gray-500': 'text-gray-400',
+                          'bg-gray-400': 'text-gray-400'
+                        };
+                        const textColor = colorMap[health.color] || 'text-gray-400';
+                        return (
+                          <>
+                            <HealthIcon className={textColor} size={18} />
+                            <span className={`text-lg font-bold ${textColor}`}>{health.label}</span>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

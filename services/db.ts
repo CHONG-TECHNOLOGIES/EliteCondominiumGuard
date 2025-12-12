@@ -62,6 +62,11 @@ export class CondoDatabase extends Dexie {
     (this as Dexie).version(7).stores({
       devices: 'id, device_identifier, condominium_id, status'
     });
+
+    // Version 8: Add device_id index to visits for device tracking
+    (this as Dexie).version(8).stores({
+      visits: 'id, condominium_id, status, sync_status, check_in_at, device_id'
+    });
   }
 
   async clearAllData() {

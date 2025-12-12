@@ -62,7 +62,7 @@ export interface Street {
 }
 
 export interface Device {
-  id?: number;               // SERIAL in Supabase
+  id?: string;               // UUID in Supabase
   created_at?: string;
   device_identifier: string;
   device_name?: string;
@@ -178,6 +178,7 @@ export interface Visit {
   status: VisitStatus;
   approval_mode?: ApprovalMode;
   guard_id: number;              // INT4 (references staff)
+  device_id?: string;            // UUID (references devices) - tracks which device registered this visit
   sync_status: SyncStatus;       // 'SINCRONIZADO' or 'PENDENTE_ENVIO'
 }
 

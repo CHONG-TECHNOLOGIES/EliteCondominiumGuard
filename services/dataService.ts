@@ -11,6 +11,7 @@ class DataService {
   private backendHealthScore: number = 3; // Health score
   private currentCondoId: number | null = null;
   private currentCondoDetails: Condominium | null = null;
+  private currentDeviceId: string | null = null; // Track device ID (UUID) for visit tracking
 
   constructor() {
     window.addEventListener('online', () => this.setOnlineStatus(true));
@@ -27,8 +28,30 @@ class DataService {
       this.currentCondoId = condoDetails.id;
       this.currentCondoDetails = condoDetails;
     }
+
+    // Load device ID for visit tracking
+    await this.loadDeviceId();
+
     this.startHealthCheck();
     this.startHeartbeat();
+  }
+
+  /**
+   * Load device ID from backend for visit tracking
+   */
+  private async loadDeviceId() {
+    try {
+      const deviceIdentifier = getDeviceIdentifier();
+      if (this.isBackendHealthy) {
+        const device = await SupabaseService.getDeviceByIdentifier(deviceIdentifier);
+        if (device && device.id) {
+          this.currentDeviceId = device.id;
+          console.log('[DataService] Device ID loaded for visit tracking:', device.id);
+        }
+      }
+    } catch (error) {
+      console.warn('[DataService] Could not load device ID, will track visits without device_id:', error);
+    }
   }
 
   /**
@@ -823,6 +846,7 @@ class DataService {
       status: visitData.status || VisitStatus.PENDING,
       approval_mode: visitData.approval_mode,
       guard_id: visitData.guard_id,
+      device_id: this.currentDeviceId || undefined, // Track which device registered this visit
       sync_status: SyncStatus.PENDING_SYNC
     };
 

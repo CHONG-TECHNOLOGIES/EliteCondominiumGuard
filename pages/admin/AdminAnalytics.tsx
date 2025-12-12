@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Tooltip } from 'react-leaflet';
 import { DivIcon } from 'leaflet';
-import { BarChart3, Loader2, MapPin, Users, AlertTriangle, RefreshCw } from 'lucide-react';
+import { BarChart3, Loader2, MapPin, Users, AlertTriangle, RefreshCw, Search, X } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { CondominiumStats } from '../../types';
 import { useToast } from '../../components/Toast';
@@ -13,6 +13,7 @@ export default function AdminAnalytics() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Default center (Lisbon, Portugal - can be adjusted)
   const defaultCenter: [number, number] = [38.7223, -9.1393];
@@ -132,10 +133,26 @@ export default function AdminAnalytics() {
     });
   };
 
-  // Calculate totals
-  const totalVisits = stats.reduce((sum, s) => sum + s.total_visits_today, 0);
-  const totalIncidents = stats.reduce((sum, s) => sum + s.total_incidents_open, 0);
-  const condosWithCoords = stats.filter(s => s.latitude && s.longitude);
+  // Filter stats based on search query
+  const filteredStats = useMemo(() => {
+    if (!searchQuery.trim()) return stats;
+
+    const query = searchQuery.toLowerCase().trim();
+    return stats.filter(condo =>
+      condo.name.toLowerCase().includes(query) ||
+      (condo.address && condo.address.toLowerCase().includes(query))
+    );
+  }, [stats, searchQuery]);
+
+  // Calculate totals from filtered stats
+  const totalVisits = filteredStats.reduce((sum, s) => sum + s.total_visits_today, 0);
+  const totalIncidents = filteredStats.reduce((sum, s) => sum + s.total_incidents_open, 0);
+  const condosWithCoords = filteredStats.filter(s => s.latitude && s.longitude);
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchQuery('');
+  };
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
@@ -152,6 +169,40 @@ export default function AdminAnalytics() {
           <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
           Atualizar
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Pesquisar por nome ou endereço do condomínio..."
+            className="w-full pl-12 pr-12 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={handleClearSearch}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              aria-label="Limpar pesquisa"
+            >
+              <X size={20} />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="mt-2 text-sm text-slate-600">
+            {filteredStats.length === 0 ? (
+              <span className="text-amber-600">Nenhum condomínio encontrado</span>
+            ) : (
+              <span>
+                {filteredStats.length} {filteredStats.length === 1 ? 'condomínio encontrado' : 'condomínios encontrados'}
+              </span>
+            )}
+          </p>
+        )}
       </div>
 
       {/* Error Display */}
@@ -173,7 +224,7 @@ export default function AdminAnalytics() {
             </div>
             <div>
               <p className="text-sm text-slate-600">Condomínios Ativos</p>
-              <p className="text-2xl font-bold text-slate-900">{stats.length}</p>
+              <p className="text-2xl font-bold text-slate-900">{filteredStats.length}</p>
             </div>
           </div>
         </div>
@@ -300,39 +351,53 @@ export default function AdminAnalytics() {
       {/* Condominium List */}
       <div className="mt-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <h2 className="text-xl font-bold text-slate-900 mb-4">Lista de Condomínios</h2>
-        <div className="grid gap-3">
-          {stats.map((condo) => (
-            <div
-              key={condo.id}
-              className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <MapPin className="text-blue-600" size={20} />
-                  <div>
-                    <h3 className="font-bold text-slate-900">{condo.name}</h3>
-                    {condo.address && (
-                      <p className="text-sm text-slate-600">{condo.address}</p>
-                    )}
-                    {!condo.latitude || !condo.longitude ? (
-                      <p className="text-xs text-amber-600 mt-1">⚠️ Sem coordenadas GPS</p>
-                    ) : null}
+        {filteredStats.length === 0 ? (
+          <div className="text-center py-12">
+            <Search size={48} className="text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-slate-800 mb-2">
+              {searchQuery ? 'Nenhum condomínio encontrado' : 'Sem dados disponíveis'}
+            </h3>
+            <p className="text-slate-600">
+              {searchQuery
+                ? 'Tente ajustar sua pesquisa ou limpar os filtros'
+                : 'Nenhum condomínio cadastrado no sistema'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {filteredStats.map((condo) => (
+              <div
+                key={condo.id}
+                className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <MapPin className="text-blue-600" size={20} />
+                    <div>
+                      <h3 className="font-bold text-slate-900">{condo.name}</h3>
+                      {condo.address && (
+                        <p className="text-sm text-slate-600">{condo.address}</p>
+                      )}
+                      {!condo.latitude || !condo.longitude ? (
+                        <p className="text-xs text-amber-600 mt-1">⚠️ Sem coordenadas GPS</p>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{condo.total_visits_today}</div>
-                    <div className="text-xs text-slate-600">Visitas Hoje</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-600">{condo.total_incidents_open}</div>
-                    <div className="text-xs text-slate-600">Incidentes Abertos</div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">{condo.total_visits_today}</div>
+                      <div className="text-xs text-slate-600">Visitas Hoje</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-red-600">{condo.total_incidents_open}</div>
+                      <div className="text-xs text-slate-600">Incidentes Abertos</div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
