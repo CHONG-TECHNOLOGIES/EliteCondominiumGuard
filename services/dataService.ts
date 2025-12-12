@@ -768,41 +768,58 @@ class DataService {
   async getTodaysVisits(): Promise<Visit[]> {
     const today = new Date().toISOString().split('T')[0];
 
-    // Get local visits for today
+    // PRIORITY 1: If ONLINE, fetch ONLY from central database (source of truth)
+    if (this.isBackendHealthy && this.currentCondoId) {
+      try {
+        console.log('[DataService] ONLINE - fetching today\'s visits from Supabase (ignoring cache)...');
+        const backendVisits = await SupabaseService.getTodaysVisits(this.currentCondoId);
+
+        // Clear OLD local visits for today (to remove deleted ones)
+        const localVisits = await db.visits
+          .where('check_in_at')
+          .between(`${today}T00:00:00`, `${today}T23:59:59`, true, true)
+          .toArray();
+
+        // Delete synced local visits (keep PENDING_SYNC ones for offline changes)
+        const syncedLocalIds = localVisits
+          .filter(v => v.sync_status === SyncStatus.SYNCED)
+          .map(v => v.id);
+        if (syncedLocalIds.length > 0) {
+          await db.visits.bulkDelete(syncedLocalIds);
+          console.log(`[DataService] Cleared ${syncedLocalIds.length} synced local visits`);
+        }
+
+        // Cache fresh backend data
+        if (backendVisits.length > 0) {
+          await db.visits.bulkPut(backendVisits);
+          console.log(`[DataService] Cached ${backendVisits.length} visits from backend`);
+        }
+
+        // Merge: backend visits + any pending local changes
+        const pendingLocalVisits = localVisits.filter(v => v.sync_status === SyncStatus.PENDING_SYNC);
+        const allVisits = [...backendVisits, ...pendingLocalVisits];
+
+        console.log(`[DataService] ✓ Returning ${backendVisits.length} backend visits + ${pendingLocalVisits.length} pending local`);
+
+        return allVisits.sort((a, b) =>
+          new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime()
+        );
+      } catch (e) {
+        console.error("[DataService] Failed to fetch from backend, falling back to local cache", e);
+        this.backendHealthScore--;
+        // Fall through to offline mode
+      }
+    }
+
+    // PRIORITY 2: OFFLINE - return only local cached visits
+    console.log('[DataService] OFFLINE - fetching today\'s visits from local cache...');
     const localVisits = await db.visits
       .where('check_in_at')
       .between(`${today}T00:00:00`, `${today}T23:59:59`, true, true)
       .toArray();
 
-    // If online, sync and merge with backend
-    if (this.isBackendHealthy && this.currentCondoId) {
-      try {
-        const backendVisits = await SupabaseService.getTodaysVisits(this.currentCondoId);
+    console.log(`[DataService] ✓ Returning ${localVisits.length} visits from local cache`);
 
-        // Merge: backend visits take precedence (they're the source of truth)
-        const mergedMap = new Map<string, Visit>();
-
-        // Add local visits first
-        localVisits.forEach(v => mergedMap.set(v.id, v));
-
-        // Overwrite with backend visits (synced data)
-        backendVisits.forEach(v => mergedMap.set(v.id, v));
-
-        // Cache backend visits locally
-        if (backendVisits.length > 0) {
-          await db.visits.bulkPut(backendVisits);
-        }
-
-        return Array.from(mergedMap.values()).sort((a, b) =>
-          new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime()
-        );
-      } catch (e) {
-        console.error("[DataService] Failed to sync today's visits", e);
-        this.backendHealthScore--;
-      }
-    }
-
-    // Offline: return only local visits
     return localVisits.sort((a, b) =>
       new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime()
     );
