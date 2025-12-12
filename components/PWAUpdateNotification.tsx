@@ -12,9 +12,9 @@ export const PWAUpdateNotification: React.FC = () => {
     onRegistered(registration) {
       console.log('[PWA Update] ✅ Service Worker registered:', registration);
 
-      // Check for updates every 1 minute (more frequent for debugging)
+      // Check for updates every 5 minutes
       if (registration) {
-        console.log('[PWA Update] 🔄 Update checker initialized (checking every 60s)');
+        console.log('[PWA Update] 🔄 Update checker initialized (checking every 5 minutes)');
         setInterval(() => {
           console.log('[PWA Update] 🔍 Checking for updates...');
           registration.update().then(() => {
@@ -22,7 +22,7 @@ export const PWAUpdateNotification: React.FC = () => {
           }).catch((error) => {
             console.error('[PWA Update] ❌ Update check failed:', error);
           });
-        }, 60 * 1000); // 1 minute for testing (change to 5 * 60 * 1000 for production)
+        }, 5 * 60 * 1000); // 5 minutes
       }
     },
     onRegisterError(error) {

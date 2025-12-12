@@ -89,8 +89,8 @@ export default defineConfig(({ mode }) => {
               }
             ],
             cleanupOutdatedCaches: true,
-            skipWaiting: true,
-            clientsClaim: true
+            skipWaiting: false,
+            clientsClaim: false
           },
           devOptions: {
             enabled: true,
