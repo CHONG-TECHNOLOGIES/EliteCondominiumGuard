@@ -20,6 +20,9 @@ class DataService {
   }
 
   private async init() {
+    // Immediately verify actual connectivity on startup
+    await this.verifyConnectivity();
+
     // Request persistent storage to prevent browser auto-deletion
     await this.requestPersistentStorage();
 
@@ -34,6 +37,49 @@ class DataService {
 
     this.startHealthCheck();
     this.startHeartbeat();
+  }
+
+  /**
+   * Verify actual connectivity to backend on startup
+   * Don't trust navigator.onLine - do a real backend check
+   */
+  private async verifyConnectivity(): Promise<void> {
+    if (!navigator.onLine) {
+      console.log('[DataService] Browser reports offline - setting offline state');
+      this.isOnline = false;
+      this.backendHealthScore = 0;
+      return;
+    }
+
+    console.log('[DataService] Verifying backend connectivity...');
+    try {
+      // Quick backend health check with 3 second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+      const SUPABASE_URL = process.env.SUPABASE_URL || 'https://nfuglaftnaohzacilike.supabase.co';
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+        method: 'HEAD',
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok || response.status === 401 || response.status === 404) {
+        // Backend is reachable (401/404 are expected for HEAD requests)
+        console.log('[DataService] ✓ Backend is reachable');
+        this.isOnline = true;
+        this.backendHealthScore = 3;
+      } else {
+        console.warn('[DataService] Backend returned non-OK status:', response.status);
+        this.isOnline = false;
+        this.backendHealthScore = 0;
+      }
+    } catch (error) {
+      console.warn('[DataService] Backend unreachable - setting offline mode:', error);
+      this.isOnline = false;
+      this.backendHealthScore = 0;
+    }
   }
 
   /**
