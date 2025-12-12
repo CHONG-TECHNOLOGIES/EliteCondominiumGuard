@@ -98,7 +98,11 @@ class DataService {
 
   private setOnlineStatus(isOnline: boolean) {
     this.isOnline = isOnline;
-    if (isOnline) this.backendHealthScore = 3; // Reset health on reconnect
+    if (isOnline) {
+      this.backendHealthScore = 3; // Reset health on reconnect
+    } else {
+      this.backendHealthScore = 0; // Immediately mark as unhealthy when offline
+    }
   }
 
   private startHealthCheck() {
@@ -127,6 +131,13 @@ class DataService {
   // --- Device Configuration (Setup) ---
 
   async isDeviceConfigured(): Promise<boolean> {
+    // Quick check: If browser is offline, skip backend checks entirely
+    if (!navigator.onLine) {
+      console.log('[DataService] Browser offline - skipping backend checks');
+      this.isOnline = false;
+      this.backendHealthScore = 0;
+    }
+
     // PRIORITY 1: If ONLINE, central database is the source of truth
     if (this.isBackendHealthy) {
       console.log('[DataService] Online - checking central database first...');
