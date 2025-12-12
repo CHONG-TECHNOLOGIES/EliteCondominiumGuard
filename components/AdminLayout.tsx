@@ -1,7 +1,8 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { useToast } from './Toast';
+import { api } from '../services/dataService';
 import {
   LayoutDashboard,
   Building2,
@@ -42,7 +43,21 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<string[]>(['management']);
-  const [isOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(api.checkOnline());
+
+  // Update online status periodically
+  useEffect(() => {
+    const handleOnlineStatus = () => setIsOnline(api.checkOnline());
+    window.addEventListener('online', handleOnlineStatus);
+    window.addEventListener('offline', handleOnlineStatus);
+    const interval = setInterval(handleOnlineStatus, 2000);
+
+    return () => {
+      window.removeEventListener('online', handleOnlineStatus);
+      window.removeEventListener('offline', handleOnlineStatus);
+      clearInterval(interval);
+    };
+  }, []);
 
   const navItems: NavItem[] = [
     {

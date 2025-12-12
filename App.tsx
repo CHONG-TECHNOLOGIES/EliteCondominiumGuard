@@ -43,24 +43,27 @@ export const AuthContext = React.createContext<AuthContextType>(null!);
 // --- Layout Component ---
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = React.useContext(AuthContext);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(api.checkOnline());
   const [condoName, setCondoName] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
+    const handleOnlineStatus = () => setIsOnline(api.checkOnline());
+    window.addEventListener('online', handleOnlineStatus);
+    window.addEventListener('offline', handleOnlineStatus);
+
     api.getDeviceCondoDetails().then(details => {
       if (details) setCondoName(details.name);
     });
 
+    // Poll online status every 2 seconds to reflect backend health
+    const interval = setInterval(handleOnlineStatus, 2000);
+
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnlineStatus);
+      window.removeEventListener('offline', handleOnlineStatus);
+      clearInterval(interval);
     };
   }, []);
 
@@ -132,7 +135,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 const ConfigGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isConfigured, setIsConfigured] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(api.checkOnline());
   const [showOfflineConfig, setShowOfflineConfig] = useState(false);
   const [condoId, setCondoId] = useState('');
   const [condoName, setCondoName] = useState('');
@@ -142,15 +145,17 @@ const ConfigGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
+    const handleOnlineStatus = () => {
+      const online = api.checkOnline();
+      setIsOnline(online);
       // Retry configuration when coming back online
-      window.location.reload();
+      if (online) {
+        window.location.reload();
+      }
     };
-    const handleOffline = () => setIsOnline(false);
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnlineStatus);
+    window.addEventListener('offline', handleOnlineStatus);
 
     // Load device identifier
     const id = getDeviceIdentifier();
@@ -162,8 +167,8 @@ const ConfigGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     });
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnlineStatus);
+      window.removeEventListener('offline', handleOnlineStatus);
     };
   }, []);
 

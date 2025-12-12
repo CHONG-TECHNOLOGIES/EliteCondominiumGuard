@@ -57,7 +57,7 @@ export default function NewEntry() {
   const [showSportModal, setShowSportModal] = useState(false);
   const [unitSearch, setUnitSearch] = useState('');
 
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(!api.checkOnline());
 
   // QR Question Modal State
   const [showQrQuestionModal, setShowQrQuestionModal] = useState(false);

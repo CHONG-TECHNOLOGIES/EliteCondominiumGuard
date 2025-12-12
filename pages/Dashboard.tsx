@@ -14,7 +14,7 @@ export default function Dashboard() {
   const { user } = useContext(AuthContext);
   const { showToast, showConfirm } = useToast();
   const [syncing, setSyncing] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(api.checkOnline());
 
   // AI State
   const [showAI, setShowAI] = useState(false);

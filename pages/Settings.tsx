@@ -7,7 +7,7 @@ import { getDeviceIdentifier } from '../services/deviceUtils';
 const Settings: React.FC = () => {
   const [condoName, setCondoName] = useState('');
   const [deviceId, setDeviceId] = useState('');
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(api.checkOnline());
   const [showUninstallDialog, setShowUninstallDialog] = useState(false);
   const [storageInfo, setStorageInfo] = useState<{
     used: string;
@@ -16,11 +16,10 @@ const Settings: React.FC = () => {
   } | null>(null);
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnlineStatus = () => setIsOnline(api.checkOnline());
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnlineStatus);
+    window.addEventListener('offline', handleOnlineStatus);
 
     // Load device info
     api.getDeviceCondoDetails().then(details => {
@@ -33,8 +32,8 @@ const Settings: React.FC = () => {
     loadStorageInfo();
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnlineStatus);
+      window.removeEventListener('offline', handleOnlineStatus);
     };
   }, []);
 
