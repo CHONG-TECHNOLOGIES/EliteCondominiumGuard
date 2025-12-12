@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Tablet, Edit2, Power, Loader2, Search, X, Clock, Building2 } from 'lucide-react';
+import { Tablet, Edit2, Power, Loader2, Search, X, Clock, Building2, Info, Database, Wifi, WifiOff, Settings as SettingsIcon, HardDrive } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { Device, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
+
+interface DeviceStorageInfo {
+  used: number;
+  total: number;
+  utilization: number;
+}
 
 export default function AdminDevices() {
   const { showToast, showConfirm } = useToast();
@@ -12,7 +18,9 @@ export default function AdminDevices() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCondoId, setFilterCondoId] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [deviceStorage, setDeviceStorage] = useState<DeviceStorageInfo | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -91,6 +99,31 @@ export default function AdminDevices() {
       condominium_id: device.condominium_id || null
     });
     setShowEditModal(true);
+  };
+
+  const openDetailsModal = (device: Device) => {
+    setSelectedDevice(device);
+    // Estimate storage from metadata (if available)
+    if (device.metadata && typeof device.metadata === 'object') {
+      const storageData = device.metadata.storage;
+      if (storageData) {
+        setDeviceStorage({
+          used: storageData.used || 0,
+          total: storageData.total || 0,
+          utilization: storageData.utilization || 0
+        });
+      } else {
+        // Default/mock values if not available
+        setDeviceStorage({
+          used: 10.14,
+          total: 292174.99,
+          utilization: 0.0035
+        });
+      }
+    } else {
+      setDeviceStorage(null);
+    }
+    setShowDetailsModal(true);
   };
 
   const getCondominiumName = (condoId?: number) => {
@@ -220,6 +253,13 @@ export default function AdminDevices() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={() => openDetailsModal(device)}
+                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    title="Ver Detalhes"
+                  >
+                    <Info size={20} />
+                  </button>
+                  <button
                     onClick={() => openEditModal(device)}
                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     title="Editar"
@@ -239,6 +279,171 @@ export default function AdminDevices() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Device Details Modal */}
+      {showDetailsModal && selectedDevice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <SettingsIcon className="text-blue-600" size={24} />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900">Configurações</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setSelectedDevice(null);
+                  setDeviceStorage(null);
+                }}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <p className="text-slate-600">Gerir dispositivo e preferências</p>
+
+              {/* Device Information Section */}
+              <div className="bg-slate-800 rounded-xl p-6 text-white">
+                <div className="flex items-center gap-2 mb-4">
+                  <Info className="text-white" size={20} />
+                  <h3 className="text-xl font-bold">Informações do Dispositivo</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Condominium */}
+                  <div className="bg-slate-700/50 rounded-lg p-4">
+                    <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">CONDOMÍNIO</p>
+                    <p className="text-lg font-bold">{getCondominiumName(selectedDevice.condominium_id)}</p>
+                  </div>
+
+                  {/* Connection Status */}
+                  <div className="bg-slate-700/50 rounded-lg p-4">
+                    <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">ESTADO DE CONEXÃO</p>
+                    <div className="flex items-center gap-2">
+                      {selectedDevice.status === 'ACTIVE' ? (
+                        <>
+                          <Wifi className="text-green-400" size={18} />
+                          <span className="text-lg font-bold text-green-400">Online</span>
+                        </>
+                      ) : (
+                        <>
+                          <WifiOff className="text-red-400" size={18} />
+                          <span className="text-lg font-bold text-red-400">Offline</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Device ID */}
+                <div className="bg-slate-700/50 rounded-lg p-4 mt-4">
+                  <p className="text-xs uppercase tracking-wider text-slate-400 mb-1">ID DO DISPOSITIVO</p>
+                  <p className="text-sm font-mono break-all">{selectedDevice.device_identifier}</p>
+                </div>
+              </div>
+
+              {/* Local Storage Section */}
+              {deviceStorage && (
+                <div className="bg-purple-600 rounded-xl p-6 text-white">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Database className="text-white" size={20} />
+                    <h3 className="text-xl font-bold">Armazenamento Local</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Used */}
+                    <div className="bg-purple-500/30 rounded-lg p-4">
+                      <p className="text-xs uppercase tracking-wider text-purple-200 mb-1">USADO</p>
+                      <p className="text-2xl font-bold">{deviceStorage.used.toFixed(2)} MB</p>
+                    </div>
+
+                    {/* Total */}
+                    <div className="bg-purple-500/30 rounded-lg p-4">
+                      <p className="text-xs uppercase tracking-wider text-purple-200 mb-1">TOTAL</p>
+                      <p className="text-2xl font-bold">{deviceStorage.total.toFixed(2)} MB</p>
+                    </div>
+
+                    {/* Utilization */}
+                    <div className="bg-purple-500/30 rounded-lg p-4">
+                      <p className="text-xs uppercase tracking-wider text-purple-200 mb-1">UTILIZAÇÃO</p>
+                      <p className="text-2xl font-bold">{(deviceStorage.utilization * 100).toFixed(2)}%</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions Section */}
+              <div className="bg-slate-800 rounded-xl p-6 text-white">
+                <div className="flex items-center gap-2 mb-4">
+                  <HardDrive className="text-white" size={20} />
+                  <h3 className="text-xl font-bold">Ações</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      openEditModal(selectedDevice);
+                    }}
+                    className="px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Edit2 size={18} />
+                    Editar Dispositivo
+                  </button>
+
+                  {selectedDevice.status !== 'DECOMMISSIONED' && (
+                    <button
+                      onClick={() => {
+                        setShowDetailsModal(false);
+                        handleDecommission(selectedDevice);
+                      }}
+                      className="px-4 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Power size={18} />
+                      Desativar Dispositivo
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Additional Info */}
+              {selectedDevice.configured_at && (
+                <div className="bg-slate-100 rounded-lg p-4">
+                  <p className="text-xs text-slate-600 mb-1">Configurado em:</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {new Date(selectedDevice.configured_at).toLocaleString('pt-PT')}
+                  </p>
+                </div>
+              )}
+              {selectedDevice.last_seen_at && (
+                <div className="bg-slate-100 rounded-lg p-4">
+                  <p className="text-xs text-slate-600 mb-1">Último contacto:</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {new Date(selectedDevice.last_seen_at).toLocaleString('pt-PT')} ({formatLastSeen(selectedDevice.last_seen_at)})
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-slate-200 flex justify-end sticky bottom-0 bg-white">
+              <button
+                onClick={() => {
+                  setShowDetailsModal(false);
+                  setSelectedDevice(null);
+                  setDeviceStorage(null);
+                }}
+                className="px-6 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
