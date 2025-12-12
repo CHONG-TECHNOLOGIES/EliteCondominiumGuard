@@ -358,10 +358,32 @@ const ConfigGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 export default function App() {
   const [user, setUser] = useState<Staff | null>(null);
 
-  const login = (staff: Staff) => setUser(staff);
-  const logout = () => setUser(null);
+  const login = (staff: Staff) => {
+    setUser(staff);
+    // Persist auth state to survive PWA updates
+    localStorage.setItem('auth_user', JSON.stringify(staff));
+  };
+
+  const logout = () => {
+    setUser(null);
+    // Clear persisted auth state
+    localStorage.removeItem('auth_user');
+  };
 
   useEffect(() => {
+    // Restore auth state from localStorage (survives PWA updates)
+    const storedUser = localStorage.getItem('auth_user');
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser) as Staff;
+        setUser(parsedUser);
+        console.log('[App] ✅ Auth state restored from localStorage');
+      } catch (e) {
+        console.error('[App] Failed to restore auth state:', e);
+        localStorage.removeItem('auth_user'); // Clean up corrupted data
+      }
+    }
+
     // Initialize PWA lifecycle tracking
     pwaLifecycleService.init();
     pwaLifecycleService.checkInactivityDecommission();

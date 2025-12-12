@@ -10,39 +10,52 @@ export const PWAUpdateNotification: React.FC = () => {
     updateServiceWorker
   } = useRegisterSW({
     onRegistered(registration) {
-      console.log('Service Worker registered:', registration);
+      console.log('[PWA Update] ✅ Service Worker registered:', registration);
 
-      // Check for updates every 5 minutes
+      // Check for updates every 1 minute (more frequent for debugging)
       if (registration) {
+        console.log('[PWA Update] 🔄 Update checker initialized (checking every 60s)');
         setInterval(() => {
-          console.log('Checking for updates...');
-          registration.update();
-        }, 5 * 60 * 1000); // 5 minutes
+          console.log('[PWA Update] 🔍 Checking for updates...');
+          registration.update().then(() => {
+            console.log('[PWA Update] ✓ Update check completed');
+          }).catch((error) => {
+            console.error('[PWA Update] ❌ Update check failed:', error);
+          });
+        }, 60 * 1000); // 1 minute for testing (change to 5 * 60 * 1000 for production)
       }
     },
     onRegisterError(error) {
-      console.error('Service Worker registration error:', error);
+      console.error('[PWA Update] ❌ Service Worker registration error:', error);
     },
     onNeedRefresh() {
-      console.log('New version available!');
+      console.log('[PWA Update] 🎉 NEW VERSION AVAILABLE! Showing update prompt...');
       setShowReload(true);
     },
     onOfflineReady() {
-      console.log('App ready to work offline');
+      console.log('[PWA Update] 📱 App ready to work offline');
     }
   });
 
   useEffect(() => {
+    console.log('[PWA Update] Component mounted, needRefresh state:', needRefresh);
     if (needRefresh) {
+      console.log('[PWA Update] ⚡ Setting showReload to true');
       setShowReload(true);
     }
   }, [needRefresh]);
 
+  useEffect(() => {
+    console.log('[PWA Update] showReload state changed:', showReload);
+  }, [showReload]);
+
   const handleUpdate = () => {
+    console.log('[PWA Update] 🔄 User clicked "Update Now" - reloading app...');
     updateServiceWorker(true);
   };
 
   const handleDismiss = () => {
+    console.log('[PWA Update] ⏭️ User dismissed update notification');
     setShowReload(false);
     setNeedRefresh(false);
   };
