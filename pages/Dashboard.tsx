@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [todaysVisitsCount, setTodaysVisitsCount] = useState(0);
   const [incidentsCount, setIncidentsCount] = useState(0);
   const previousIncidentCountRef = useRef<number>(0);
+  const [audioEnabled, setAudioEnabled] = useState(false);
 
   const loadQuickActions = async () => {
     const data = await api.getTodaysVisits();
@@ -97,11 +98,18 @@ export default function Dashboard() {
     window.addEventListener('online', checkStatus);
     window.addEventListener('offline', checkStatus);
 
+    // Check audio status periodically
+    const checkAudio = () => {
+      setAudioEnabled(audioService.isEnabled());
+    };
+    checkAudio(); // Initial check
+
     loadQuickActions();
     loadIncidentsCount();
     const interval = setInterval(() => {
       loadQuickActions();
       loadIncidentsCount();
+      checkAudio(); // Check audio status
     }, 10000); // Refresh every 10s
 
     return () => {
@@ -171,23 +179,22 @@ export default function Dashboard() {
             <p className="text-slate-500">Aqui está o resumo da portaria hoje.</p>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            {/* Test Sound Button */}
-            <button
-              onClick={testAlertSound}
-              className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all border shadow-sm flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 text-white border-orange-600"
-              title="Testar som de alerta de incidentes"
-            >
-              🔊 Testar Som
-            </button>
-            {/* Elegant Sync Status - DISABLED FOR NOW */}
-            <button
-              onClick={handleSync}
-              disabled={true}
-              className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all border shadow-sm flex-1 md:flex-none bg-slate-100 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
-            >
-              <RefreshCw size={16} />
-              {isOnline ? 'Sincronizar' : 'Offline'}
-            </button>
+            {/* Audio Status Indicator - Only show if audio is NOT enabled */}
+            {!audioEnabled && (
+              <button
+                onClick={testAlertSound}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all border shadow-sm flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 text-white border-orange-600 animate-pulse"
+                title="Clique para ativar alertas sonoros de incidentes"
+              >
+                🔊 Ativar Som
+              </button>
+            )}
+            {/* Audio Enabled Indicator - Subtle green indicator */}
+            {audioEnabled && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-200">
+                🔊 Alertas Ativos
+              </div>
+            )}
           </div>
         </div>
       </div>
