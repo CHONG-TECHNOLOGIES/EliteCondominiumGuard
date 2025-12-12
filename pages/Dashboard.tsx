@@ -54,6 +54,17 @@ export default function Dashboard() {
     }
   };
 
+  const testAlertSound = async () => {
+    console.log('[Dashboard] 🔊 Manual test sound triggered');
+    const success = await audioService.testSound();
+    if (success) {
+      vibrateDevice();
+      showToast('success', '✅ Som de alerta tocado! Agora os alertas de incidentes irão tocar automaticamente.');
+    } else {
+      showToast('error', '❌ Erro ao tocar som. Verifique as permissões do navegador.');
+    }
+  };
+
   const loadIncidentsCount = async () => {
     try {
       const incidents = await api.getIncidents();
@@ -159,15 +170,25 @@ export default function Dashboard() {
             <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Olá, {user?.first_name} 👋</h1>
             <p className="text-slate-500">Aqui está o resumo da portaria hoje.</p>
           </div>
-          {/* Elegant Sync Status - DISABLED FOR NOW */}
-          <button
-            onClick={handleSync}
-            disabled={true}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all border shadow-sm w-full md:w-auto bg-slate-100 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
-          >
-            <RefreshCw size={16} />
-            {isOnline ? 'Sincronizar Agora' : 'Modo Offline'}
-          </button>
+          <div className="flex gap-2 w-full md:w-auto">
+            {/* Test Sound Button */}
+            <button
+              onClick={testAlertSound}
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all border shadow-sm flex-1 md:flex-none bg-orange-500 hover:bg-orange-600 text-white border-orange-600"
+              title="Testar som de alerta de incidentes"
+            >
+              🔊 Testar Som
+            </button>
+            {/* Elegant Sync Status - DISABLED FOR NOW */}
+            <button
+              onClick={handleSync}
+              disabled={true}
+              className="flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all border shadow-sm flex-1 md:flex-none bg-slate-100 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
+            >
+              <RefreshCw size={16} />
+              {isOnline ? 'Sincronizar' : 'Offline'}
+            </button>
+          </div>
         </div>
       </div>
 
