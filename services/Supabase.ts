@@ -747,20 +747,43 @@ export const SupabaseService = {
    * @param condominiumId - Optional condominium filter
    */
   async adminGetAllVisits(startDate?: string, endDate?: string, condominiumId?: number): Promise<Visit[]> {
-    if (!supabase) return [];
+    if (!supabase) {
+      console.error('[SupabaseService] Supabase client not initialized');
+      return [];
+    }
 
     try {
+      console.log('[SupabaseService] Calling admin_get_all_visits RPC with params:', {
+        p_start_date: startDate || null,
+        p_end_date: endDate || null,
+        p_condominium_id: condominiumId || null
+      });
+
       const { data, error } = await supabase.rpc('admin_get_all_visits', {
         p_start_date: startDate || null,
         p_end_date: endDate || null,
         p_condominium_id: condominiumId || null
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[SupabaseService] RPC error:', error);
+        throw error;
+      }
+
+      console.log('[SupabaseService] RPC returned:', data?.length || 0, 'visits');
+      if (data && data.length > 0) {
+        console.log('[SupabaseService] Sample visit:', data[0]);
+      }
 
       return (data || []) as Visit[];
     } catch (err: any) {
-      console.error("[Admin] Error fetching visits via RPC:", err.message || JSON.stringify(err));
+      console.error("[SupabaseService] Error fetching visits via RPC:", {
+        message: err.message,
+        details: err.details,
+        hint: err.hint,
+        code: err.code,
+        fullError: err
+      });
       return [];
     }
   },
@@ -780,36 +803,15 @@ export const SupabaseService = {
 
       if (error) throw error;
 
-      // Transform RPC result to match Incident interface
-      return (data || []).map((inc: any) => ({
-        id: inc.id,
-        reported_at: inc.reported_at,
-        resident_id: inc.resident_id,
-        resident: {
-          id: inc.resident_id,
-          name: inc.resident_name,
-          condominium_id: inc.resident_condominium_id,
-          unit_id: inc.resident_unit_id
-        },
-        unit: inc.resident_unit_id ? {
-          id: inc.resident_unit_id,
-          code_block: inc.unit_code_block,
-          number: inc.unit_number,
-          floor: inc.unit_floor,
-          building_name: inc.unit_building_name,
-          condominium_id: inc.resident_condominium_id
-        } : undefined,
-        description: inc.description,
-        type: inc.type,
-        type_label: inc.type_label,
-        status: inc.status,
-        status_label: inc.status_label,
-        photo_path: inc.photo_path,
-        acknowledged_at: inc.acknowledged_at,
-        acknowledged_by: inc.acknowledged_by,
-        guard_notes: inc.guard_notes,
-        resolved_at: inc.resolved_at
-      } as Incident));
+      // Debug: Log first incident to see actual structure
+      if (data && data.length > 0) {
+        console.log('[Admin] Sample incident from RPC:', JSON.stringify(data[0], null, 2));
+        console.log('[Admin] All keys:', Object.keys(data[0]));
+      }
+
+      // Try direct cast first (like adminGetAllVisits does)
+      // The RPC should return the correct structure with nested objects
+      return (data || []) as Incident[];
     } catch (err: any) {
       console.error("[Admin] Error fetching incidents via RPC:", err.message || JSON.stringify(err));
       return [];

@@ -23,6 +23,12 @@ export default function AdminVisits() {
   const loadData = async () => {
     setLoading(true);
     try {
+      console.log('[AdminVisits] Loading data with filters:', {
+        startDate: startDate ? `${startDate}T00:00:00` : undefined,
+        endDate: endDate ? `${endDate}T23:59:59` : undefined,
+        filterCondoId: filterCondoId || undefined
+      });
+
       const [visitsData, condosData] = await Promise.all([
         api.adminGetAllVisits(
           startDate ? `${startDate}T00:00:00` : undefined,
@@ -31,10 +37,16 @@ export default function AdminVisits() {
         ),
         api.adminGetAllCondominiums()
       ]);
+
+      console.log('[AdminVisits] Loaded visits:', visitsData.length, 'visits');
+      console.log('[AdminVisits] Loaded condominiums:', condosData.length, 'condos');
+      console.log('[AdminVisits] Sample visit data:', visitsData[0]);
+
       setVisits(visitsData);
       setCondominiums(condosData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('[AdminVisits] Error loading data:', error);
+      showToast('error', `Erro ao carregar dados: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
     }
@@ -92,6 +104,18 @@ export default function AdminVisits() {
     const matchesStatus = !filterStatus || visit.status === filterStatus;
 
     return matchesSearch && matchesStatus;
+  });
+
+  // Debug logging for filters
+  console.log('[AdminVisits] Filter summary:', {
+    totalVisits: visits.length,
+    filteredVisits: filteredVisits.length,
+    searchTerm,
+    filterStatus,
+    statusCounts: visits.reduce((acc, v) => {
+      acc[v.status] = (acc[v.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
   });
 
   const handleExportCSV = () => {
