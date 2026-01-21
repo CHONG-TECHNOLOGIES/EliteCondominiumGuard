@@ -8,10 +8,14 @@ Parse arguments (format: "commit message" or "commit message | PR title | PR bod
 Execute:
 1. git status (show what will be committed)
 2. git add .
-3. git commit -m "<commit-message>"
-4. git push -u origin HEAD
-5. Create PR:
+3. Examines recent commit messages to match your repository's style
+4. Drafts an appropriate commit message
+5. git commit -m "<commit-message>"
+6. git push -u origin HEAD
+7. Create PR:
    gh pr create --title "<pr-title>" --body "<pr-body>" --base main --fill
+
+If PR creation has been sucessufully created run the /code-review and then code-simplifier plugin use plan mode
 
 If PR creation fails, provide the URL: https://github.com/<owner>/<repo>/compare/<branch>?expand=1
 

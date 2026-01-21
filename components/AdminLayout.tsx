@@ -148,6 +148,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     }
   ];
 
+
   const toggleSection = (label: string) => {
     setExpandedSections(prev =>
       prev.includes(label)
