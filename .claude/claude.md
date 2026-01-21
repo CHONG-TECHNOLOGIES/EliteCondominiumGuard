@@ -6,7 +6,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 **Elite AccessControl** is an offline-first Progressive Web App (PWA) for condominium and building security gate management. Guards can register visits, deliveries, and incidents even without internet connectivity, with automatic synchronization when connection is restored.
 
-**Stack**: React 19 + TypeScript, Vite 6, Dexie.js (IndexedDB), Supabase (PostgreSQL backend), Tailwind CSS, Google Gemini AI
+**Stack**: React 19 + TypeScript, Vite 6, Dexie.js (IndexedDB), Supabase (PostgreSQL backend), Tailwind CSS, Google Gemini AI, Leaflet (maps)
 
 ## Development Commands
 
@@ -410,7 +410,8 @@ Configured in `vite.config.ts` and `tsconfig.json`.
 ```
 src/
 ├── App.tsx                  # Router + AuthContext provider (462 lines)
-├── types.ts                 # All TypeScript interfaces/enums (239 lines)
+├── types.ts                 # All TypeScript interfaces/enums (238 lines)
+├── eslint.config.js         # ESLint flat config
 ├── components/
 │   ├── CameraCapture.tsx        # Photo capture with preview/retake
 │   ├── ApprovalModeSelector.tsx # Visit approval mode UI
@@ -421,6 +422,11 @@ src/
 │   ├── AdminRoute.tsx           # Route protection for admin
 │   ├── AdminLayout.tsx          # Admin page wrapper
 │   └── UninstallConfirmDialog.tsx # PWA uninstall confirmation
+├── config/
+│   └── deployment.ts            # Environment-aware deployment config
+├── utils/
+│   ├── approvalModes.ts         # Approval mode UI configurations
+│   └── csvExport.ts             # CSV export utilities for data
 ├── pages/
 │   ├── Setup.tsx                # Device configuration (first-run)
 │   ├── Login.tsx                # PIN authentication
@@ -444,16 +450,18 @@ src/
 │       ├── AdminServiceTypes.tsx
 │       ├── AdminAnalytics.tsx
 │       └── AdminAuditLogs.tsx
-└── services/
-    ├── dataService.ts           # CRITICAL: All data operations (1,949 lines)
-    ├── Supabase.ts              # Backend RPC client (2,146 lines)
-    ├── db.ts                    # Dexie database schema (89 lines)
-    ├── deviceUtils.ts           # Device fingerprinting
-    ├── geminiService.ts         # AI concierge integration
-    ├── audioService.ts          # Alert sounds and vibration
-    ├── pwaLifecycleService.ts   # PWA install/uninstall tracking
-    ├── supabaseClient.ts        # Supabase client initialization
-    └── mockSupabase.ts          # Mock data for testing
+├── services/
+│   ├── dataService.ts           # CRITICAL: All data operations (1,949 lines)
+│   ├── Supabase.ts              # Backend RPC client (2,146 lines)
+│   ├── db.ts                    # Dexie database schema (88 lines)
+│   ├── deviceUtils.ts           # Device fingerprinting
+│   ├── geminiService.ts         # AI concierge integration
+│   ├── audioService.ts          # Alert sounds and vibration
+│   ├── pwaLifecycleService.ts   # PWA install/uninstall tracking
+│   ├── supabaseClient.ts        # Supabase client initialization
+│   └── mockSupabase.ts          # Mock data for testing
+├── database/                    # SQL migration files
+└── docs/                        # Project documentation
 ```
 
 ---
@@ -505,6 +513,62 @@ Tracks PWA installation and usage:
 - Service Worker monitoring
 - Visibility tracking
 - Inactivity decommissioning checks
+
+### Deployment Configuration (config/deployment.ts)
+
+Environment-aware configuration for different deployment targets:
+
+```typescript
+import { config } from '@/config/deployment';
+
+// Access environment-specific settings
+config.appUrl          // Base URL for the app
+config.supabaseUrl     // Supabase project URL
+config.supabaseAnonKey // Supabase anonymous key
+config.geminiApiKey    // Google Gemini API key
+```
+
+**Features**:
+- Automatic environment detection (development/staging/production)
+- Centralized configuration management
+- Type-safe configuration access
+
+### Approval Modes Configuration (utils/approvalModes.ts)
+
+Centralized UI configuration for all visit approval modes:
+
+```typescript
+import { APPROVAL_MODE_CONFIGS, getApprovalModeConfig } from '@/utils/approvalModes';
+
+// Get config for a specific mode
+const config = getApprovalModeConfig(ApprovalMode.APP);
+// { label: 'App', icon: '📱', color: 'blue', requiresOnline: true, ... }
+```
+
+**Features**:
+- Maps ApprovalMode enum to UI properties (label, icon, color)
+- Tracks which modes require online connectivity
+- Used by ApprovalModeSelector component
+
+### CSV Export Utilities (utils/csvExport.ts)
+
+Data export functionality for admin reports:
+
+```typescript
+import { exportToCSV, downloadCSV } from '@/utils/csvExport';
+
+// Convert data to CSV string
+const csv = exportToCSV(visits, ['visitor_name', 'check_in_at', 'status']);
+
+// Trigger file download
+downloadCSV(csv, 'visits-report.csv');
+```
+
+**Features**:
+- Generic CSV conversion with column selection
+- Proper escaping for special characters
+- Browser download trigger
+- Supports visits, incidents, and other data exports
 
 ---
 
@@ -1069,7 +1133,7 @@ get_service_types()
 - [ ] QR Code for recurring visitors
 - [ ] Facial biometrics for identification
 - [ ] IP camera integration
-- [ ] Visit history export (CSV/PDF)
+- [x] Visit history export (CSV/PDF) - *Implemented in utils/csvExport.ts*
 - [ ] Vehicle & parking management
 - [ ] Internal guard chat
 
@@ -1080,6 +1144,37 @@ get_service_types()
 - [ ] Automated testing (Jest + Testing Library)
 - [ ] CI/CD pipeline
 - [ ] Error monitoring (Sentry)
+- [x] ESLint configuration - *Implemented in eslint.config.js*
+
+---
+
+## Claude Code Integration
+
+### MCP Server (Notion)
+
+This project integrates with Claude Code via the Model Context Protocol (MCP) for enhanced workflow automation.
+
+**Configuration**: See `docs/MCP.md` for setup instructions.
+
+**Available Skills**:
+- `/notion-task` - Automated workflow for starting work on Notion tasks
+
+**Setup Requirements**:
+1. Notion integration token configured
+2. MCP server enabled in Claude Code settings
+3. Database connection established
+
+**Usage**:
+```bash
+# In Claude Code
+/notion-task [task-name]
+```
+
+This enables Claude to:
+- Query Notion databases for tasks
+- Update task status automatically
+- Link commits to Notion pages
+- Track work progress
 
 ---
 
