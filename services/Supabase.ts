@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, Street } from '../types';
+import { Staff, Visit, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
 
 /**
  * Serviço Real de API Supabase
@@ -271,6 +271,7 @@ export const SupabaseService = {
     );
 
     try {
+      console.log("[DEBUG] cleanedPayload keys:", Object.keys(cleanedPayload));
       const { data, error } = await supabase
         .rpc('create_visit', { p_data: cleanedPayload });
 
@@ -1691,6 +1692,46 @@ export const SupabaseService = {
     } catch (err: any) {
       console.error("[Admin] Error fetching audit logs:", err.message || JSON.stringify(err));
       return { logs: [], total: 0 };
+    }
+  },
+
+  /**
+   * Admin: Get device registration errors with optional filters
+   */
+  async adminGetDeviceRegistrationErrors(filters?: {
+    startDate?: string;
+    endDate?: string;
+    deviceIdentifier?: string;
+  }, limit: number = 100, offset: number = 0): Promise<{ errors: DeviceRegistrationError[], total: number }> {
+    if (!supabase) return { errors: [], total: 0 };
+
+    try {
+      let query = supabase
+        .from('device_registration_errors')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (filters?.startDate) {
+        query = query.gte('created_at', filters.startDate);
+      }
+      if (filters?.endDate) {
+        query = query.lte('created_at', filters.endDate);
+      }
+      if (filters?.deviceIdentifier) {
+        query = query.eq('device_identifier', filters.deviceIdentifier);
+      }
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+
+      return {
+        errors: (data as DeviceRegistrationError[]) || [],
+        total: count || 0
+      };
+    } catch (err: any) {
+      console.error("[Admin] Error fetching device registration errors:", err.message || JSON.stringify(err));
+      return { errors: [], total: 0 };
     }
   },
 

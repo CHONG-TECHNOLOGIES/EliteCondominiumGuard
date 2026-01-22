@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Settings,
   BarChart3,
+  FileText,
   LogOut,
   Menu,
   X,
@@ -145,6 +146,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       label: 'Analytics',
       path: '/admin/analytics',
       icon: <BarChart3 size={20} />
+    },
+    {
+      label: 'Logs',
+      path: '/admin/logs',
+      icon: <FileText size={20} />,
+      children: [
+        {
+          label: 'Auditoria',
+          path: '/admin/audit-logs',
+          icon: <FileText size={18} />
+        },
+        {
+          label: 'Erros de Registo',
+          path: '/admin/device-registration-errors',
+          icon: <AlertTriangle size={18} />
+        }
+      ]
     }
   ];
 

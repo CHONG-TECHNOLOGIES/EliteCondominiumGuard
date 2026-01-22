@@ -276,6 +276,52 @@ Component → DataService → IndexedDB (primary) + Supabase (sync)
 - `syncPendingItems()` automatically retries failed syncs
 - Called on health check recovery and user-triggered sync
 
+**Sync Event System**:
+The `DataService` emits custom window events to notify the UI about sync progress:
+
+```typescript
+// Event types (dataService.ts)
+type SyncEventType = 'sync:start' | 'sync:progress' | 'sync:complete' | 'sync:error';
+
+// Event detail structure
+interface SyncEventDetail {
+  total?: number;    // Total items to sync
+  synced?: number;   // Items synced so far
+  message?: string;  // Status message
+  error?: string;    // Error message (for sync:error)
+}
+```
+
+**Sync Flow**:
+```
+1. syncPendingItems() called (manual or auto-recovery)
+2. Emit 'sync:start' with total count
+3. For each pending item:
+   - Sync to Supabase
+   - Emit 'sync:progress' with current count
+4. Emit 'sync:complete' or 'sync:error'
+```
+
+**SyncOverlay Component** (components/SyncOverlay.tsx):
+- Full-screen overlay shown during sync operations
+- Displays progress bar with item count
+- Shows success/error states
+- Prevents user interaction during sync
+
+**App.tsx Event Listeners**:
+```typescript
+// App.tsx listens to sync events and controls SyncOverlay visibility
+window.addEventListener('sync:start', handleSyncStart);
+window.addEventListener('sync:progress', handleSyncProgress);
+window.addEventListener('sync:complete', handleSyncComplete);
+window.addEventListener('sync:error', handleSyncError);
+```
+
+**Automatic Sync Triggers**:
+1. Health check recovery (backend was down, now up) - every 60 seconds
+2. Manual sync button on Dashboard
+3. After creating/updating records when online
+
 ### 3. Device Configuration Flow
 
 Each tablet must be configured before use:
@@ -419,6 +465,7 @@ src/
 │   ├── ErrorBoundary.tsx        # Error handling wrapper
 │   ├── PWAInstallPrompt.tsx     # PWA installation UI
 │   ├── PWAUpdateNotification.tsx# PWA update alerts
+│   ├── SyncOverlay.tsx          # Full-screen sync progress overlay
 │   ├── AdminRoute.tsx           # Route protection for admin
 │   ├── AdminLayout.tsx          # Admin page wrapper
 │   └── UninstallConfirmDialog.tsx # PWA uninstall confirmation

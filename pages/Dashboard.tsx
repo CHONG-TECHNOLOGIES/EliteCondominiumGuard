@@ -13,7 +13,6 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
   const { showToast, showConfirm } = useToast();
-  const [syncing, setSyncing] = useState(false);
   const [isOnline, setIsOnline] = useState(api.checkOnline());
 
   // AI State
@@ -121,9 +120,12 @@ export default function Dashboard() {
 
   const handleSync = async () => {
     if (!isOnline) return;
-    setSyncing(true);
+    // syncPendingItems now emits events that App.tsx listens to
+    // The SyncOverlay will automatically show/hide based on those events
     await api.syncPendingItems();
-    setSyncing(false);
+    // Refresh data after sync
+    loadQuickActions();
+    loadIncidentsCount();
   };
 
   const handleAskAI = async (e: React.FormEvent) => {

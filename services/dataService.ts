@@ -1,9 +1,18 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, Street } from '../types';
+import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 
+// Sync event types for UI integration
+export type SyncEventType = 'sync:start' | 'sync:progress' | 'sync:complete' | 'sync:error';
+
+export interface SyncEventDetail {
+  total?: number;
+  synced?: number;
+  message?: string;
+  error?: string;
+}
 
 class DataService {
   private isOnline: boolean = navigator.onLine;
@@ -11,11 +20,20 @@ class DataService {
   private currentCondoId: number | null = null;
   private currentCondoDetails: Condominium | null = null;
   private currentDeviceId: string | null = null; // Track device ID (UUID) for visit tracking
+  private isSyncing: boolean = false; // Prevent concurrent syncs
 
   constructor() {
     window.addEventListener('online', () => this.setOnlineStatus(true));
     window.addEventListener('offline', () => this.setOnlineStatus(false));
     this.init();
+  }
+
+  /**
+   * Emit sync events for UI integration
+   * UI components can listen to these events to show sync overlay
+   */
+  private emitSyncEvent(type: SyncEventType, detail: SyncEventDetail = {}) {
+    window.dispatchEvent(new CustomEvent(type, { detail }));
   }
 
   private async init() {
@@ -56,9 +74,16 @@ class DataService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-      const SUPABASE_URL = process.env.SUPABASE_URL || 'https://nfuglaftnaohzacilike.supabase.co';
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://nfuglaftnaohzacilike.supabase.co';
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const headers: Record<string, string> = {};
+      if (SUPABASE_ANON_KEY) {
+        headers.apikey = SUPABASE_ANON_KEY;
+        headers.Authorization = `Bearer ${SUPABASE_ANON_KEY}`;
+      }
       const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
         method: 'HEAD',
+        headers,
         signal: controller.signal
       });
 
@@ -153,9 +178,30 @@ class DataService {
   private startHealthCheck() {
     setInterval(async () => {
       if (this.isOnline) {
+        const wasUnhealthy = this.backendHealthScore === 0;
+
         // Ping Supabase
-        const success = await SupabaseService.getServiceTypes().then(res => res.length > 0);
-        if (success) this.backendHealthScore = 3;
+        const success = await SupabaseService.getServiceTypes().then(res => res.length > 0).catch(() => false);
+
+        if (success) {
+          this.backendHealthScore = 3;
+
+          // If backend just recovered, sync pending items automatically
+          if (wasUnhealthy) {
+            console.log('[DataService] Backend recovered - auto-syncing pending items...');
+            // syncPendingItems already emits all necessary events
+            this.syncPendingItems().then(count => {
+              if (count > 0) {
+                console.log(`[DataService] ✓ Auto-synced ${count} pending items after recovery`);
+              }
+            }).catch(err => {
+              console.error('[DataService] Auto-sync after recovery failed:', err);
+            });
+          }
+        } else {
+          this.backendHealthScore = Math.max(0, this.backendHealthScore - 1);
+          console.log('[DataService] Health check failed, score:', this.backendHealthScore);
+        }
       }
     }, 60000); // Check every minute
   }
@@ -1027,66 +1073,156 @@ class DataService {
   }
 
   async syncPendingItems(): Promise<number> {
+    // Prevent concurrent syncs
+    if (this.isSyncing) {
+      console.log("[DataService] Sync already in progress, skipping");
+      return 0;
+    }
+
     if (!this.isBackendHealthy) return 0;
     if (!this.currentCondoId) {
       console.warn("[DataService] Cannot sync: no condominium ID set");
       return 0;
     }
 
+    this.isSyncing = true;
     let totalSynced = 0;
 
-    // Sync pending visits
-    const pendingVisits = await db.visits
-      .where('sync_status')
-      .equals(SyncStatus.PENDING_SYNC)
-      .toArray();
+    try {
+      // Get all pending items to calculate total
+      const pendingVisits = await db.visits
+        .where('sync_status')
+        .equals(SyncStatus.PENDING_SYNC)
+        .toArray();
 
-    for (const visit of pendingVisits) {
-      try {
-        // Check if visit has offline photo data that needs to be uploaded
-        const visitWithPhoto = visit as Visit & { photo_data_url?: string };
+      const pendingIncidents = await db.incidents
+        .where('sync_status')
+        .equals(SyncStatus.PENDING_SYNC)
+        .toArray();
 
-        if (visitWithPhoto.photo_data_url && !visitWithPhoto.photo_url) {
-          console.log("[DataService] Uploading offline photo for visit:", visit.id);
-          const photoUrl = await SupabaseService.uploadVisitorPhoto(
-            visitWithPhoto.photo_data_url,
-            this.currentCondoId,
-            visit.visitor_name
-          );
+      const totalPending = pendingVisits.length + pendingIncidents.length;
 
-          if (photoUrl) {
-            visit.photo_url = photoUrl;
-            console.log("[DataService] Offline photo uploaded successfully:", photoUrl);
-          } else {
-            console.warn("[DataService] Failed to upload offline photo, syncing visit without photo");
+      // Emit start event
+      this.emitSyncEvent('sync:start', {
+        total: totalPending,
+        message: `A sincronizar ${totalPending} items...`
+      });
+
+      // If nothing to sync, complete immediately
+      if (totalPending === 0) {
+        this.emitSyncEvent('sync:complete', { synced: 0, message: 'Nada para sincronizar' });
+        return 0;
+      }
+
+      // Sync pending visits
+      for (const visit of pendingVisits) {
+        try {
+          // Check if visit has offline photo data that needs to be uploaded
+          const visitWithPhoto = visit as Visit & { photo_data_url?: string };
+
+          if (visitWithPhoto.photo_data_url && !visitWithPhoto.photo_url) {
+            console.log("[DataService] Uploading offline photo for visit:", visit.id);
+            const photoUrl = await SupabaseService.uploadVisitorPhoto(
+              visitWithPhoto.photo_data_url,
+              this.currentCondoId!,
+              visit.visitor_name
+            );
+
+            if (photoUrl) {
+              visit.photo_url = photoUrl;
+              console.log("[DataService] Offline photo uploaded successfully:", photoUrl);
+            } else {
+              console.warn("[DataService] Failed to upload offline photo, syncing visit without photo");
+            }
+
+            // Remove photo_data_url before syncing to Supabase (not a DB column)
+            delete visitWithPhoto.photo_data_url;
           }
 
-          // Remove photo_data_url before syncing to Supabase (not a DB column)
-          delete visitWithPhoto.photo_data_url;
-        }
+          const createdVisit = await SupabaseService.createVisit(visit);
+          if (createdVisit) {
+            // Replace local temp visit with server version (has real ID)
+            await db.visits.delete(visit.id); // Delete temp ID
+            createdVisit.sync_status = SyncStatus.SYNCED;
+            await db.visits.put(createdVisit); // Add server version
+            totalSynced++;
+            console.log("[DataService] Synced pending visit:", visit.id, "-> new ID:", createdVisit.id);
 
-        const createdVisit = await SupabaseService.createVisit(visit);
-        if (createdVisit) {
-          // Replace local temp visit with server version (has real ID)
-          await db.visits.delete(visit.id); // Delete temp ID
-          createdVisit.sync_status = SyncStatus.SYNCED;
-          await db.visits.put(createdVisit); // Add server version
-          totalSynced++;
-          console.log("[DataService] Synced pending visit:", visit.id, "-> new ID:", createdVisit.id);
+            // Emit progress event
+            this.emitSyncEvent('sync:progress', {
+              synced: totalSynced,
+              total: totalPending,
+              message: `Visita sincronizada (${totalSynced}/${totalPending})`
+            });
+          }
+        } catch (e) {
+          console.error("[DataService] Failed to sync visit:", visit.id, e);
+          this.backendHealthScore--;
+          this.emitSyncEvent('sync:error', {
+            error: `Erro ao sincronizar visita: ${e instanceof Error ? e.message : 'Erro desconhecido'}`
+          });
+          break; // Stop on first failure
         }
-      } catch (e) {
-        console.error("[DataService] Failed to sync visit:", visit.id, e);
-        this.backendHealthScore--;
-        break; // Stop on first failure
       }
+
+      // Sync pending incidents
+      for (const incident of pendingIncidents) {
+        try {
+          let success = false;
+
+          // Determine what kind of update needs to be synced
+          if (incident.status === 'acknowledged' && incident.acknowledged_at) {
+            success = await SupabaseService.acknowledgeIncident(
+              incident.id,
+              incident.acknowledged_by!
+            );
+          } else if ((incident.status === 'inprogress' || incident.status === 'resolved') && incident.guard_notes) {
+            const lastNote = incident.guard_notes.split('\n---\n').pop() || incident.guard_notes;
+            success = await SupabaseService.reportIncidentAction(
+              incident.id,
+              lastNote,
+              incident.status
+            );
+          }
+
+          if (success) {
+            incident.sync_status = SyncStatus.SYNCED;
+            await db.incidents.put(incident);
+            totalSynced++;
+            console.log("[DataService] Synced incident:", incident.id);
+
+            // Emit progress event
+            this.emitSyncEvent('sync:progress', {
+              synced: totalSynced,
+              total: totalPending,
+              message: `Incidente sincronizado (${totalSynced}/${totalPending})`
+            });
+          }
+        } catch (e) {
+          console.error("[DataService] Failed to sync incident:", incident.id, e);
+          this.backendHealthScore--;
+          this.emitSyncEvent('sync:error', {
+            error: `Erro ao sincronizar incidente: ${e instanceof Error ? e.message : 'Erro desconhecido'}`
+          });
+          break;
+        }
+      }
+
+      console.log(`[DataService] Sync complete: ${totalSynced} items synced`);
+
+      // Emit complete event
+      this.emitSyncEvent('sync:complete', {
+        synced: totalSynced,
+        total: totalPending,
+        message: totalSynced > 0
+          ? `${totalSynced} items sincronizados com sucesso`
+          : 'Sincronização concluída'
+      });
+
+      return totalSynced;
+    } finally {
+      this.isSyncing = false;
     }
-
-    // Sync pending incidents
-    const incidentsSynced = await this.syncPendingIncidents();
-    totalSynced += incidentsSynced;
-
-    console.log(`[DataService] Sync complete: ${totalSynced} items synced (visits + incidents)`);
-    return totalSynced;
   }
 
   // --- Incidents ---
@@ -1940,6 +2076,22 @@ class DataService {
     } catch (e) {
       console.error('[Admin] Failed to fetch audit logs (online required):', e);
       return { logs: [], total: 0 };
+    }
+  }
+
+  /**
+   * Admin: Get device registration errors with optional filters and pagination
+   */
+  async adminGetDeviceRegistrationErrors(filters?: {
+    startDate?: string;
+    endDate?: string;
+    deviceIdentifier?: string;
+  }, limit: number = 100, offset: number = 0): Promise<{ errors: DeviceRegistrationError[], total: number }> {
+    try {
+      return await SupabaseService.adminGetDeviceRegistrationErrors(filters, limit, offset);
+    } catch (e) {
+      console.error('[Admin] Failed to fetch device registration errors (online required):', e);
+      return { errors: [], total: 0 };
     }
   }
 }

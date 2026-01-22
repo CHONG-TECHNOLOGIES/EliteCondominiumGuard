@@ -226,6 +226,14 @@ export interface AuditLog {
   details: any;                  // JSON details about the change
 }
 
+export interface DeviceRegistrationError {
+  id: number;
+  created_at: string;
+  device_identifier?: string | null;
+  error_message: string;
+  payload?: any;
+}
+
 export interface CondominiumStats {
   id: number;
   name: string;

@@ -28,9 +28,12 @@ import AdminVisitTypes from './pages/admin/AdminVisitTypes';
 import AdminServiceTypes from './pages/admin/AdminServiceTypes';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminAuditLogs from './pages/admin/AdminAuditLogs';
+import AdminDeviceRegistrationErrors from './pages/admin/AdminDeviceRegistrationErrors';
 import { ToastProvider } from './components/Toast';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
+import { SyncOverlay } from './components/SyncOverlay';
+import type { SyncEventDetail } from './services/dataService';
 
 // --- Auth Context ---
 interface AuthContextType {
@@ -363,6 +366,21 @@ const ConfigGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 export default function App() {
   const [user, setUser] = useState<Staff | null>(null);
 
+  // Sync overlay state
+  const [syncState, setSyncState] = useState<{
+    isVisible: boolean;
+    status: 'syncing' | 'success' | 'error';
+    message: string;
+    total: number;
+    synced: number;
+  }>({
+    isVisible: false,
+    status: 'syncing',
+    message: '',
+    total: 0,
+    synced: 0
+  });
+
   const login = (staff: Staff) => {
     setUser(staff);
     // Persist auth state to survive PWA updates
@@ -415,10 +433,67 @@ export default function App() {
     document.addEventListener('touchstart', initAudio);
     document.addEventListener('keydown', initAudio);
 
+    // --- Sync Event Listeners ---
+    const handleSyncStart = (e: Event) => {
+      const detail = (e as CustomEvent<SyncEventDetail>).detail;
+      setSyncState({
+        isVisible: true,
+        status: 'syncing',
+        message: detail.message || 'A sincronizar...',
+        total: detail.total || 0,
+        synced: 0
+      });
+    };
+
+    const handleSyncProgress = (e: Event) => {
+      const detail = (e as CustomEvent<SyncEventDetail>).detail;
+      setSyncState(prev => ({
+        ...prev,
+        synced: detail.synced || 0,
+        message: detail.message || prev.message
+      }));
+    };
+
+    const handleSyncComplete = (e: Event) => {
+      const detail = (e as CustomEvent<SyncEventDetail>).detail;
+      setSyncState(prev => ({
+        ...prev,
+        status: 'success',
+        message: detail.message || 'Sincronização concluída',
+        synced: detail.synced || prev.synced
+      }));
+      // Auto-hide after 1.5 seconds
+      setTimeout(() => {
+        setSyncState(prev => ({ ...prev, isVisible: false }));
+      }, 1500);
+    };
+
+    const handleSyncError = (e: Event) => {
+      const detail = (e as CustomEvent<SyncEventDetail>).detail;
+      setSyncState(prev => ({
+        ...prev,
+        status: 'error',
+        message: detail.error || 'Erro na sincronização'
+      }));
+      // Auto-hide after 3 seconds on error
+      setTimeout(() => {
+        setSyncState(prev => ({ ...prev, isVisible: false }));
+      }, 3000);
+    };
+
+    window.addEventListener('sync:start', handleSyncStart);
+    window.addEventListener('sync:progress', handleSyncProgress);
+    window.addEventListener('sync:complete', handleSyncComplete);
+    window.addEventListener('sync:error', handleSyncError);
+
     return () => {
       document.removeEventListener('click', initAudio);
       document.removeEventListener('touchstart', initAudio);
       document.removeEventListener('keydown', initAudio);
+      window.removeEventListener('sync:start', handleSyncStart);
+      window.removeEventListener('sync:progress', handleSyncProgress);
+      window.removeEventListener('sync:complete', handleSyncComplete);
+      window.removeEventListener('sync:error', handleSyncError);
     };
   }, []);
 
@@ -427,6 +502,13 @@ export default function App() {
       <AuthContext.Provider value={{ user, login, logout }}>
         <PWAUpdateNotification />
         <PWAInstallPrompt />
+        <SyncOverlay
+          isVisible={syncState.isVisible}
+          status={syncState.status}
+          message={syncState.message}
+          itemsTotal={syncState.total}
+          itemsSynced={syncState.synced}
+        />
         <HashRouter>
           <Routes>
             <Route path="/setup" element={<Setup />} />
@@ -447,6 +529,7 @@ export default function App() {
             <Route path="/admin/config/service-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminServiceTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
             <Route path="/admin/analytics" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAnalytics /></AdminLayout></AdminRoute></ConfigGuard>} />
             <Route path="/admin/audit-logs" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAuditLogs /></AdminLayout></AdminRoute></ConfigGuard>} />
+            <Route path="/admin/device-registration-errors" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDeviceRegistrationErrors /></AdminLayout></AdminRoute></ConfigGuard>} />
 
             {/* Guard Routes */}
             <Route path="/" element={<ConfigGuard><ProtectedRoute><Dashboard /></ProtectedRoute></ConfigGuard>} />
