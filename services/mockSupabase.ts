@@ -57,7 +57,7 @@ class DataService {
   private async refreshConfigs(condoId: string) {
     if (!this.useRealBackend) return;
     
-    const vt = await SupabaseService.getVisitTypes(condoId);
+    const vt = await SupabaseService.getVisitTypes(parseInt(condoId, 10));
     if (vt.length) localStorage.setItem(STORAGE_KEYS.CONFIG_VISIT_TYPES, JSON.stringify(vt));
 
     const st = await SupabaseService.getServiceTypes();
@@ -68,7 +68,7 @@ class DataService {
     const cached = localStorage.getItem(STORAGE_KEYS.CONFIG_VISIT_TYPES);
     // Se online, tenta atualizar em background, mas retorna cache para velocidade
     if (this.isOnline && this.useRealBackend) {
-        SupabaseService.getVisitTypes(condoId).then(vt => {
+        SupabaseService.getVisitTypes(parseInt(condoId, 10)).then(vt => {
             if(vt.length) localStorage.setItem(STORAGE_KEYS.CONFIG_VISIT_TYPES, JSON.stringify(vt));
         });
     }

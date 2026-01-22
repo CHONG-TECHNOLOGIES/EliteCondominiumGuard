@@ -1,0 +1,24 @@
+# =========================
+# Codex MCP Configuration
+# =========================
+
+[mcp_servers]
+
+# -------------------------
+# Notion MCP (Hosted)
+# -------------------------
+[mcp_servers.notion]
+url = "https://mcp.notion.com/mcp"
+
+headers = { 
+  "Authorization" = "Bearer ${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}"
+}
+
+
+# -------------------------
+# Supabase MCP (Hosted)
+# -------------------------
+[mcp_servers.supabase]
+# OPTIONAL but recommended:
+# Replace YOUR_PROJECT_REF with your Supabase project ref
+url = "https://mcp.supabase.com/mcp?project_ref=YOUR_PROJECT_REF"

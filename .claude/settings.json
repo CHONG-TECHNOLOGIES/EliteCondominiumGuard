@@ -12,14 +12,14 @@
     "ask": []
   },
   "hooks": {
-    "PostToolUse": [
-    ]
+    "PostToolUse": []
   },
   "enabledPlugins": {
     "code-review@claude-plugins-official": true,
     "context7@claude-plugins-official": true,
     "code-simplifier@claude-plugins-official": true,
     "vercel@claude-plugins-official": true,
-    "sentry@claude-plugins-official": true
+    "sentry@claude-plugins-official": true,
+    "supabase@claude-plugins-official": true
   }
 }

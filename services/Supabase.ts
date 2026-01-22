@@ -16,9 +16,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('condominiums')
-        .select('*')
-        .eq('id', condoId)
+        .rpc('get_condominium', { p_id: condoId })
         .single();
 
       if (error) throw error;
@@ -33,16 +31,18 @@ export const SupabaseService = {
     if (!supabase) return [];
 
     try {
-      // Otimização: Filtrar diretamente na base de dados
+      // Use RPC to get all condominiums, then filter in memory
       const { data, error } = await supabase
-        .from('condominiums')
-        .select('*')
-        .eq('status', 'ACTIVE')
-        .order('name');
+        .rpc('get_condominiums');
 
       if (error) throw error;
 
-      return (data as Condominium[]) || [];
+      // Filter for ACTIVE status and sort by name
+      const activeCondos = (data as Condominium[] || [])
+        .filter(c => c.status === 'ACTIVE')
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      return activeCondos;
 
     } catch (err: any) {
       console.error("Error listing condos:", err.message || JSON.stringify(err));
@@ -55,10 +55,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('streets')
-        .select('*')
-        .eq('condominium_id', condoId)
-        .order('name');
+        .rpc('get_streets', { p_condominium_id: condoId });
 
       if (error) throw error;
       return data || [];
@@ -73,10 +70,9 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('streets')
-        .insert({ condominium_id: condoId, name })
-        .select()
-        .single();
+        .rpc('create_street', {
+          p_data: { condominium_id: condoId, name }
+        });
 
       if (error) throw error;
       return data;
@@ -91,9 +87,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('streets')
-        .delete()
-        .eq('id', streetId);
+        .rpc('delete_street', { p_id: streetId });
 
       if (error) throw error;
       return true;
@@ -125,23 +119,19 @@ export const SupabaseService = {
   },
 
   // --- Configurações ---
-  async getVisitTypes(): Promise<VisitTypeConfig[]> {
+  async getVisitTypes(condoId: number): Promise<VisitTypeConfig[]> {
     if (!supabase) {
       console.error('[SupabaseService] Supabase client not initialized');
       return [];
     }
 
-    console.log('[SupabaseService] Fetching global visit types');
     try {
-      // Visit types are global (no condominium_id column in table)
       const { data, error } = await supabase
-        .from('visit_types')
-        .select('*')
-        .order('name');
+        .rpc('get_visit_types', { p_condominium_id: condoId });
 
       if (error) throw error;
-      console.log('[SupabaseService] Visit types fetched successfully:', data?.length || 0, 'items');
-      return (data as VisitTypeConfig[]) || [];
+      const visitTypes = (data as VisitTypeConfig[]) || [];
+      return visitTypes.sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
       console.error("[SupabaseService] Error getting visit types:", err.message || JSON.stringify(err));
       return [];
@@ -153,11 +143,11 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('service_types')
-        .select('*');
+        .rpc('get_service_types');
 
       if (error) throw error;
-      return (data as ServiceTypeConfig[]) || [];
+      const serviceTypes = (data as ServiceTypeConfig[]) || [];
+      return serviceTypes.sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
       console.error("Error getting service types:", err.message || JSON.stringify(err));
       return [];
@@ -169,15 +159,13 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('condominium_id', condoId)
-        .eq('status', 'ACTIVE')
-        .order('name');
+        .rpc('get_restaurants', { p_condominium_id: condoId });
 
       if (error) throw error;
-      console.log('[SupabaseService] Restaurants fetched successfully:', data?.length || 0, 'items');
-      return (data as Restaurant[]) || [];
+      const restaurants = (data as Restaurant[]) || [];
+      return restaurants
+        .filter((restaurant) => restaurant.status === 'ACTIVE')
+        .sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
       console.error("[SupabaseService] Error getting restaurants:", err.message || JSON.stringify(err));
       return [];
@@ -189,15 +177,13 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('sports')
-        .select('*')
-        .eq('condominium_id', condoId)
-        .eq('status', 'ACTIVE')
-        .order('name');
+        .rpc('get_sports', { p_condominium_id: condoId });
 
       if (error) throw error;
-      console.log('[SupabaseService] Sports fetched successfully:', data?.length || 0, 'items');
-      return (data as Sport[]) || [];
+      const sports = (data as Sport[]) || [];
+      return sports
+        .filter((sport) => sport.status === 'ACTIVE')
+        .sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
       console.error("[SupabaseService] Error getting sports:", err.message || JSON.stringify(err));
       return [];
@@ -210,9 +196,7 @@ export const SupabaseService = {
     if (!supabase) return [];
     try {
       const { data, error } = await supabase
-        .from('staff')
-        .select('*')
-        .eq('condominium_id', condoId);
+        .rpc('get_staff_by_condominium', { p_condominium_id: condoId });
 
       if (error) throw error;
       return (data as Staff[]) || [];
@@ -227,9 +211,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('units')
-        .select('*, residents(*)')
-        .eq('condominium_id', condoId);
+        .rpc('get_units', { p_condominium_id: condoId });
 
       if (error) throw error;
       return (data as Unit[]) || [];
@@ -243,11 +225,10 @@ export const SupabaseService = {
   async getTodaysVisits(condoId: number): Promise<Visit[]> {
     if (!supabase) return [];
 
-    const today = new Date().toISOString().split('T')[0];
-
     try {
+      // Use RPC to get visits
       const { data, error } = await supabase
-        .from('visits')
+        .rpc('get_todays_visits', { p_condominium_id: condoId })
         .select(`
           *,
           visit_types(name),
@@ -255,14 +236,11 @@ export const SupabaseService = {
           restaurants(name),
           sports(name),
           units(code_block, number)
-        `)
-        .eq('condominium_id', condoId)
-        .gte('check_in_at', `${today}T00:00:00`)
-        .order('check_in_at', { ascending: false });
+        `);
 
       if (error) throw error;
 
-      return data.map((v: any) => ({
+      return (data || []).map((v: any) => ({
         ...v,
         visit_type: v.visit_types?.name || 'Desconhecido',
         service_type: v.service_types?.name,
@@ -294,10 +272,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('visits')
-        .insert(cleanedPayload)
-        .select()
-        .single();
+        .rpc('create_visit', { p_data: cleanedPayload });
 
       if (error) throw error;
       return data as Visit;
@@ -312,9 +287,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('visits')
-        .update(updates)
-        .eq('id', visitId);
+        .rpc('admin_update_visit', { p_id: visitId, p_data: updates });
 
       if (error) throw error;
       return true;
@@ -328,17 +301,15 @@ export const SupabaseService = {
     if (!supabase) return false;
 
     try {
-      const updates: any = { status };
-      if (checkOutAt) {
-        updates.check_out_at = checkOutAt;
+      if (checkOutAt || status === 'LEFT') {
+        const { error } = await supabase
+          .rpc('checkout_visit', { p_id: visitId });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .rpc('update_visit_status', { p_id: visitId, p_status: status });
+        if (error) throw error;
       }
-
-      const { error } = await supabase
-        .from('visits')
-        .update(updates)
-        .eq('id', visitId);
-
-      if (error) throw error;
       return true;
     } catch (err: any) {
       console.error("Update Visit Status Error:", err.message || JSON.stringify(err));
@@ -349,9 +320,11 @@ export const SupabaseService = {
   // --- Logs e Outros ---
   async logAudit(entry: any) {
     if (!supabase) return;
-    supabase.from('audit_logs').insert(entry).then(({ error }) => {
-      if (error) console.error("Audit Log Error:", error.message || JSON.stringify(error));
-    });
+    supabase
+      .rpc('create_audit_log', { p_data: entry })
+      .then(({ error }) => {
+        if (error) console.error("Audit Log Error:", error.message || JSON.stringify(error));
+      });
   },
 
   // --- Incidents ---
@@ -360,12 +333,11 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('incident_types')
-        .select('*')
-        .order('sort_order');
+        .rpc('get_incident_types');
 
       if (error) throw error;
-      return (data as IncidentType[]) || [];
+      const incidentTypes = (data as IncidentType[]) || [];
+      return incidentTypes.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     } catch (err: any) {
       console.error("Error fetching incident types:", err.message || JSON.stringify(err));
       return [];
@@ -377,12 +349,11 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('incident_statuses')
-        .select('*')
-        .order('sort_order');
+        .rpc('get_incident_statuses');
 
       if (error) throw error;
-      return (data as IncidentStatus[]) || [];
+      const incidentStatuses = (data as IncidentStatus[]) || [];
+      return incidentStatuses.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     } catch (err: any) {
       console.error("Error fetching incident statuses:", err.message || JSON.stringify(err));
       return [];
@@ -394,31 +365,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('incidents')
-        .select(`
-          *,
-          residents!inner (
-            id,
-            name,
-            condominium_id,
-            unit_id,
-            units (
-              id,
-              code_block,
-              number,
-              floor,
-              building_name
-            )
-          ),
-          incident_types (
-            label
-          ),
-          incident_statuses (
-            label
-          )
-        `)
-        .eq('residents.condominium_id', condoId)
-        .order('reported_at', { ascending: false });
+        .rpc('get_incidents', { p_condominium_id: condoId });
 
       if (error) throw error;
 
@@ -441,20 +388,14 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('incidents')
-        .update({
-          status: 'acknowledged',
-          acknowledged_by: staffId,
-          acknowledged_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('acknowledge_incident', { p_id: id, p_guard_id: staffId });
 
       if (error) throw error;
 
       // Create notification for resident
-      const incident = data as Incident;
+      const incident = Array.isArray(data) ? data[0] : data;
+      if (!incident) return false;
+
       await this.createIncidentReadNotification(incident);
 
       return true;
@@ -468,15 +409,6 @@ export const SupabaseService = {
     if (!supabase) return false;
 
     try {
-      // First, fetch the existing incident to get current notes
-      const { data: incident, error: fetchError } = await supabase
-        .from('incidents')
-        .select('guard_notes')
-        .eq('id', id)
-        .single();
-
-      if (fetchError) throw fetchError;
-
       // Concatenate new notes with existing notes to preserve history
       const timestamp = new Date().toLocaleString('pt-PT', {
         day: '2-digit',
@@ -488,27 +420,12 @@ export const SupabaseService = {
 
       const formattedNewNote = `[${timestamp}] ${guardNotes}`;
 
-      let updatedNotes: string;
-      if (incident?.guard_notes && incident.guard_notes.trim()) {
-        updatedNotes = `${incident.guard_notes}\n---\n${formattedNewNote}`;
-      } else {
-        updatedNotes = formattedNewNote;
-      }
-
-      const updates: any = {
-        guard_notes: updatedNotes,
-        status: newStatus
-      };
-
-      // If resolving, add resolved timestamp
-      if (newStatus === 'resolved') {
-        updates.resolved_at = new Date().toISOString();
-      }
-
       const { error } = await supabase
-        .from('incidents')
-        .update(updates)
-        .eq('id', id);
+        .rpc('update_incident_status', {
+          p_id: id,
+          p_status: newStatus,
+          p_notes: formattedNewNote
+        });
 
       if (error) throw error;
       return true;
@@ -524,17 +441,16 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('devices')
-        .upsert({
-          device_identifier: device.device_identifier,
-          device_name: device.device_name,
-          condominium_id: device.condominium_id,
-          configured_at: new Date().toISOString(),
-          last_seen_at: new Date().toISOString(),
-          status: 'ACTIVE',
-          metadata: device.metadata
-        }, {
-          onConflict: 'device_identifier'
+        .rpc('register_device', {
+          p_data: {
+            device_identifier: device.device_identifier,
+            device_name: device.device_name,
+            condominium_id: device.condominium_id,
+            configured_at: new Date().toISOString(),
+            last_seen_at: new Date().toISOString(),
+            status: 'ACTIVE',
+            metadata: device.metadata
+          }
         });
 
       if (error) throw error;
@@ -549,10 +465,10 @@ export const SupabaseService = {
     if (!supabase) return;
 
     try {
-      await supabase
-        .from('devices')
-        .update({ last_seen_at: new Date().toISOString() })
-        .eq('device_identifier', deviceIdentifier);
+      const { error } = await supabase
+        .rpc('update_device_heartbeat', { p_identifier: deviceIdentifier });
+
+      if (error) throw error;
     } catch (err: any) {
       console.error("Heartbeat update error:", err.message || JSON.stringify(err));
     }
@@ -566,14 +482,19 @@ export const SupabaseService = {
     if (!supabase) return false;
 
     try {
+      const { data: devices, error: fetchError } = await supabase
+        .rpc('get_device', { p_identifier: deviceIdentifier });
+
+      if (fetchError) throw fetchError;
+
+      const device = Array.isArray(devices) ? devices[0] : devices;
+      if (!device?.id) return false;
+
       const { error } = await supabase
-        .from('devices')
-        .update({
-          status: 'DECOMMISSIONED',
-          condominium_id: null,
-          last_seen_at: new Date().toISOString()
-        })
-        .eq('device_identifier', deviceIdentifier);
+        .rpc('update_device_status', {
+          p_id: device.id,
+          p_status: 'DECOMMISSIONED'
+        });
 
       if (error) throw error;
       console.log('[Supabase] Device decommissioned:', deviceIdentifier);
@@ -589,10 +510,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('devices')
-        .update({ status: 'INACTIVE' })
-        .eq('condominium_id', condoId)
-        .eq('status', 'ACTIVE');
+        .rpc('deactivate_condo_devices', { p_condominium_id: condoId });
 
       if (error) throw error;
       return true;
@@ -685,20 +603,12 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('devices')
-        .select('*')
-        .eq('device_identifier', deviceIdentifier)
-        .single();
+        .rpc('get_device', { p_identifier: deviceIdentifier });
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // No rows returned - device not registered
-          return null;
-        }
-        throw error;
-      }
+      if (error) throw error;
 
-      return data as Device;
+      const device = Array.isArray(data) ? data[0] : data;
+      return (device as Device) || null;
     } catch (err: any) {
       console.error("Get device error:", err.message || JSON.stringify(err));
       return null;
@@ -715,22 +625,17 @@ export const SupabaseService = {
     if (!supabase) return [];
 
     try {
-      let query = supabase
-        .from('devices')
-        .select('*')
-        .eq('condominium_id', condoId)
-        .eq('status', 'ACTIVE');
-
-      // Exclude current device if reconfiguring
-      if (excludeDeviceIdentifier) {
-        query = query.neq('device_identifier', excludeDeviceIdentifier);
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .rpc('get_devices_by_condominium', { p_condominium_id: condoId });
 
       if (error) throw error;
 
-      return (data as Device[]) || [];
+      const devices = (data as Device[]) || [];
+      return devices.filter((device) => {
+        if (device.status !== 'ACTIVE') return false;
+        if (!excludeDeviceIdentifier) return true;
+        return device.device_identifier !== excludeDeviceIdentifier;
+      });
     } catch (err: any) {
       console.error("Get devices by condominium error:", err.message || JSON.stringify(err));
       return [];
@@ -925,18 +830,17 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('condominiums')
-        .insert({
-          name: condo.name,
-          address: condo.address,
-          logo_url: condo.logo_url,
-          latitude: condo.latitude,
-          longitude: condo.longitude,
-          gps_radius_meters: condo.gps_radius_meters,
-          status: condo.status || 'ACTIVE'
-        })
-        .select()
-        .single();
+        .rpc('admin_create_condominium', {
+          p_data: {
+            name: condo.name,
+            address: condo.address,
+            logo_url: condo.logo_url,
+            latitude: condo.latitude,
+            longitude: condo.longitude,
+            gps_radius_meters: condo.gps_radius_meters,
+            status: condo.status || 'ACTIVE'
+          }
+        });
 
       if (error) throw error;
       return data as Condominium;
@@ -954,11 +858,10 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('condominiums')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('admin_update_condominium', {
+          p_id: id,
+          p_data: updates
+        });
 
       if (error) throw error;
       return data as Condominium;
@@ -976,9 +879,10 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('condominiums')
-        .update({ status })
-        .eq('id', id);
+        .rpc('admin_update_condominium', {
+          p_id: id,
+          p_data: { status }
+        });
 
       if (error) throw error;
       return true;
@@ -996,11 +900,10 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('devices')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('admin_update_device', {
+          p_id: parseInt(id, 10),
+          p_data: updates
+        });
 
       if (error) throw error;
       return data as Device;
@@ -1018,9 +921,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('devices')
-        .update({ status: 'DECOMMISSIONED' })
-        .eq('id', id);
+        .rpc('admin_delete_device', { p_id: parseInt(id, 10) });
 
       if (error) throw error;
       return true;
@@ -1037,19 +938,13 @@ export const SupabaseService = {
     if (!supabase) return [];
 
     try {
-      let query = supabase
-        .from('devices')
-        .select('*')
-        .order('last_seen_at', { ascending: false });
-
-      if (condominiumId) {
-        query = query.eq('condominium_id', condominiumId);
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .rpc('admin_get_all_devices');
 
       if (error) throw error;
-      return (data as Device[]) || [];
+      const devices = (data as Device[]) || [];
+      if (!condominiumId) return devices;
+      return devices.filter((device) => device.condominium_id === condominiumId);
     } catch (err: any) {
       console.error("[Admin] Error fetching devices:", err.message || JSON.stringify(err));
       return [];
@@ -1064,16 +959,15 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('staff')
-        .insert({
-          first_name: staff.first_name,
-          last_name: staff.last_name,
-          condominium_id: staff.condominium_id,
-          role: staff.role,
-          pin_hash: staff.pin_hash
-        })
-        .select()
-        .single();
+        .rpc('admin_create_staff', {
+          p_data: {
+            first_name: staff.first_name,
+            last_name: staff.last_name,
+            condominium_id: staff.condominium_id,
+            role: staff.role,
+            pin_hash: staff.pin_hash
+          }
+        });
 
       if (error) throw error;
       return data as Staff;
@@ -1091,11 +985,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('staff')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('admin_update_staff', { p_id: id, p_data: updates });
 
       if (error) throw error;
       return data as Staff;
@@ -1113,9 +1003,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('staff')
-        .delete()
-        .eq('id', id);
+        .rpc('admin_delete_staff', { p_id: id });
 
       if (error) throw error;
       return true;
@@ -1135,16 +1023,15 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('units')
-        .insert({
-          condominium_id: unit.condominium_id,
-          code_block: unit.code_block,
-          number: unit.number,
-          floor: unit.floor,
-          building_name: unit.building_name
-        })
-        .select()
-        .single();
+        .rpc('admin_create_unit', {
+          p_data: {
+            condominium_id: unit.condominium_id,
+            code_block: unit.code_block,
+            number: unit.number,
+            floor: unit.floor,
+            building_name: unit.building_name
+          }
+        });
 
       if (error) throw error;
       return data as Unit;
@@ -1162,11 +1049,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('units')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('admin_update_unit', { p_id: parseInt(id), p_data: updates });
 
       if (error) throw error;
       return data as Unit;
@@ -1184,9 +1067,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('units')
-        .delete()
-        .eq('id', id);
+        .rpc('admin_delete_unit', { p_id: parseInt(id) });
 
       if (error) throw error;
       return true;
@@ -1205,16 +1086,8 @@ export const SupabaseService = {
     if (!supabase) return [];
 
     try {
-      let query = supabase
-        .from('residents')
-        .select('*, unit:units(*), condominium:condominiums(*)')
-        .order('name', { ascending: true });
-
-      if (condominiumId) {
-        query = query.eq('condominium_id', condominiumId);
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .rpc('admin_get_residents', { p_condominium_id: condominiumId || null });
 
       if (error) throw error;
       return data || [];
@@ -1232,16 +1105,15 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('residents')
-        .insert({
-          name: resident.name,
-          email: resident.email,
-          phone: resident.phone,
-          condominium_id: resident.condominium_id,
-          unit_id: resident.unit_id
-        })
-        .select()
-        .single();
+        .rpc('admin_create_resident', {
+          p_data: {
+            name: resident.name,
+            email: resident.email,
+            phone: resident.phone,
+            condominium_id: resident.condominium_id,
+            unit_id: resident.unit_id
+          }
+        });
 
       if (error) throw error;
       return data;
@@ -1259,11 +1131,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('residents')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('admin_update_resident', { p_id: parseInt(id), p_data: updates });
 
       if (error) throw error;
       return data;
@@ -1281,9 +1149,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('residents')
-        .delete()
-        .eq('id', id);
+        .rpc('admin_delete_resident', { p_id: parseInt(id) });
 
       if (error) throw error;
       return true;
@@ -1302,19 +1168,14 @@ export const SupabaseService = {
     if (!supabase) return [];
 
     try {
-      let query = supabase
-        .from('restaurants')
-        .select('*, condominium:condominiums(*)')
-        .order('name', { ascending: true });
-
-      if (condominiumId) {
-        query = query.eq('condominium_id', condominiumId);
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .rpc('admin_get_restaurants');
 
       if (error) throw error;
-      return (data as Restaurant[]) || [];
+      const restaurants = (data as Restaurant[]) || [];
+      return restaurants
+        .filter((restaurant) => !condominiumId || restaurant.condominium_id === condominiumId)
+        .sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
       console.error("[Admin] Error fetching restaurants:", err.message || JSON.stringify(err));
       return [];
@@ -1329,15 +1190,14 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('restaurants')
-        .insert({
-          name: restaurant.name,
-          description: restaurant.description,
-          condominium_id: restaurant.condominium_id,
-          status: restaurant.status || 'ACTIVE'
-        })
-        .select()
-        .single();
+        .rpc('admin_create_restaurant', {
+          p_data: {
+            name: restaurant.name,
+            description: restaurant.description,
+            condominium_id: restaurant.condominium_id,
+            status: restaurant.status || 'ACTIVE'
+          }
+        });
 
       if (error) throw error;
       return data as Restaurant;
@@ -1355,11 +1215,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('restaurants')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('admin_update_restaurant', { p_id: parseInt(id, 10), p_data: updates });
 
       if (error) throw error;
       return data as Restaurant;
@@ -1377,9 +1233,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('restaurants')
-        .delete()
-        .eq('id', id);
+        .rpc('admin_delete_restaurant', { p_id: parseInt(id, 10) });
 
       if (error) throw error;
       return true;
@@ -1398,19 +1252,14 @@ export const SupabaseService = {
     if (!supabase) return [];
 
     try {
-      let query = supabase
-        .from('sports')
-        .select('*, condominium:condominiums(*)')
-        .order('name', { ascending: true });
-
-      if (condominiumId) {
-        query = query.eq('condominium_id', condominiumId);
-      }
-
-      const { data, error } = await query;
+      const { data, error } = await supabase
+        .rpc('admin_get_sports');
 
       if (error) throw error;
-      return (data as Sport[]) || [];
+      const sports = (data as Sport[]) || [];
+      return sports
+        .filter((sport) => !condominiumId || sport.condominium_id === condominiumId)
+        .sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
       console.error("[Admin] Error fetching sports:", err.message || JSON.stringify(err));
       return [];
@@ -1425,15 +1274,14 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('sports')
-        .insert({
-          name: sport.name,
-          description: sport.description,
-          condominium_id: sport.condominium_id,
-          status: sport.status || 'ACTIVE'
-        })
-        .select()
-        .single();
+        .rpc('admin_create_sport', {
+          p_data: {
+            name: sport.name,
+            description: sport.description,
+            condominium_id: sport.condominium_id,
+            status: sport.status || 'ACTIVE'
+          }
+        });
 
       if (error) throw error;
       return data as Sport;
@@ -1451,11 +1299,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('sports')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('admin_update_sport', { p_id: parseInt(id, 10), p_data: updates });
 
       if (error) throw error;
       return data as Sport;
@@ -1473,9 +1317,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('sports')
-        .delete()
-        .eq('id', id);
+        .rpc('admin_delete_sport', { p_id: parseInt(id, 10) });
 
       if (error) throw error;
       return true;
@@ -1494,19 +1336,21 @@ export const SupabaseService = {
     if (!supabase) return null;
 
     try {
-      const updates: any = { status };
+      let data, error;
 
-      // If marking as LEFT, set check_out_at
-      if (status === VisitStatus.LEFT && !updates.check_out_at) {
-        updates.check_out_at = new Date().toISOString();
+      // If marking as LEFT, use checkout_visit RPC which handles check_out_at
+      if (status === VisitStatus.LEFT) {
+        // checkout_visit RPC sets status to LEFT and check_out_at to NOW()
+        const result = await supabase
+          .rpc('checkout_visit', { p_id: id });
+        data = result.data;
+        error = result.error;
+      } else {
+        const result = await supabase
+          .rpc('update_visit_status', { p_id: id, p_status: status });
+        data = result.data;
+        error = result.error;
       }
-
-      const { data, error } = await supabase
-        .from('visits')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
 
       if (error) throw error;
 
@@ -1537,25 +1381,20 @@ export const SupabaseService = {
     if (!supabase) return null;
 
     try {
-      const updates: any = {
-        status: 'ACKNOWLEDGED',
-        acknowledged_at: new Date().toISOString(),
-        acknowledged_by: guardId
-      };
-
-      if (notes) {
-        updates.guard_notes = notes;
-      }
-
       const { data, error } = await supabase
-        .from('incidents')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('acknowledge_incident', { p_id: id, p_guard_id: guardId });
 
       if (error) throw error;
-      return data as Incident;
+
+      if (notes) {
+        const { data: updatedIncident, error: notesError } = await supabase
+          .rpc('admin_update_incident', { p_id: id, p_data: { guard_notes: notes } });
+
+        if (notesError) throw notesError;
+        return updatedIncident as Incident;
+      }
+
+      return (Array.isArray(data) ? data[0] : data) as Incident;
     } catch (err: any) {
       console.error("[Admin] Error acknowledging incident:", err.message || JSON.stringify(err));
       return null;
@@ -1569,36 +1408,25 @@ export const SupabaseService = {
     if (!supabase) return null;
 
     try {
-      const updates: any = {
-        status: 'RESOLVED',
-        resolved_at: new Date().toISOString()
-      };
+      const timestamp = new Date().toLocaleString('pt-PT', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
 
-      if (notes) {
-        updates.guard_notes = notes;
-      }
-
-      // If not already acknowledged, set acknowledgment data too
-      const { data: incident } = await supabase
-        .from('incidents')
-        .select('acknowledged_at')
-        .eq('id', id)
-        .single();
-
-      if (incident && !incident.acknowledged_at) {
-        updates.acknowledged_at = new Date().toISOString();
-        updates.acknowledged_by = guardId;
-      }
+      const formattedNotes = notes ? `[${timestamp}] ${notes}` : null;
 
       const { data, error } = await supabase
-        .from('incidents')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('update_incident_status', {
+          p_id: id,
+          p_status: 'RESOLVED',
+          p_notes: formattedNotes
+        });
 
       if (error) throw error;
-      return data as Incident;
+      return (Array.isArray(data) ? data[0] : data) as Incident;
     } catch (err: any) {
       console.error("[Admin] Error resolving incident:", err.message || JSON.stringify(err));
       return null;
@@ -1613,11 +1441,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('incidents')
-        .update({ guard_notes: notes })
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('admin_update_incident', { p_id: id, p_data: { guard_notes: notes } });
 
       if (error) throw error;
       return data as Incident;
@@ -1637,12 +1461,11 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('visit_types')
-        .select('*')
-        .order('name', { ascending: true });
+        .rpc('admin_get_visit_types');
 
       if (error) throw error;
-      return (data as VisitTypeConfig[]) || [];
+      const visitTypes = (data as VisitTypeConfig[]) || [];
+      return visitTypes.sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
       console.error("[Admin] Error fetching visit types:", err.message || JSON.stringify(err));
       return [];
@@ -1657,16 +1480,15 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('visit_types')
-        .insert({
-          name: visitType.name,
-          icon_key: visitType.icon_key || 'user',
-          requires_service_type: visitType.requires_service_type || false,
-          requires_restaurant: visitType.requires_restaurant || false,
-          requires_sport: visitType.requires_sport || false
-        })
-        .select()
-        .single();
+        .rpc('admin_create_visit_type', {
+          p_data: {
+            name: visitType.name,
+            icon_key: visitType.icon_key || 'user',
+            requires_service_type: visitType.requires_service_type || false,
+            requires_restaurant: visitType.requires_restaurant || false,
+            requires_sport: visitType.requires_sport || false
+          }
+        });
 
       if (error) throw error;
       return data as VisitTypeConfig;
@@ -1684,11 +1506,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('visit_types')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('admin_update_visit_type', { p_id: id, p_data: updates });
 
       if (error) throw error;
       return data as VisitTypeConfig;
@@ -1706,9 +1524,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('visit_types')
-        .delete()
-        .eq('id', id);
+        .rpc('admin_delete_visit_type', { p_id: id });
 
       if (error) throw error;
       return true;
@@ -1728,12 +1544,11 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('service_types')
-        .select('*')
-        .order('name', { ascending: true });
+        .rpc('admin_get_service_types');
 
       if (error) throw error;
-      return (data as ServiceTypeConfig[]) || [];
+      const serviceTypes = (data as ServiceTypeConfig[]) || [];
+      return serviceTypes.sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
       console.error("[Admin] Error fetching service types:", err.message || JSON.stringify(err));
       return [];
@@ -1748,12 +1563,11 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('service_types')
-        .insert({
-          name: serviceType.name
-        })
-        .select()
-        .single();
+        .rpc('admin_create_service_type', {
+          p_data: {
+            name: serviceType.name
+          }
+        });
 
       if (error) throw error;
       return data as ServiceTypeConfig;
@@ -1771,11 +1585,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('service_types')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .rpc('admin_update_service_type', { p_id: id, p_data: updates });
 
       if (error) throw error;
       return data as ServiceTypeConfig;
@@ -1793,9 +1603,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .from('service_types')
-        .delete()
-        .eq('id', id);
+        .rpc('admin_delete_service_type', { p_id: id });
 
       if (error) throw error;
       return true;
@@ -1813,56 +1621,12 @@ export const SupabaseService = {
     if (!supabase) return [];
 
     try {
-      // Fetch all active condominiums
-      const { data: condos, error: condoError } = await supabase
-        .from('condominiums')
-        .select('id, name, address, latitude, longitude, status')
-        .eq('status', 'ACTIVE')
-        .order('name');
+      // Fetch stats using single RPC call
+      const { data, error } = await supabase
+        .rpc('admin_get_condominiums_with_stats');
 
-      if (condoError) throw condoError;
-      if (!condos) return [];
-
-      // Get today's date range
-      const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString();
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).toISOString();
-
-      // Fetch stats for each condominium
-      const stats: CondominiumStats[] = await Promise.all(
-        condos.map(async (condo) => {
-          // Count visits today
-          const { count: visitCount, error: visitError } = await supabase
-            .from('visits')
-            .select('id', { count: 'exact', head: true })
-            .eq('condominium_id', condo.id)
-            .gte('check_in_at', startOfDay)
-            .lt('check_in_at', endOfDay);
-
-          // Count open/acknowledged incidents (not resolved)
-          const { count: incidentCount, error: incidentError } = await supabase
-            .from('incidents')
-            .select('id', { count: 'exact', head: true })
-            .eq('condominium_id', condo.id)
-            .in('status', ['PENDING', 'ACKNOWLEDGED']);
-
-          if (visitError) console.warn(`Error counting visits for condo ${condo.id}:`, visitError);
-          if (incidentError) console.warn(`Error counting incidents for condo ${condo.id}:`, incidentError);
-
-          return {
-            id: condo.id,
-            name: condo.name,
-            address: condo.address,
-            latitude: condo.latitude,
-            longitude: condo.longitude,
-            total_visits_today: visitCount || 0,
-            total_incidents_open: incidentCount || 0,
-            status: condo.status as 'ACTIVE' | 'INACTIVE'
-          };
-        })
-      );
-
-      return stats;
+      if (error) throw error;
+      return (data as CondominiumStats[]) || [];
     } catch (err: any) {
       console.error("[Admin] Error fetching condominium stats:", err.message || JSON.stringify(err));
       return [];
@@ -1888,101 +1652,42 @@ export const SupabaseService = {
     if (!supabase) return { logs: [], total: 0 };
 
     try {
-      // Method 1: Use RPC function (recommended for better performance)
-      // This requires the admin_get_audit_logs RPC function to be created in Supabase
-      const USE_RPC = false; // Set to true after running the audit logging migration
-
-      if (USE_RPC) {
-        const { data, error } = await supabase.rpc('admin_get_audit_logs', {
-          p_start_date: filters?.startDate || null,
-          p_end_date: filters?.endDate || null,
-          p_condominium_id: filters?.condominiumId || null,
-          p_actor_id: filters?.actorId || null,
-          p_action: filters?.action || null,
-          p_target_table: filters?.targetTable || null,
-          p_limit: limit,
-          p_offset: offset
-        });
-
-        if (error) throw error;
-
-        const logs: AuditLog[] = (data || []).map((row: any) => ({
-          id: row.id,
-          created_at: row.created_at,
-          condominium_id: row.condominium_id,
-          condominium: row.condominium_name ? {
-            id: row.condominium_id,
-            name: row.condominium_name
-          } : undefined,
-          actor_id: row.actor_id,
-          actor: row.actor_first_name ? {
-            id: row.actor_id,
-            first_name: row.actor_first_name,
-            last_name: row.actor_last_name,
-            role: row.actor_role
-          } : undefined,
-          action: row.action,
-          target_table: row.target_table,
-          target_id: row.target_id,
-          details: row.details
-        }));
-
-        const total = data && data.length > 0 ? data[0].total_count : 0;
-        return { logs, total };
-      }
-
-      // Method 2: Direct table query with joins (fallback)
-      let query = supabase
-        .from('audit_logs')
-        .select(`
-          *,
-          condominium:condominiums(id, name),
-          actor:staff(id, first_name, last_name, role)
-        `, { count: 'exact' })
-        .order('created_at', { ascending: false });
-
-      // Apply filters
-      if (filters?.startDate) {
-        query = query.gte('created_at', filters.startDate);
-      }
-      if (filters?.endDate) {
-        query = query.lte('created_at', filters.endDate);
-      }
-      if (filters?.condominiumId) {
-        query = query.eq('condominium_id', filters.condominiumId);
-      }
-      if (filters?.actorId) {
-        query = query.eq('actor_id', filters.actorId);
-      }
-      if (filters?.action) {
-        query = query.eq('action', filters.action);
-      }
-      if (filters?.targetTable) {
-        query = query.eq('target_table', filters.targetTable);
-      }
-
-      // Apply pagination
-      query = query.range(offset, offset + limit - 1);
-
-      const { data, error, count } = await query;
+      const { data, error } = await supabase.rpc('admin_get_audit_logs', {
+        p_start_date: filters?.startDate || null,
+        p_end_date: filters?.endDate || null,
+        p_condominium_id: filters?.condominiumId || null,
+        p_actor_id: filters?.actorId || null,
+        p_action: filters?.action || null,
+        p_target_table: filters?.targetTable || null,
+        p_limit: limit,
+        p_offset: offset
+      });
 
       if (error) throw error;
 
-      // Transform data to flatten joins
-      const logs: AuditLog[] = (data || []).map((log: any) => ({
-        id: log.id,
-        created_at: log.created_at,
-        condominium_id: log.condominium_id,
-        condominium: log.condominium,
-        actor_id: log.actor_id,
-        actor: log.actor,
-        action: log.action,
-        target_table: log.target_table,
-        target_id: log.target_id,
-        details: log.details
+      const logs: AuditLog[] = (data || []).map((row: any) => ({
+        id: row.id,
+        created_at: row.created_at,
+        condominium_id: row.condominium_id,
+        condominium: row.condominium_name ? {
+          id: row.condominium_id,
+          name: row.condominium_name
+        } : undefined,
+        actor_id: row.actor_id,
+        actor: row.actor_first_name ? {
+          id: row.actor_id,
+          first_name: row.actor_first_name,
+          last_name: row.actor_last_name,
+          role: row.actor_role
+        } : undefined,
+        action: row.action,
+        target_table: row.target_table,
+        target_id: row.target_id,
+        details: row.details
       }));
 
-      return { logs, total: count || 0 };
+      const total = data && data.length > 0 ? data[0].total_count : 0;
+      return { logs, total };
     } catch (err: any) {
       console.error("[Admin] Error fetching audit logs:", err.message || JSON.stringify(err));
       return { logs: [], total: 0 };
@@ -1997,12 +1702,12 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .from('condominiums')
-        .select('*')
-        .order('name', { ascending: true });
+        .rpc('get_condominiums');
 
       if (error) throw error;
-      return (data as Condominium[]) || [];
+
+      const sorted = (data as Condominium[] || []).sort((a, b) => a.name.localeCompare(b.name));
+      return sorted;
     } catch (err: any) {
       console.error("[Admin] Error fetching all condominiums:", err.message || JSON.stringify(err));
       return [];
@@ -2020,25 +1725,26 @@ export const SupabaseService = {
 
     try {
       // Get all residents of the unit
-      const { data: residents, error: residentError } = await supabase
-        .from('residents')
-        .select('id, condominium_id, unit_id')
-        .eq('unit_id', visit.unit_id)
-        .eq('condominium_id', visit.condominium_id);
+      // Get all residents of the unit using admin_get_residents RPC and filtering
+      const { data: allResidents, error: residentError } = await supabase
+        .rpc('admin_get_residents', { p_condominium_id: visit.condominium_id });
+
+      if (residentError) throw residentError;
+
+      const residents = (allResidents || []).filter((r: any) => r.unit_id === visit.unit_id);
 
       if (residentError) throw residentError;
       if (!residents || residents.length === 0) return false;
 
-      // Create notification for each resident using direct INSERT
+      // Create notification for each resident using RPC
       for (const resident of residents) {
-        await supabase
-          .from('notifications')
-          .insert({
+        await supabase.rpc('create_notification', {
+          p_data: {
             resident_id: resident.id,
             condominium_id: resident.condominium_id,
             unit_id: resident.unit_id,
             title: 'Visitante chegou',
-            body: `${visit.visitor_name || 'Visitante'} entrou no condomínio`,
+            body: `${visit.visitor_name || 'Visitante'} entrou no condom?nio`,
             type: 'visitor_entered',
             data: {
               visit_id: visit.id,
@@ -2047,9 +1753,9 @@ export const SupabaseService = {
               visitor_phone: visit.visitor_phone,
               check_in_at: visit.check_in_at
             }
-          });
+          }
+        });
       }
-
       return true;
     } catch (err: any) {
       console.error('[Notifications] Error creating visitor entered notification:', err.message);
@@ -2066,25 +1772,26 @@ export const SupabaseService = {
 
     try {
       // Get all residents of the unit
-      const { data: residents, error: residentError } = await supabase
-        .from('residents')
-        .select('id, condominium_id, unit_id')
-        .eq('unit_id', visit.unit_id)
-        .eq('condominium_id', visit.condominium_id);
+      // Get all residents of the unit using admin_get_residents RPC and filtering
+      const { data: allResidents, error: residentError } = await supabase
+        .rpc('admin_get_residents', { p_condominium_id: visit.condominium_id });
+
+      if (residentError) throw residentError;
+
+      const residents = (allResidents || []).filter((r: any) => r.unit_id === visit.unit_id);
 
       if (residentError) throw residentError;
       if (!residents || residents.length === 0) return false;
 
-      // Create notification for each resident using direct INSERT
+      // Create notification for each resident using RPC
       for (const resident of residents) {
-        await supabase
-          .from('notifications')
-          .insert({
+        await supabase.rpc('create_notification', {
+          p_data: {
             resident_id: resident.id,
             condominium_id: resident.condominium_id,
             unit_id: resident.unit_id,
             title: 'Visitante saiu',
-            body: `${visit.visitor_name || 'Visitante'} saiu do condomínio`,
+            body: `${visit.visitor_name || 'Visitante'} saiu do condom?nio`,
             type: 'visitor_left',
             data: {
               visit_id: visit.id,
@@ -2092,9 +1799,9 @@ export const SupabaseService = {
               check_in_at: visit.check_in_at,
               check_out_at: visit.check_out_at
             }
-          });
+          }
+        });
       }
-
       return true;
     } catch (err: any) {
       console.error('[Notifications] Error creating visitor left notification:', err.message);
@@ -2111,24 +1818,22 @@ export const SupabaseService = {
 
     try {
       // Get resident info
-      const { data: resident, error: residentError } = await supabase
-        .from('residents')
-        .select('id, condominium_id, unit_id')
-        .eq('id', incident.resident_id)
-        .single();
+      const { data, error: residentError } = await supabase
+        .rpc('get_resident', { p_id: incident.resident_id }); // RPC returns SETOF, so we get array
 
       if (residentError) throw residentError;
+      const resident = data && data.length > 0 ? data[0] : null;
+
       if (!resident) return false;
 
-      // Create notification using direct INSERT
-      await supabase
-        .from('notifications')
-        .insert({
+      // Create notification using RPC
+      await supabase.rpc('create_notification', {
+        p_data: {
           resident_id: resident.id,
           condominium_id: resident.condominium_id,
           unit_id: resident.unit_id,
           title: 'Incidente visualizado',
-          body: 'Seu incidente foi lido pela segurança',
+          body: 'Seu incidente foi lido pela seguran?a',
           type: 'incident_read',
           data: {
             incident_id: incident.id,
@@ -2136,7 +1841,8 @@ export const SupabaseService = {
             acknowledged_at: incident.acknowledged_at,
             acknowledged_by: incident.acknowledged_by
           }
-        });
+        }
+      });
 
       return true;
     } catch (err: any) {

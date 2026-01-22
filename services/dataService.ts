@@ -4,7 +4,6 @@ import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitT
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 
-const MOCK_FALLBACK_ID = "00000000-0000-0000-0000-000000000001";
 
 class DataService {
   private isOnline: boolean = navigator.onLine;
@@ -628,8 +627,7 @@ class DataService {
     if (!this.isBackendHealthy) return;
     console.log('[DataService] refreshConfigs called for condo:', condoId);
     try {
-      // Visit types are global (no condo filter needed)
-      const vt = await SupabaseService.getVisitTypes();
+      const vt = await SupabaseService.getVisitTypes(condoId);
       console.log('[DataService] Received visit types from Supabase:', vt.length, 'items', vt);
       if (vt.length) {
         await db.visitTypes.bulkPut(vt);
