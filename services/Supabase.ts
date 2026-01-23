@@ -226,9 +226,18 @@ export const SupabaseService = {
     if (!supabase) return [];
 
     try {
+      const normalizedCondoId = Number(condoId);
+      if (!Number.isInteger(normalizedCondoId)) {
+        console.error("Error fetching visits: invalid condominium_id", {
+          condoId,
+          type: typeof condoId
+        });
+        return [];
+      }
+
       // Use RPC to get visits (RPC already returns joined fields)
       const { data, error } = await supabase
-        .rpc('get_todays_visits', { p_condominium_id: condoId });
+        .rpc('get_todays_visits', { p_condominium_id: normalizedCondoId });
 
       if (error) throw error;
 
@@ -594,6 +603,42 @@ export const SupabaseService = {
         error: err,
         stack: err.stack
       });
+      return null;
+    }
+  },
+
+  /**
+   * Uploads a condominium logo to Supabase Storage
+   * @param file - Image file (png/jpg/jpeg)
+   * @returns Public URL of the uploaded logo, or null if upload fails
+   */
+  async uploadCondoLogo(file: File): Promise<string | null> {
+    if (!supabase) {
+      console.error('[SupabaseService] Supabase client not initialized');
+      return null;
+    }
+
+    try {
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const fileName = `condo-logos/${Date.now()}_${sanitizedName}`;
+
+      const { error } = await supabase.storage
+        .from('logo_condominio')
+        .upload(fileName, file, {
+          contentType: file.type,
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('logo_condominio')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (err: any) {
+      console.error('[SupabaseService] Logo upload error:', err.message || JSON.stringify(err));
       return null;
     }
   },

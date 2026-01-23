@@ -10,6 +10,7 @@ export default function AdminCondominiums() {
   const [condominiums, setCondominiums] = useState<Condominium[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedCondo, setSelectedCondo] = useState<Condominium | null>(null);
@@ -30,10 +31,22 @@ export default function AdminCondominiums() {
   const [streets, setStreets] = useState<Street[]>([]);
   const [newStreetName, setNewStreetName] = useState('');
   const [loadingStreets, setLoadingStreets] = useState(false);
+  const [pendingStreets, setPendingStreets] = useState<string[]>([]);
+  const [pendingStreetName, setPendingStreetName] = useState('');
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     loadCondominiums();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (logoPreviewUrl && logoPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(logoPreviewUrl);
+      }
+    };
+  }, [logoPreviewUrl]);
 
   const loadCondominiums = async () => {
     setLoading(true);
@@ -56,10 +69,21 @@ export default function AdminCondominiums() {
     try {
       const result = await api.adminCreateCondominium(formData);
       if (result) {
+        const failedStreets: string[] = [];
+        for (const streetName of pendingStreets) {
+          const created = await api.adminAddStreet(result.id, streetName);
+          if (!created) {
+            failedStreets.push(streetName);
+          }
+        }
         await loadCondominiums();
         setShowCreateModal(false);
         resetForm();
-        showToast('success', 'Condomínio criado com sucesso!');
+        if (failedStreets.length > 0) {
+          showToast('warning', 'Condomínio criado, mas algumas ruas falharam');
+        } else {
+          showToast('success', 'Condomínio criado com sucesso!');
+        }
       } else {
         showToast('error', 'Erro ao criar condomínio');
       }
@@ -128,6 +152,7 @@ export default function AdminCondominiums() {
       status: condo.status || 'ACTIVE',
       phone_number: condo.phone_number || ''
     });
+    setLogoPreviewUrl(condo.logo_url || null);
     setShowEditModal(true);
     loadStreets(condo.id);
   };
@@ -177,6 +202,71 @@ export default function AdminCondominiums() {
     }
   };
 
+  const handleAddPendingStreet = () => {
+    const trimmedName = pendingStreetName.trim();
+    if (!trimmedName) return;
+
+    const exists = pendingStreets.some(
+      (street) => street.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (!exists) {
+      setPendingStreets([...pendingStreets, trimmedName]);
+    }
+
+    setPendingStreetName('');
+  };
+
+  const handleRemovePendingStreet = (streetName: string) => {
+    setPendingStreets(pendingStreets.filter((street) => street !== streetName));
+  };
+
+  const handleLogoFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(file.type)) {
+      showToast('warning', 'Formato inválido. Use JPG ou PNG');
+      event.target.value = '';
+      return;
+    }
+
+    const maxSizeBytes = 1.5 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      showToast('warning', 'Tamanho máximo: 1.5MB');
+      event.target.value = '';
+      return;
+    }
+
+    if (logoPreviewUrl && logoPreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(logoPreviewUrl);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setLogoPreviewUrl(previewUrl);
+    setLogoUploading(true);
+
+    try {
+      const uploadedUrl = await api.adminUploadCondoLogo(file);
+      if (uploadedUrl) {
+        setFormData((prev) => ({ ...prev, logo_url: uploadedUrl }));
+        setLogoPreviewUrl(uploadedUrl);
+        showToast('success', 'Logo carregado com sucesso!');
+      } else {
+        setLogoPreviewUrl(null);
+        showToast('error', 'Erro ao carregar logo');
+      }
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      setLogoPreviewUrl(null);
+      showToast('error', 'Erro ao carregar logo');
+    } finally {
+      setLogoUploading(false);
+      event.target.value = '';
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -188,12 +278,17 @@ export default function AdminCondominiums() {
       status: 'ACTIVE',
       phone_number: ''
     });
+    setPendingStreets([]);
+    setPendingStreetName('');
+    setLogoPreviewUrl(null);
   };
 
-  const filteredCondominiums = condominiums.filter(condo =>
-    condo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    condo.address?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCondominiums = condominiums.filter((condo) => {
+    const matchesSearch = condo.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      condo.address?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'ALL' || condo.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
@@ -214,16 +309,28 @@ export default function AdminCondominiums() {
         </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-4 relative">
-        <Search className="absolute left-3 top-3 text-slate-400" size={20} />
-        <input
-          type="text"
-          placeholder="Buscar por nome ou endereço..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      {/* Search + Status Filter */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3 text-slate-400" size={20} />
+          <input
+            type="text"
+            placeholder="Buscar por nome ou endereco..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
+          className="w-full sm:w-52 px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Filtrar por status"
+        >
+          <option value="ALL">Todos</option>
+          <option value="ACTIVE">Ativos</option>
+          <option value="INACTIVE">Inativos</option>
+        </select>
       </div>
 
       {/* Condominiums List */}
@@ -318,7 +425,10 @@ export default function AdminCondominiums() {
             <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-slate-900">Novo Condomínio</h2>
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  resetForm();
+                }}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 <X size={20} />
@@ -358,7 +468,27 @@ export default function AdminCondominiums() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Logo URL</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Logo do Condomínio</label>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                  onChange={handleLogoFileChange}
+                  disabled={logoUploading}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-2">JPG/PNG até 1.5MB</p>
+                {logoPreviewUrl && (
+                  <div className="mt-3">
+                    <img
+                      src={logoPreviewUrl}
+                      alt="Pré-visualização do logo"
+                      className="h-20 w-20 rounded-lg object-cover border border-slate-200"
+                    />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Logo URL (opcional)</label>
                 <input
                   type="text"
                   value={formData.logo_url}
@@ -418,10 +548,57 @@ export default function AdminCondominiums() {
                   placeholder="100"
                 />
               </div>
+
+              <div className="border-t border-slate-200 pt-4 mt-4">
+                <h3 className="text-lg font-bold text-slate-900 mb-4">Ruas do Condomínio</h3>
+
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={pendingStreetName}
+                    onChange={(e) => setPendingStreetName(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nome da rua"
+                  />
+                  <button
+                    onClick={handleAddPendingStreet}
+                    disabled={!pendingStreetName.trim()}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    <Plus size={20} />
+                    Adicionar
+                  </button>
+                </div>
+
+                {pendingStreets.length === 0 ? (
+                  <p className="text-slate-500 text-center py-4">Nenhuma rua adicionada.</p>
+                ) : (
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {pendingStreets.map((street) => (
+                      <div
+                        key={street}
+                        className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200"
+                      >
+                        <span className="text-slate-700">{street}</span>
+                        <button
+                          onClick={() => handleRemovePendingStreet(street)}
+                          className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
+                          title="Remover rua"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  resetForm();
+                }}
                 className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancelar
@@ -487,7 +664,27 @@ export default function AdminCondominiums() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Logo URL</label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Logo do Condomínio</label>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                  onChange={handleLogoFileChange}
+                  disabled={logoUploading}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-slate-500 mt-2">JPG/PNG até 1.5MB</p>
+                {logoPreviewUrl && (
+                  <div className="mt-3">
+                    <img
+                      src={logoPreviewUrl}
+                      alt="Pré-visualização do logo"
+                      className="h-20 w-20 rounded-lg object-cover border border-slate-200"
+                    />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Logo URL (opcional)</label>
                 <input
                   type="text"
                   value={formData.logo_url}

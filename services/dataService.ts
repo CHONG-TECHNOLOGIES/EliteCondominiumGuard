@@ -222,6 +222,65 @@ class DataService {
     return this.isOnline && this.backendHealthScore > 0;
   }
 
+  private async isLocalCacheEmpty(): Promise<boolean> {
+    const counts = await Promise.all([
+      db.condominiums.count(),
+      db.devices.count(),
+      db.staff.count(),
+      db.units.count(),
+      db.visitTypes.count(),
+      db.serviceTypes.count(),
+      db.restaurants.count(),
+      db.sports.count(),
+      db.incidentTypes.count(),
+      db.incidentStatuses.count(),
+      db.incidents.count(),
+      db.visits.count()
+    ]);
+
+    return counts.every(count => count === 0);
+  }
+
+  private async bootstrapSyncIfEmpty(): Promise<void> {
+    if (!this.isBackendHealthy || !this.currentCondoId) return;
+
+    const isEmpty = await this.isLocalCacheEmpty();
+    if (!isEmpty) return;
+
+    console.log('[DataService] Local cache empty - bootstrapping sync from backend...');
+
+    try {
+      if (this.currentCondoDetails) {
+        await db.condominiums.put(this.currentCondoDetails);
+      }
+
+      const [staffList, devices] = await Promise.all([
+        SupabaseService.getStaffForSync(this.currentCondoId),
+        SupabaseService.getActiveDevicesByCondominium(this.currentCondoId)
+      ]);
+
+      if (staffList.length) await db.staff.bulkPut(staffList);
+      if (devices.length) await db.devices.bulkPut(devices);
+
+      await Promise.all([
+        this.refreshConfigs(this.currentCondoId),
+        this.refreshRestaurantsAndSports(this.currentCondoId),
+        this.refreshUnits(this.currentCondoId),
+        this.refreshIncidentConfigs()
+      ]);
+
+      await Promise.all([
+        this.getIncidents(),
+        this.getTodaysVisits()
+      ]);
+
+      console.log('[DataService] Bootstrap sync complete');
+    } catch (error) {
+      console.error('[DataService] Bootstrap sync failed:', error);
+      this.backendHealthScore--;
+    }
+  }
+
   private getStoredUser(): Staff | null {
     try {
       const raw = localStorage.getItem('auth_user');
@@ -329,9 +388,14 @@ class DataService {
       console.log('[DataService] Online - checking central database first...');
 
       try {
-        // Get local device identifier (or generate temporary one)
+        // Get local device identifier (fallback to fingerprint if storage is empty)
         let localDeviceId = localStorage.getItem('condo_guard_device_id');
-        console.log('[DataService] Local device ID from localStorage:', localDeviceId || 'EMPTY');
+        if (!localDeviceId) {
+          localDeviceId = getDeviceIdentifier();
+          console.log('[DataService] Local device ID missing, using fingerprint:', localDeviceId);
+        } else {
+          console.log('[DataService] Local device ID from localStorage:', localDeviceId);
+        }
 
         // Try to find device in central database by local device ID
         let centralDevice = null;
@@ -393,6 +457,7 @@ class DataService {
         this.currentCondoId = correctCondo.id;
 
         console.log('[DataService] ✓ Device configured from central database:', correctCondo.name);
+        await this.bootstrapSyncIfEmpty();
         return true;
 
       } catch (err) {
@@ -972,20 +1037,10 @@ class DataService {
         console.log('[DataService] ONLINE - fetching today\'s visits from Supabase (ignoring cache)...');
         const backendVisits = await SupabaseService.getTodaysVisits(this.currentCondoId);
 
-        // Clear OLD local visits for today (to remove deleted ones)
         const localVisits = await db.visits
           .where('check_in_at')
           .between(`${today}T00:00:00`, `${today}T23:59:59`, true, true)
           .toArray();
-
-        // Delete synced local visits (keep PENDING_SYNC ones for offline changes)
-        const syncedLocalIds = localVisits
-          .filter(v => v.sync_status === SyncStatus.SYNCED)
-          .map(v => v.id);
-        if (syncedLocalIds.length > 0) {
-          await db.visits.bulkDelete(syncedLocalIds);
-          console.log(`[DataService] Cleared ${syncedLocalIds.length} synced local visits`);
-        }
 
         // Cache fresh backend data
         if (backendVisits.length > 0) {
@@ -993,9 +1048,15 @@ class DataService {
           console.log(`[DataService] Cached ${backendVisits.length} visits from backend`);
         }
 
-        // Merge: backend visits + any pending local changes
+        // Merge: backend visits + any pending local changes + local-only synced visits not returned yet
         const pendingLocalVisits = localVisits.filter(v => v.sync_status === SyncStatus.PENDING_SYNC);
-        const allVisits = [...backendVisits, ...pendingLocalVisits];
+        const merged = new Map<number, Visit>();
+        backendVisits.forEach(v => merged.set(v.id, v));
+        pendingLocalVisits.forEach(v => merged.set(v.id, v));
+        localVisits
+          .filter(v => v.sync_status === SyncStatus.SYNCED && !merged.has(v.id))
+          .forEach(v => merged.set(v.id, v));
+        const allVisits = Array.from(merged.values());
 
         console.log(`[DataService] ✓ Returning ${backendVisits.length} backend visits + ${pendingLocalVisits.length} pending local`);
 
@@ -1565,7 +1626,7 @@ class DataService {
         const condo = await SupabaseService.getCondominium(scopedCondoId);
         return condo ? [condo] : [];
       }
-      return await SupabaseService.listActiveCondominiums();
+        return await SupabaseService.adminGetAllCondominiums();
     } catch (e) {
       console.error('[Admin] Failed to fetch condominiums (online required):', e);
       return [];
@@ -1789,6 +1850,18 @@ class DataService {
     } catch (e) {
       console.error('[Admin] Failed to remove street (online required):', e);
       return false;
+    }
+  }
+
+  /**
+   * Admin: Upload condominium logo
+   */
+  async adminUploadCondoLogo(file: File): Promise<string | null> {
+    try {
+      return await SupabaseService.uploadCondoLogo(file);
+    } catch (e) {
+      console.error('[Admin] Failed to upload condominium logo (online required):', e);
+      return null;
     }
   }
 
