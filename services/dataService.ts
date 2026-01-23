@@ -1049,6 +1049,7 @@ class DataService {
       visitor_name: visitData.visitor_name || '',
       visitor_doc: visitData.visitor_doc,
       visitor_phone: visitData.visitor_phone,
+      vehicle_license_plate: visitData.vehicle_license_plate,
       visit_type_id: visitData.visit_type_id,
       service_type_id: visitData.service_type_id,
       restaurant_id: visitData.restaurant_id ? String(visitData.restaurant_id) : undefined,

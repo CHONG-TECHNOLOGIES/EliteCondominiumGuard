@@ -455,7 +455,7 @@ Configured in `vite.config.ts` and `tsconfig.json`.
 
 ```
 src/
-├── App.tsx                  # Router + AuthContext provider (462 lines)
+├── App.tsx                  # Router + AuthContext provider (~550 lines)
 ├── types.ts                 # All TypeScript interfaces/enums (238 lines)
 ├── eslint.config.js         # ESLint flat config
 ├── components/
@@ -482,10 +482,11 @@ src/
 │   ├── DailyList.tsx            # Today's visits list
 │   ├── Incidents.tsx            # Incident management with alerts
 │   ├── Settings.tsx             # Device settings and storage info
-│   └── admin/                   # Admin pages (14 pages)
+│   └── admin/                   # Admin pages (15 pages)
 │       ├── AdminDashboard.tsx
 │       ├── AdminCondominiums.tsx
 │       ├── AdminDevices.tsx
+│       ├── AdminDeviceRegistrationErrors.tsx  # Device registration error tracking
 │       ├── AdminStaff.tsx
 │       ├── AdminUnits.tsx
 │       ├── AdminResidents.tsx
@@ -635,6 +636,7 @@ HashRouter (# based URLs for compatibility)
         ├── /admin              - Admin dashboard
         ├── /admin/condominiums - Manage condominiums
         ├── /admin/devices      - Manage devices
+        ├── /admin/device-registration-errors - View device registration errors
         ├── /admin/staff        - Manage staff
         ├── /admin/units        - Manage units
         ├── /admin/residents    - Manage residents
@@ -642,8 +644,8 @@ HashRouter (# based URLs for compatibility)
         ├── /admin/sports       - Manage sports
         ├── /admin/visits       - View all visits
         ├── /admin/incidents    - Manage incidents
-        ├── /admin/visit-types  - Configure visit types
-        ├── /admin/service-types- Configure service types
+        ├── /admin/config/visit-types    - Configure visit types
+        ├── /admin/config/service-types  - Configure service types
         ├── /admin/analytics    - View statistics
         └── /admin/audit-logs   - View audit trail
 ```
@@ -933,6 +935,31 @@ interface AuditLog {
 }
 ```
 
+#### DeviceRegistrationError
+```typescript
+interface DeviceRegistrationError {
+  id: number;
+  created_at: string;
+  device_identifier?: string | null;
+  error_message: string;
+  payload?: any;  // JSON - original registration payload
+}
+```
+
+#### CondominiumStats
+```typescript
+interface CondominiumStats {
+  id: number;
+  name: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  total_visits_today: number;       // Count of all visits today
+  total_incidents_open: number;     // Count of open/acknowledged incidents
+  status: 'ACTIVE' | 'INACTIVE';
+}
+```
+
 ---
 
 ## Page Descriptions
@@ -1024,13 +1051,14 @@ interface AuditLog {
 
 ### Admin Pages (/admin/*)
 
-14 pages for full administrative management:
+15 pages for full administrative management:
 
 | Page | Purpose |
 |------|---------|
 | AdminDashboard | Admin overview and quick stats |
 | AdminCondominiums | CRUD for condominiums |
 | AdminDevices | Device registry and status management |
+| AdminDeviceRegistrationErrors | View and troubleshoot device registration errors |
 | AdminStaff | Staff management with PIN reset |
 | AdminUnits | Unit/Block management |
 | AdminResidents | Resident directory |

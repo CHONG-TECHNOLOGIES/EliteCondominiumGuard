@@ -153,6 +153,7 @@ export interface Visit {
   visitor_name: string;
   visitor_doc?: string;
   visitor_phone?: string;
+  vehicle_license_plate?: string;  // Matrícula do veículo (opcional)
 
   // For display purposes (fetched via joins)
   visit_type?: string;           // Nome do tipo (para exibição)

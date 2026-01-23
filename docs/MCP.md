@@ -184,3 +184,89 @@ O Claude usará automaticamente os MCP tools apropriados.
 - [Notion MCP Server (npm)](https://www.npmjs.com/package/@notionhq/notion-mcp-server)
 - [Notion API Documentation](https://developers.notion.com/)
 - [Claude Code MCP Documentation](https://docs.anthropic.com/claude-code/mcp)
+
+---
+
+## Playwright MCP Server
+
+### Descrição
+
+O MCP Playwright permite ao Claude Code automatizar browsers para:
+- Navegar em websites e aplicações web
+- Tirar screenshots de páginas
+- Interagir com elementos (clicar, preencher formulários)
+- Testar funcionalidades E2E da aplicação
+
+### Configuração
+
+Não requer configuração adicional. O server inicia automaticamente quando necessário.
+
+### MCP Tools Disponíveis (Playwright)
+
+| Tool | Descrição |
+|------|-----------|
+| `mcp__playwright__browser_navigate` | Navegar para uma URL |
+| `mcp__playwright__browser_screenshot` | Capturar screenshot da página |
+| `mcp__playwright__browser_click` | Clicar num elemento |
+| `mcp__playwright__browser_fill` | Preencher campo de input |
+| `mcp__playwright__browser_select` | Selecionar opção em dropdown |
+| `mcp__playwright__browser_hover` | Hover sobre elemento |
+| `mcp__playwright__browser_evaluate` | Executar JavaScript na página |
+
+### Uso Direto
+
+Podes pedir ao Claude para:
+
+```
+"Abre a aplicação em https://localhost:3000 e tira um screenshot"
+"Testa o login com utilizador X e password Y"
+"Navega até à página de settings e verifica se o botão existe"
+"Preenche o formulário de nova visita e submete"
+```
+
+### Casos de Uso para Elite AccessControl
+
+1. **Testar Login Flow**: Verificar autenticação com PIN
+2. **Testar Registo de Visitas**: Preencher formulário multi-step
+3. **Verificar UI Responsiva**: Screenshots em diferentes viewports
+4. **Testar Modo Offline**: Verificar comportamento sem rede
+5. **Validar PWA**: Testar instalação e funcionalidades offline
+
+### Configuração Técnica (Playwright)
+
+#### `.mcp.json`
+
+```json
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-server-playwright"]
+    }
+  }
+}
+```
+
+#### Permissões em `.claude/settings.json`
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__playwright__*"
+    ]
+  }
+}
+```
+
+### Verificação
+
+1. Reiniciar Claude Code após configurar
+2. Executar `/mcp` para ver servers ativos
+3. Verificar que `playwright` aparece na lista
+4. Testar: "Navega para https://example.com e tira um screenshot"
+
+### Referências (Playwright)
+
+- [Playwright MCP Server](https://www.npmjs.com/package/@anthropic/mcp-server-playwright)
+- [Playwright Documentation](https://playwright.dev/)

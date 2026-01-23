@@ -6,7 +6,8 @@
       "Bash(vercel:*)",
       "Bash(cd:*)",
       "Bash(git:*)",
-      "mcp__notion__*"
+      "mcp__notion__*",
+      "mcp__playwright__*"
     ],
     "deny": [],
     "ask": []

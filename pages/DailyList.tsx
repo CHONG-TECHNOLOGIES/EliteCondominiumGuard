@@ -117,12 +117,17 @@ export default function DailyList() {
                   {getStatusBadge(visit.status)}
                 </div>
 
-                <div className="flex gap-4 text-sm text-slate-600 bg-slate-50 p-2 rounded-lg">
+                <div className="flex flex-wrap gap-4 text-sm text-slate-600 bg-slate-50 p-2 rounded-lg">
                   <div className="flex items-center gap-1"><User size={14} /> {visit.visit_type}</div>
                   <div className="flex items-center gap-1">
                     <MapPin size={14} />
                     {visit.restaurant_name || visit.sport_name || (visit.unit_block && visit.unit_number ? `${visit.unit_block} - ${visit.unit_number}` : `Unidade ${visit.unit_id}`)}
                   </div>
+                  {visit.vehicle_license_plate && (
+                    <div className="flex items-center gap-1">
+                      <span>🚗</span> {visit.vehicle_license_plate}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end gap-2 mt-2">
@@ -198,6 +203,9 @@ export default function DailyList() {
                       <p className="text-sm text-slate-500">
                         {visit.restaurant_name || visit.sport_name || (visit.unit_block && visit.unit_number ? `${visit.unit_block} - ${visit.unit_number}` : `Unidade ${visit.unit_id}`)}
                       </p>
+                      {visit.vehicle_license_plate && (
+                        <p className="text-sm text-slate-500">🚗 {visit.vehicle_license_plate}</p>
+                      )}
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-2 text-slate-600">

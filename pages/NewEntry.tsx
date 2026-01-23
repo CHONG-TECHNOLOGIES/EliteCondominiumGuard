@@ -35,6 +35,7 @@ export default function NewEntry() {
   const [visitorName, setVisitorName] = useState('');
   const [visitorDoc, setVisitorDoc] = useState('');
   const [visitorPhone, setVisitorPhone] = useState('');
+  const [vehiclePlate, setVehiclePlate] = useState('');
   const [unitId, setUnitId] = useState('');
   const [serviceTypeId, setServiceTypeId] = useState(''); // ID
   const [restaurantId, setRestaurantId] = useState(''); // ID for restaurant visits
@@ -215,6 +216,7 @@ export default function NewEntry() {
       visitor_name: visitorName,
       visitor_doc: visitorDoc || undefined,
       visitor_phone: visitorPhone || undefined,
+      vehicle_license_plate: vehiclePlate || undefined,
       visit_type_id: selectedType, // Send UUID instead of name
       service_type_id: serviceTypeId || undefined,
       restaurant_id: restaurantId || undefined,
@@ -378,6 +380,16 @@ export default function NewEntry() {
                   onChange={e => setVisitorPhone(e.target.value)}
                   className="w-full px-4 py-3.5 rounded-xl border-2 border-slate-200 focus:border-accent focus:ring-4 focus:ring-accent/10 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400 hover:border-slate-300"
                   placeholder="+351 912 345 678"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">Matrícula do Veículo</label>
+                <input
+                  value={vehiclePlate}
+                  onChange={e => setVehiclePlate(e.target.value.toUpperCase())}
+                  className="w-full px-4 py-3.5 rounded-xl border-2 border-slate-200 focus:border-accent focus:ring-4 focus:ring-accent/10 outline-none transition-all font-medium text-slate-800 placeholder:text-slate-400 hover:border-slate-300 uppercase"
+                  placeholder="XX-XX-XX"
+                  maxLength={10}
                 />
               </div>
             </div>
@@ -594,6 +606,12 @@ export default function NewEntry() {
                   <div>
                     <span className="text-slate-500 font-medium">Serviço:</span>
                     <p className="font-bold text-slate-800">{getSelectedServiceLabel()}</p>
+                  </div>
+                )}
+                {vehiclePlate && (
+                  <div>
+                    <span className="text-slate-500 font-medium">Matrícula:</span>
+                    <p className="font-bold text-slate-800">{vehiclePlate}</p>
                   </div>
                 )}
               </div>
