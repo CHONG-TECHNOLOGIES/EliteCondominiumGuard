@@ -643,6 +643,84 @@ export const SupabaseService = {
     }
   },
 
+  /**
+   * Uploads a staff photo to Supabase Storage
+   * @param photoDataUrl - Base64 data URL of the photo
+   * @param staffName - Name of the staff member (for filename)
+   * @param condoId - Condominium ID (for folder organization)
+   * @returns Public URL of the uploaded photo, or null if upload fails
+   */
+  async uploadStaffPhoto(photoDataUrl: string, staffName: string, condoId?: number): Promise<string | null> {
+    if (!supabase) {
+      console.error('[SupabaseService] Supabase client not initialized');
+      return null;
+    }
+
+    try {
+      console.log('[SupabaseService] Starting photo upload for staff:', staffName);
+
+      // Convert base64 data URL to Blob
+      const base64Data = photoDataUrl.split(',')[1];
+      if (!base64Data) {
+        throw new Error('Invalid photo data URL - missing base64 data');
+      }
+
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+      console.log('[SupabaseService] Staff photo blob created:', blob.size, 'bytes');
+
+      // Generate unique filename: condo_id/timestamp_staffname.jpg or global/timestamp_staffname.jpg
+      const timestamp = Date.now();
+      const sanitizedName = staffName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      const folder = condoId ? condoId.toString() : 'global';
+      const fileName = `${folder}/${timestamp}_${sanitizedName}.jpg`;
+
+      console.log('[SupabaseService] Uploading staff photo to path:', fileName);
+
+      // Upload to Supabase Storage bucket 'staff-photos'
+      const { data, error } = await supabase.storage
+        .from('staff-photos')
+        .upload(fileName, blob, {
+          contentType: 'image/jpeg',
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.error('[SupabaseService] Staff photo upload error details:', {
+          message: error.message,
+          statusCode: (error as any).statusCode,
+          error: error
+        });
+        throw error;
+      }
+
+      console.log('[SupabaseService] Staff photo upload successful, getting public URL...');
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('staff-photos')
+        .getPublicUrl(fileName);
+
+      console.log('[SupabaseService] Staff photo uploaded successfully:', publicUrl);
+      return publicUrl;
+
+    } catch (err: any) {
+      console.error('[SupabaseService] Staff photo upload error:', {
+        message: err.message,
+        error: err,
+        stack: err.stack
+      });
+      return null;
+    }
+  },
+
   async getDeviceByIdentifier(deviceIdentifier: string): Promise<Device | null> {
     if (!supabase) return null;
 

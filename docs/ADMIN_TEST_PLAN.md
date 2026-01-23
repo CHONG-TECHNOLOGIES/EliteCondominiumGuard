@@ -2,12 +2,6 @@
 
 Este documento serve como um roteiro para validar todas as funcionalidades do Painel Administrativo do Elite Condo Guard. Utilize as caixas de seleção para marcar o progresso dos testes.
 
-## 1. Autenticação e Navegação
-- [x] **Login de Administrador**: Verificar se é possível fazer login com credenciais de administrador.
-- [x] **Proteção de Rotas**: Tentar acessar `/admin/*` sem estar logado e verificar o redirecionamento para login.
-- [x] **Logout**: Verificar se o botão de logout encerra a sessão corretamente.
-- [x] **Menu Lateral**: Testar a navegação entre todas as páginas do menu (Dashboard, Condomínios, Residentes, etc.).
-- [x] **Responsividade**: Verificar se o menu se adapta corretamente em dispositivos móveis (hambúrguer menu).
 
 ## 2. Dashboard (`AdminDashboard`)
 - [ ] **Carregamento de Estatísticas**: Verificar se os números (Condomínios, Dispositivos, Pessoal, etc.) carregam corretamente.
@@ -17,26 +11,15 @@ Este documento serve como um roteiro para validar todas as funcionalidades do Pa
 ## 3. Gestão de Condomínios (`AdminCondominiums`)
 ### Listagem e Filtros
 - [x] **Listagem**: Verificar se todos os condomínios são listados.
-- [x] **Busca**: Testar a busca por nome e endereço.
+
 - [ ] **Badges de Status**: Verificar se condomínios ativos/inativos têm cores diferentes.
 
 ### Ações (CRUD)
-- [x] **Criar Condomínio**:
-    - [x] Validar campos obrigatórios (Nome).
-    - [x] Criar um novo condomínio com sucesso.
-    - [x] Verificar se aparece na lista após criação.
-- [x] **Editar Condomínio**:
-    - [x] Alterar nome, endereço, coordenadas GPS e raio.
-    - [x] Salvar e verificar se as alterações persistem.
-- [x] **Gerir Ruas**:
-    - [x] Adicionar uma nova rua a um condomínio.
-    - [x] Remover uma rua existente.
-- [x] **Ativar/Desativar**:
-    - [x] Testar o botão de toggle de status (Power icon).
-    - [x] Confirmar a ação no modal de confirmação.
+
+- [x] **Inserir,Editar Condomínio**:
+    - [x] carregar logo.
 
 ### ⚠️ Issues Identificadas
-- **ISSUE 1**: Quando um condomínio é desativado, ele desaparece da listagem. Deveria continuar visível com badge "INATIVO".
 - **ISSUE 2**: O ícone (logo) não está a aparecer para todos os condomínios na listagem.
 
 ## 4. Gestão de Residentes (`AdminResidents`)

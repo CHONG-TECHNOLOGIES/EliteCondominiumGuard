@@ -1,18 +1,170 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Plus, Edit2, Trash2, Key, Loader2, Search, X, Building2, Shield } from 'lucide-react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { Users, Plus, Edit2, Trash2, Key, Loader2, Search, X, Building2, Shield, Eye, EyeOff, Camera, User, ChevronDown, Check } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { Staff, Condominium, UserRole } from '../../types';
 import bcrypt from 'bcryptjs';
 import { useToast } from '../../components/Toast';
+import CameraCapture from '../../components/CameraCapture';
+import { SupabaseService } from '../../services/Supabase';
+import { AuthContext } from '../../App';
+
+// Configure bcrypt to use browser-compatible random fallback
+bcrypt.setRandomFallback((len: number) => {
+  const buf = new Uint8Array(len);
+  crypto.getRandomValues(buf);
+  return Array.from(buf);
+});
+
+// Searchable Select Component
+interface SearchableSelectProps {
+  options: { value: number | string; label: string }[];
+  value: number | string | null;
+  onChange: (value: number | string | null) => void;
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
+  className?: string;
+}
+
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder = 'Selecione...',
+  searchPlaceholder = 'Pesquisar...',
+  emptyMessage = 'Nenhum resultado encontrado',
+  className = ''
+}: SearchableSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filteredOptions = options.filter(option =>
+    option.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const handleSelect = (optionValue: number | string) => {
+    onChange(optionValue);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(null);
+    setSearch('');
+  };
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left flex items-center justify-between cursor-pointer"
+      >
+        <span className={selectedOption ? 'text-slate-900' : 'text-slate-500'}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <div className="flex items-center gap-1">
+          {selectedOption && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="p-1 hover:bg-slate-100 rounded transition-colors"
+            >
+              <X size={14} className="text-slate-400" />
+            </button>
+          )}
+          <ChevronDown size={18} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
+          <div className="p-2 border-b border-slate-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                ref={inputRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {filteredOptions.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                {emptyMessage}
+              </div>
+            ) : (
+              filteredOptions.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleSelect(option.value)}
+                  className={`w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center justify-between transition-colors ${
+                    option.value === value ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  {option.value === value && <Check size={16} className="text-blue-600" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminStaff() {
   const { showToast, showConfirm } = useToast();
+  const { user: currentUser } = useContext(AuthContext);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [condominiums, setCondominiums] = useState<Condominium[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCondoId, setFilterCondoId] = useState<number | null>(null);
   const [filterRole, setFilterRole] = useState<string>('');
+
+  // Only SUPER_ADMIN can create/edit SUPER_ADMIN users
+  const isSuperAdmin = currentUser?.role === UserRole.SUPER_ADMIN;
+
+  // Available roles based on current user's permissions
+  const availableRoles = isSuperAdmin
+    ? [
+        { value: UserRole.GUARD, label: 'Guarda' },
+        { value: UserRole.ADMIN, label: 'Admin' },
+        { value: UserRole.SUPER_ADMIN, label: 'Super Admin' }
+      ]
+    : [
+        { value: UserRole.GUARD, label: 'Guarda' },
+        { value: UserRole.ADMIN, label: 'Admin' }
+      ];
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
@@ -31,6 +183,16 @@ export default function AdminStaff() {
     newPin: '',
     confirmPin: ''
   });
+
+  // PIN visibility states
+  const [showCreatePin, setShowCreatePin] = useState(false);
+  const [showNewPin, setShowNewPin] = useState(false);
+  const [showConfirmPin, setShowConfirmPin] = useState(false);
+
+  // Photo states
+  const [photoBase64, setPhotoBase64] = useState<string>('');
+  const [showCamera, setShowCamera] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -67,13 +229,30 @@ export default function AdminStaff() {
     }
 
     try {
+      setUploadingPhoto(true);
+
+      // Upload photo if captured
+      let photoUrl: string | null = null;
+      if (photoBase64) {
+        const staffName = `${formData.first_name}_${formData.last_name}`;
+        photoUrl = await SupabaseService.uploadStaffPhoto(
+          photoBase64,
+          staffName,
+          formData.condominium_id || undefined
+        );
+        if (!photoUrl) {
+          showToast('warning', 'Erro ao fazer upload da foto, mas o staff será criado sem foto');
+        }
+      }
+
       const pinHash = await bcrypt.hash(formData.pin, 10);
       const result = await api.adminCreateStaff({
         first_name: formData.first_name,
         last_name: formData.last_name,
         condominium_id: formData.condominium_id,
         role: formData.role,
-        pin_hash: pinHash
+        pin_hash: pinHash,
+        photo_url: photoUrl || undefined
       });
 
       if (result) {
@@ -87,6 +266,8 @@ export default function AdminStaff() {
     } catch (error) {
       console.error('Error creating staff:', error);
       showToast('error', 'Erro ao criar staff');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -102,11 +283,28 @@ export default function AdminStaff() {
     }
 
     try {
+      setUploadingPhoto(true);
+
+      // Upload photo if new one was captured
+      let photoUrl: string | null | undefined = undefined;
+      if (photoBase64) {
+        const staffName = `${formData.first_name}_${formData.last_name}`;
+        photoUrl = await SupabaseService.uploadStaffPhoto(
+          photoBase64,
+          staffName,
+          formData.condominium_id || undefined
+        );
+        if (!photoUrl) {
+          showToast('warning', 'Erro ao fazer upload da foto');
+        }
+      }
+
       const result = await api.adminUpdateStaff(selectedStaff.id, {
         first_name: formData.first_name,
         last_name: formData.last_name,
         condominium_id: formData.condominium_id,
-        role: formData.role
+        role: formData.role,
+        ...(photoUrl && { photo_url: photoUrl })
       });
 
       if (result) {
@@ -121,6 +319,8 @@ export default function AdminStaff() {
     } catch (error) {
       console.error('Error updating staff:', error);
       showToast('error', 'Erro ao atualizar staff');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -184,6 +384,8 @@ export default function AdminStaff() {
       role: staffMember.role,
       pin: ''
     });
+    setPhotoBase64(''); // Reset photo capture (existing photo shown from staffMember.photo_url)
+    setShowCamera(false);
     setShowEditModal(true);
   };
 
@@ -201,6 +403,8 @@ export default function AdminStaff() {
       role: UserRole.GUARD,
       pin: ''
     });
+    setPhotoBase64('');
+    setShowCamera(false);
   };
 
   const getCondominiumName = (condoId?: number) => {
@@ -305,15 +509,24 @@ export default function AdminStaff() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    {staffMember.role === UserRole.SUPER_ADMIN ? (
-                      <Shield className="text-rose-600" size={32} />
-                    ) : staffMember.role === UserRole.ADMIN ? (
-                      <Shield className="text-purple-600" size={32} />
-                    ) : (
-                      <Users className="text-blue-600" size={32} />
-                    )}
-                  </div>
+                  {/* Staff Photo or Icon */}
+                  {staffMember.photo_url ? (
+                    <img
+                      src={staffMember.photo_url}
+                      alt={`${staffMember.first_name} ${staffMember.last_name}`}
+                      className="w-14 h-14 rounded-full object-cover border-2 border-slate-200"
+                    />
+                  ) : (
+                    <div className="p-3 bg-slate-50 rounded-lg">
+                      {staffMember.role === UserRole.SUPER_ADMIN ? (
+                        <Shield className="text-rose-600" size={32} />
+                      ) : staffMember.role === UserRole.ADMIN ? (
+                        <Shield className="text-purple-600" size={32} />
+                      ) : (
+                        <Users className="text-blue-600" size={32} />
+                      )}
+                    </div>
+                  )}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-xl font-bold text-slate-900">
@@ -363,7 +576,10 @@ export default function AdminStaff() {
             <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-slate-900">Novo Staff</h2>
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setShowCreatePin(false);
+                }}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 <X size={20} />
@@ -400,24 +616,17 @@ export default function AdminStaff() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Condomínio <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={formData.condominium_id || ''}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      condominium_id: e.target.value ? parseInt(e.target.value) : null
-                    })
-                  }
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Selecione um condomínio</option>
-                  {condominiums
+                <SearchableSelect
+                  options={condominiums
                     .filter(c => c.status === 'ACTIVE')
-                    .map(condo => (
-                      <option key={condo.id} value={condo.id}>{condo.name}</option>
-                    ))
+                    .map(condo => ({ value: condo.id, label: condo.name }))
                   }
-                </select>
+                  value={formData.condominium_id}
+                  onChange={(val) => setFormData({ ...formData, condominium_id: val as number | null })}
+                  placeholder="Selecione um condomínio"
+                  searchPlaceholder="Pesquisar condomínio..."
+                  emptyMessage="Nenhum condomínio encontrado"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -428,37 +637,111 @@ export default function AdminStaff() {
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value={UserRole.GUARD}>Guarda</option>
-                  <option value={UserRole.ADMIN}>Admin</option>
-                  <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
+                  {availableRoles.map(role => (
+                    <option key={role.value} value={role.value}>{role.label}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   PIN <span className="text-red-500">*</span> <span className="text-xs text-slate-500">(mínimo 4 dígitos)</span>
                 </label>
-                <input
-                  type="password"
-                  value={formData.pin}
-                  onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="****"
-                  maxLength={6}
-                />
+                <div className="relative">
+                  <input
+                    type={showCreatePin ? "text" : "password"}
+                    value={formData.pin}
+                    onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
+                    className="w-full px-4 py-2 pr-12 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="****"
+                    maxLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePin(!showCreatePin)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showCreatePin ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Photo capture section */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Foto do Staff
+                </label>
+                {!showCamera ? (
+                  <div className="flex items-center gap-4">
+                    {photoBase64 ? (
+                      <div className="relative">
+                        <img
+                          src={photoBase64}
+                          alt="Staff"
+                          className="w-24 h-24 rounded-full object-cover border-4 border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPhotoBase64('')}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center border-2 border-dashed border-slate-300">
+                        <User size={40} className="text-slate-400" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowCamera(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                    >
+                      <Camera size={20} />
+                      {photoBase64 ? 'Trocar Foto' : 'Tirar Foto'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <CameraCapture
+                      onCapture={(base64) => {
+                        if (base64) {
+                          setPhotoBase64(base64);
+                          setShowCamera(false);
+                        }
+                      }}
+                      mode="photo"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCamera(false)}
+                      className="w-full py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setShowCreatePin(false);
+                  resetForm();
+                }}
                 className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                disabled={uploadingPhoto}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreate}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={uploadingPhoto}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                Criar Staff
+                {uploadingPhoto && <Loader2 size={18} className="animate-spin" />}
+                {uploadingPhoto ? 'Criando...' : 'Criar Staff'}
               </button>
             </div>
           </div>
@@ -510,24 +793,17 @@ export default function AdminStaff() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Condomínio <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={formData.condominium_id || ''}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      condominium_id: e.target.value ? parseInt(e.target.value) : null
-                    })
-                  }
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Selecione um condomínio</option>
-                  {condominiums
+                <SearchableSelect
+                  options={condominiums
                     .filter(c => c.status === 'ACTIVE')
-                    .map(condo => (
-                      <option key={condo.id} value={condo.id}>{condo.name}</option>
-                    ))
+                    .map(condo => ({ value: condo.id, label: condo.name }))
                   }
-                </select>
+                  value={formData.condominium_id}
+                  onChange={(val) => setFormData({ ...formData, condominium_id: val as number | null })}
+                  placeholder="Selecione um condomínio"
+                  searchPlaceholder="Pesquisar condomínio..."
+                  emptyMessage="Nenhum condomínio encontrado"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -538,11 +814,75 @@ export default function AdminStaff() {
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value={UserRole.GUARD}>Guarda</option>
-                  <option value={UserRole.ADMIN}>Admin</option>
-                  <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
+                  {availableRoles.map(role => (
+                    <option key={role.value} value={role.value}>{role.label}</option>
+                  ))}
                 </select>
               </div>
+              {/* Photo section */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Foto do Staff
+                </label>
+                {!showCamera ? (
+                  <div className="flex items-center gap-4">
+                    {photoBase64 ? (
+                      <div className="relative">
+                        <img
+                          src={photoBase64}
+                          alt="Staff"
+                          className="w-24 h-24 rounded-full object-cover border-4 border-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPhotoBase64('')}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : selectedStaff.photo_url ? (
+                      <img
+                        src={selectedStaff.photo_url}
+                        alt="Staff"
+                        className="w-24 h-24 rounded-full object-cover border-4 border-slate-300"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center border-2 border-dashed border-slate-300">
+                        <User size={40} className="text-slate-400" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowCamera(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                    >
+                      <Camera size={20} />
+                      {photoBase64 || selectedStaff.photo_url ? 'Trocar Foto' : 'Tirar Foto'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <CameraCapture
+                      onCapture={(base64) => {
+                        if (base64) {
+                          setPhotoBase64(base64);
+                          setShowCamera(false);
+                        }
+                      }}
+                      mode="photo"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCamera(false)}
+                      className="w-full py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <p className="text-sm text-yellow-800">
                   <strong>Nota:</strong> Para alterar o PIN, use o botão "Alterar PIN" na lista de staff.
@@ -554,16 +894,20 @@ export default function AdminStaff() {
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedStaff(null);
+                  resetForm();
                 }}
                 className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                disabled={uploadingPhoto}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleEdit}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={uploadingPhoto}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                Salvar Alterações
+                {uploadingPhoto && <Loader2 size={18} className="animate-spin" />}
+                {uploadingPhoto ? 'Salvando...' : 'Salvar Alterações'}
               </button>
             </div>
           </div>
@@ -581,6 +925,8 @@ export default function AdminStaff() {
                   setShowPinModal(false);
                   setSelectedStaff(null);
                   setPinData({ newPin: '', confirmPin: '' });
+                  setShowNewPin(false);
+                  setShowConfirmPin(false);
                 }}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
@@ -597,27 +943,45 @@ export default function AdminStaff() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Novo PIN <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  value={pinData.newPin}
-                  onChange={(e) => setPinData({ ...pinData, newPin: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="****"
-                  maxLength={6}
-                />
+                <div className="relative">
+                  <input
+                    type={showNewPin ? "text" : "password"}
+                    value={pinData.newPin}
+                    onChange={(e) => setPinData({ ...pinData, newPin: e.target.value })}
+                    className="w-full px-4 py-2 pr-12 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="****"
+                    maxLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPin(!showNewPin)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showNewPin ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Confirmar PIN <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
-                  value={pinData.confirmPin}
-                  onChange={(e) => setPinData({ ...pinData, confirmPin: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="****"
-                  maxLength={6}
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPin ? "text" : "password"}
+                    value={pinData.confirmPin}
+                    onChange={(e) => setPinData({ ...pinData, confirmPin: e.target.value })}
+                    className="w-full px-4 py-2 pr-12 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="****"
+                    maxLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPin(!showConfirmPin)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showConfirmPin ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
@@ -626,6 +990,8 @@ export default function AdminStaff() {
                   setShowPinModal(false);
                   setSelectedStaff(null);
                   setPinData({ newPin: '', confirmPin: '' });
+                  setShowNewPin(false);
+                  setShowConfirmPin(false);
                 }}
                 className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
               >

@@ -294,7 +294,15 @@ export default function AdminCondominiums() {
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Condomínios</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-slate-900">Gestão de Condomínios</h1>
+            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">
+              {filteredCondominiums.length === condominiums.length
+                ? `${condominiums.length} total`
+                : `${filteredCondominiums.length} de ${condominiums.length}`
+              }
+            </span>
+          </div>
           <p className="text-slate-600">Criar, editar e gerir condomínios no sistema</p>
         </div>
         <button

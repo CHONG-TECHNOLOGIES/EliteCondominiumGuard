@@ -83,6 +83,7 @@ export interface Staff {
   condominium_id: number;    // INT4
   condominium?: Condominium; // Dados completos do condomínio (incluindo GPS)
   role: UserRole;
+  photo_url?: string;        // URL da foto do staff (bucket: staff-photos)
 }
 
 export interface Resident {
