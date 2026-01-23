@@ -26,7 +26,7 @@ export const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
   }
 
   // Logged in but not admin - show access denied
-  if (user.role !== UserRole.ADMIN) {
+  if (user.role !== UserRole.ADMIN && user.role !== UserRole.SUPER_ADMIN) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">

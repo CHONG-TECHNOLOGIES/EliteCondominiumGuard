@@ -46,7 +46,6 @@ export default function NewEntry() {
   const [qrConfirmed, setQrConfirmed] = useState(false);
 
   const handlePhotoCapture = (photoDataUrl: string) => {
-    console.log('📸 Photo received in NewEntry:', photoDataUrl ? `${photoDataUrl.length} bytes` : 'empty');
     setPhoto(photoDataUrl);
   };
 
@@ -244,12 +243,12 @@ export default function NewEntry() {
   };
 
   const getSelectedRestaurantLabel = () => {
-    const r = restaurants.find(r => r.id === restaurantId);
+    const r = restaurants.find(r => String(r.id) === restaurantId);
     return r ? r.name : '';
   };
 
   const getSelectedSportLabel = () => {
-    const s = sports.find(s => s.id === sportId);
+    const s = sports.find(s => String(s.id) === sportId);
     return s ? s.name : '';
   };
 
@@ -842,10 +841,10 @@ export default function NewEntry() {
               {restaurants.map(r => (
                 <button
                   key={r.id}
-                  onClick={() => { setRestaurantId(r.id); setShowRestaurantModal(false); }}
-                  className={`p-4 rounded-xl border-2 text-left transition-all flex flex-col items-center justify-center gap-2 ${restaurantId === r.id ? 'border-accent bg-sky-50' : 'border-slate-100 hover:border-slate-300 bg-white'}`}
+                  onClick={() => { setRestaurantId(String(r.id)); setShowRestaurantModal(false); }}
+                  className={`p-4 rounded-xl border-2 text-left transition-all flex flex-col items-center justify-center gap-2 ${restaurantId === String(r.id) ? 'border-accent bg-sky-50' : 'border-slate-100 hover:border-slate-300 bg-white'}`}
                 >
-                  <div className={restaurantId === r.id ? 'text-accent' : 'text-slate-400'}>
+                  <div className={restaurantId === String(r.id) ? 'text-accent' : 'text-slate-400'}>
                     <UtensilsCrossed size={40} />
                   </div>
                   <span className="font-bold text-sm text-center text-slate-700">{r.name}</span>
@@ -871,10 +870,10 @@ export default function NewEntry() {
               {sports.map(s => (
                 <button
                   key={s.id}
-                  onClick={() => { setSportId(s.id); setShowSportModal(false); }}
-                  className={`p-4 rounded-xl border-2 text-left transition-all flex flex-col items-center justify-center gap-2 ${sportId === s.id ? 'border-accent bg-sky-50' : 'border-slate-100 hover:border-slate-300 bg-white'}`}
+                  onClick={() => { setSportId(String(s.id)); setShowSportModal(false); }}
+                  className={`p-4 rounded-xl border-2 text-left transition-all flex flex-col items-center justify-center gap-2 ${sportId === String(s.id) ? 'border-accent bg-sky-50' : 'border-slate-100 hover:border-slate-300 bg-white'}`}
                 >
-                  <div className={sportId === s.id ? 'text-accent' : 'text-slate-400'}>
+                  <div className={sportId === String(s.id) ? 'text-accent' : 'text-slate-400'}>
                     <Dumbbell size={40} />
                   </div>
                   <span className="font-bold text-sm text-center text-slate-700">{s.name}</span>

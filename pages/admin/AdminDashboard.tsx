@@ -15,8 +15,10 @@ import {
   Activity,
   CheckCircle,
   XCircle,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
+import { UserRole } from '../../types';
 
 interface DashboardStats {
   totalCondominiums: number;
@@ -83,6 +85,8 @@ export default function AdminDashboard() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [stats, setStats] = useState<DashboardStats>({
     totalCondominiums: 0,
     activeCondominiums: 0,
@@ -108,13 +112,27 @@ export default function AdminDashboard() {
       setLoading(true);
 
       // Use admin-specific methods that fetch data across ALL condominiums
-      const dashboardStats = await api.adminGetDashboardStats();
+      const [dashboardStats, pendingCount] = await Promise.all([
+        api.adminGetDashboardStats(),
+        api.getPendingSyncCount()
+      ]);
 
       setStats(dashboardStats);
+      setPendingSyncCount(pendingCount);
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      // Error handling without console.log
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await api.syncPendingItems();
+      await loadDashboardData();
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -135,12 +153,31 @@ export default function AdminDashboard() {
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">
-          Dashboard Administrativo
-        </h1>
-        <p className="text-slate-600">
-          Bem-vindo, <strong>{user?.first_name}</strong>! Aqui está uma visão geral do sistema.
-        </p>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+              Dashboard Administrativo
+            </h1>
+            <p className="text-slate-600">
+              Bem-vindo, <strong>{user?.first_name}</strong>! Aqui está uma visão geral do sistema.
+            </p>
+          </div>
+          {user?.role === UserRole.SUPER_ADMIN && (
+            <button
+              onClick={handleSync}
+              disabled={syncing || pendingSyncCount === 0}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm ${
+                pendingSyncCount > 0
+                  ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+              }`}
+              title={pendingSyncCount === 0 ? 'Não há dados para sincronizar' : `${pendingSyncCount} item(s) pendente(s)`}
+            >
+              <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'Sincronizando...' : pendingSyncCount > 0 ? `Sincronizar (${pendingSyncCount})` : 'Sincronizado'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Infrastructure Stats */}

@@ -78,7 +78,7 @@ export default function Login() {
         });
 
         // Redirect based on user role
-        if (staff.role === UserRole.ADMIN) {
+        if (staff.role === UserRole.ADMIN || staff.role === UserRole.SUPER_ADMIN) {
           navigate('/admin');
         } else {
           navigate('/');

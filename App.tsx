@@ -132,6 +132,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = React.useContext(AuthContext);
   if (!user) return <Navigate to="/login" replace />;
+  if (user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN) {
+    return <Navigate to="/admin" replace />;
+  }
   return <Layout>{children}</Layout>;
 };
 

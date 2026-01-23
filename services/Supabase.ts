@@ -226,28 +226,20 @@ export const SupabaseService = {
     if (!supabase) return [];
 
     try {
-      // Use RPC to get visits
+      // Use RPC to get visits (RPC already returns joined fields)
       const { data, error } = await supabase
-        .rpc('get_todays_visits', { p_condominium_id: condoId })
-        .select(`
-          *,
-          visit_types(name),
-          service_types(name),
-          restaurants(name),
-          sports(name),
-          units(code_block, number)
-        `);
+        .rpc('get_todays_visits', { p_condominium_id: condoId });
 
       if (error) throw error;
 
       return (data || []).map((v: any) => ({
         ...v,
-        visit_type: v.visit_types?.name || 'Desconhecido',
-        service_type: v.service_types?.name,
-        restaurant_name: v.restaurants?.name,
-        sport_name: v.sports?.name,
-        unit_block: v.units?.code_block,
-        unit_number: v.units?.number,
+        visit_type: v.visit_type_name || 'Desconhecido',
+        service_type: v.service_type_name,
+        restaurant_name: v.restaurant_name,
+        sport_name: v.sport_name,
+        unit_block: v.unit_block,
+        unit_number: v.unit_number,
         sync_status: 'SINCRONIZADO'
       }));
     } catch (err: any) {
@@ -270,10 +262,17 @@ export const SupabaseService = {
       ])
     );
 
+    const normalizedPayload = { ...cleanedPayload } as Record<string, any>;
+    if (normalizedPayload.restaurant_id !== null && normalizedPayload.restaurant_id !== undefined) {
+      normalizedPayload.restaurant_id = String(normalizedPayload.restaurant_id);
+    }
+    if (normalizedPayload.sport_id !== null && normalizedPayload.sport_id !== undefined) {
+      normalizedPayload.sport_id = String(normalizedPayload.sport_id);
+    }
+
     try {
-      console.log("[DEBUG] cleanedPayload keys:", Object.keys(cleanedPayload));
       const { data, error } = await supabase
-        .rpc('create_visit', { p_data: cleanedPayload });
+        .rpc('create_visit', { p_data: normalizedPayload });
 
       if (error) throw error;
       return data as Visit;
@@ -902,7 +901,7 @@ export const SupabaseService = {
     try {
       const { data, error } = await supabase
         .rpc('admin_update_device', {
-          p_id: parseInt(id, 10),
+          p_id: id,
           p_data: updates
         });
 
@@ -922,7 +921,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .rpc('admin_delete_device', { p_id: parseInt(id, 10) });
+        .rpc('admin_delete_device', { p_id: id });
 
       if (error) throw error;
       return true;
@@ -1216,7 +1215,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .rpc('admin_update_restaurant', { p_id: parseInt(id, 10), p_data: updates });
+        .rpc('admin_update_restaurant', { p_id: id, p_data: updates });
 
       if (error) throw error;
       return data as Restaurant;
@@ -1234,7 +1233,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .rpc('admin_delete_restaurant', { p_id: parseInt(id, 10) });
+        .rpc('admin_delete_restaurant', { p_id: id });
 
       if (error) throw error;
       return true;
@@ -1300,7 +1299,7 @@ export const SupabaseService = {
 
     try {
       const { data, error } = await supabase
-        .rpc('admin_update_sport', { p_id: parseInt(id, 10), p_data: updates });
+        .rpc('admin_update_sport', { p_id: id, p_data: updates });
 
       if (error) throw error;
       return data as Sport;
@@ -1318,7 +1317,7 @@ export const SupabaseService = {
 
     try {
       const { error } = await supabase
-        .rpc('admin_delete_sport', { p_id: parseInt(id, 10) });
+        .rpc('admin_delete_sport', { p_id: id });
 
       if (error) throw error;
       return true;

@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
+import { ApprovalMode, Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 
@@ -21,6 +21,7 @@ class DataService {
   private currentCondoDetails: Condominium | null = null;
   private currentDeviceId: string | null = null; // Track device ID (UUID) for visit tracking
   private isSyncing: boolean = false; // Prevent concurrent syncs
+  private readonly pendingAuditLogsKey = 'pending_audit_logs';
 
   constructor() {
     window.addEventListener('online', () => this.setOnlineStatus(true));
@@ -170,6 +171,7 @@ class DataService {
     this.isOnline = isOnline;
     if (isOnline) {
       this.backendHealthScore = 3; // Reset health on reconnect
+      void this.flushPendingAuditLogs();
     } else {
       this.backendHealthScore = 0; // Immediately mark as unhealthy when offline
     }
@@ -188,6 +190,7 @@ class DataService {
 
           // If backend just recovered, sync pending items automatically
           if (wasUnhealthy) {
+            void this.flushPendingAuditLogs();
             console.log('[DataService] Backend recovered - auto-syncing pending items...');
             // syncPendingItems already emits all necessary events
             this.syncPendingItems().then(count => {
@@ -217,6 +220,98 @@ class DataService {
 
   private get isBackendHealthy(): boolean {
     return this.isOnline && this.backendHealthScore > 0;
+  }
+
+  private getStoredUser(): Staff | null {
+    try {
+      const raw = localStorage.getItem('auth_user');
+      if (!raw) return null;
+      return JSON.parse(raw) as Staff;
+    } catch {
+      return null;
+    }
+  }
+
+  private async getPendingAuditLogs(): Promise<any[]> {
+    const setting = await db.settings.get(this.pendingAuditLogsKey);
+    if (!setting || !Array.isArray(setting.value)) {
+      return [];
+    }
+    return setting.value;
+  }
+
+  private async setPendingAuditLogs(entries: any[]): Promise<void> {
+    await db.settings.put({ key: this.pendingAuditLogsKey, value: entries });
+  }
+
+  private async enqueueAuditLog(entry: any): Promise<void> {
+    const pending = await this.getPendingAuditLogs();
+    pending.push(entry);
+    await this.setPendingAuditLogs(pending);
+  }
+
+  private async flushPendingAuditLogs(): Promise<void> {
+    if (!this.isBackendHealthy) return;
+    const pending = await this.getPendingAuditLogs();
+    if (pending.length === 0) return;
+    pending.forEach(entry => SupabaseService.logAudit(entry));
+    await this.setPendingAuditLogs([]);
+  }
+
+  async logCallInitiated(payload: {
+    phone: string;
+    source: 'resident' | 'visitor';
+    unitId?: number;
+    unitLabel?: string;
+    visitId?: number;
+    approvalMode?: ApprovalMode;
+    context?: string;
+    targetTable?: string;
+    targetId?: number | null;
+  }): Promise<void> {
+    const user = this.getStoredUser();
+    if (!user?.id || !user.condominium_id || !payload.phone) return;
+
+    const targetTable = payload.targetTable
+      || (payload.visitId ? 'visits' : payload.unitId ? 'units' : 'phone_calls');
+    const targetId = payload.targetId ?? payload.visitId ?? payload.unitId ?? null;
+
+    const entry = {
+      condominium_id: user.condominium_id,
+      actor_id: user.id,
+      action: 'CALL_INITIATED',
+      target_table: targetTable,
+      target_id: targetId,
+      details: {
+        phone: payload.phone,
+        source: payload.source,
+        unit_id: payload.unitId,
+        unit_label: payload.unitLabel,
+        visit_id: payload.visitId,
+        approval_mode: payload.approvalMode,
+        context: payload.context
+      }
+    };
+
+    if (this.isBackendHealthy) {
+      SupabaseService.logAudit(entry);
+      return;
+    }
+
+    await this.enqueueAuditLog(entry);
+  }
+
+  private getAdminScopeCondoId(): number | null {
+    const user = this.getStoredUser();
+    // SUPER_ADMIN can see all condominiums (returns null = no scope filter)
+    // ADMIN can only see their own condominium
+    if (user?.role === UserRole.SUPER_ADMIN) {
+      return null;
+    }
+    if (user?.role === UserRole.ADMIN && user.condominium_id) {
+      return user.condominium_id;
+    }
+    return null;
   }
 
   // --- Device Configuration (Setup) ---
@@ -642,8 +737,10 @@ class DataService {
       try {
         const staff = await SupabaseService.verifyStaffLogin(firstName, lastName, pin);
         if (staff) {
-          if (String(staff.condominium_id) !== String(deviceCondoId)) {
+          if (staff.role !== UserRole.SUPER_ADMIN) {
+            if (String(staff.condominium_id) !== String(deviceCondoId)) {
             throw new Error(`Acesso Negado: Utilizador pertence ao condomínio ${staff.condominium_id}, mas o tablet está no ${deviceCondoId}.`);
+          }
           }
           await this.syncStaff(deviceCondoId); // Sync all staff after a successful login
           await this.refreshConfigs(deviceCondoId);
@@ -954,8 +1051,8 @@ class DataService {
       visitor_phone: visitData.visitor_phone,
       visit_type_id: visitData.visit_type_id,
       service_type_id: visitData.service_type_id,
-      restaurant_id: visitData.restaurant_id,
-      sport_id: visitData.sport_id,
+      restaurant_id: visitData.restaurant_id ? String(visitData.restaurant_id) : undefined,
+      sport_id: visitData.sport_id ? String(visitData.sport_id) : undefined,
       unit_id: visitData.unit_id,
       reason: visitData.reason,
       photo_url: visitData.photo_url,
@@ -1462,6 +1559,11 @@ class DataService {
    */
   async adminGetAllCondominiums(): Promise<Condominium[]> {
     try {
+      const scopedCondoId = this.getAdminScopeCondoId();
+      if (scopedCondoId) {
+        const condo = await SupabaseService.getCondominium(scopedCondoId);
+        return condo ? [condo] : [];
+      }
       return await SupabaseService.listActiveCondominiums();
     } catch (e) {
       console.error('[Admin] Failed to fetch condominiums (online required):', e);
@@ -1476,7 +1578,9 @@ class DataService {
    */
   async adminGetAllUnits(condominiumId?: number): Promise<Unit[]> {
     try {
-      return await SupabaseService.adminGetAllUnits(condominiumId);
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveCondoId = scopedCondoId ?? condominiumId;
+      return await SupabaseService.adminGetAllUnits(effectiveCondoId);
     } catch (e) {
       console.error('[Admin] Failed to fetch units (online required):', e);
       return [];
@@ -1492,7 +1596,9 @@ class DataService {
    */
   async adminGetAllVisits(startDate?: string, endDate?: string, condominiumId?: number): Promise<Visit[]> {
     try {
-      return await SupabaseService.adminGetAllVisits(startDate, endDate, condominiumId);
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveCondoId = scopedCondoId ?? condominiumId;
+      return await SupabaseService.adminGetAllVisits(startDate, endDate, effectiveCondoId);
     } catch (e) {
       console.error('[Admin] Failed to fetch visits (online required):', e);
       return [];
@@ -1506,7 +1612,9 @@ class DataService {
    */
   async adminGetAllIncidents(condominiumId?: number): Promise<Incident[]> {
     try {
-      return await SupabaseService.adminGetAllIncidents(condominiumId);
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveCondoId = scopedCondoId ?? condominiumId;
+      return await SupabaseService.adminGetAllIncidents(effectiveCondoId);
     } catch (e) {
       console.error('[Admin] Failed to fetch incidents (online required):', e);
       return [];
@@ -1520,7 +1628,9 @@ class DataService {
    */
   async adminGetAllStaff(condominiumId?: number): Promise<Staff[]> {
     try {
-      return await SupabaseService.adminGetAllStaff(condominiumId);
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveCondoId = scopedCondoId ?? condominiumId;
+      return await SupabaseService.adminGetAllStaff(effectiveCondoId);
     } catch (e) {
       console.error('[Admin] Failed to fetch staff (online required):', e);
       return [];
@@ -1548,13 +1658,59 @@ class DataService {
     resolvedIncidents: number;
   } | null> {
     try {
-      console.log('[Admin] Fetching dashboard stats from RPC...');
-      const stats = await SupabaseService.adminGetDashboardStats();
-      if (stats) {
-        console.log('[Admin] Dashboard stats fetched successfully');
-        return stats;
+      const scopedCondoId = this.getAdminScopeCondoId();
+      if (scopedCondoId) {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date();
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const [
+          condo,
+          devices,
+          staff,
+          units,
+          residents,
+          incidents,
+          visits
+        ] = await Promise.all([
+          SupabaseService.getCondominium(scopedCondoId),
+          SupabaseService.adminGetAllDevices(scopedCondoId),
+          SupabaseService.adminGetAllStaff(scopedCondoId),
+          SupabaseService.adminGetAllUnits(scopedCondoId),
+          SupabaseService.adminGetAllResidents(scopedCondoId),
+          SupabaseService.adminGetAllIncidents(scopedCondoId),
+          SupabaseService.adminGetAllVisits(
+            startOfDay.toISOString(),
+            endOfDay.toISOString(),
+            scopedCondoId
+          )
+        ]);
+
+        const pendingVisits = visits.filter(visit => visit.status === VisitStatus.PENDING).length;
+        const insideVisits = visits.filter(visit => visit.status === VisitStatus.INSIDE).length;
+        const activeIncidents = incidents.filter(incident => incident.status?.toUpperCase() !== 'RESOLVED').length;
+        const resolvedIncidents = incidents.filter(incident => incident.status?.toUpperCase() === 'RESOLVED').length;
+
+        return {
+          totalCondominiums: condo ? 1 : 0,
+          activeCondominiums: condo?.status === 'ACTIVE' ? 1 : 0,
+          totalDevices: devices.length,
+          activeDevices: devices.filter(device => device.status === 'ACTIVE').length,
+          totalStaff: staff.length,
+          totalUnits: units.length,
+          totalResidents: residents.length,
+          todayVisits: visits.length,
+          pendingVisits,
+          insideVisits,
+          activeIncidents,
+          totalIncidents: incidents.length,
+          resolvedIncidents
+        };
       }
-      return null;
+
+      const stats = await SupabaseService.adminGetDashboardStats();
+      return stats ?? null;
     } catch (error) {
       console.error('[Admin] Error fetching dashboard stats (online required):', error);
       return null;
@@ -1640,7 +1796,9 @@ class DataService {
    */
   async adminGetAllDevices(condominiumId?: number): Promise<Device[]> {
     try {
-      return await SupabaseService.adminGetAllDevices(condominiumId);
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveCondoId = scopedCondoId ?? condominiumId;
+      return await SupabaseService.adminGetAllDevices(effectiveCondoId);
     } catch (e) {
       console.error('[Admin] Failed to fetch devices (online required):', e);
       return [];
@@ -1752,7 +1910,9 @@ class DataService {
    */
   async adminGetAllResidents(condominiumId?: number): Promise<any[]> {
     try {
-      return await SupabaseService.adminGetAllResidents(condominiumId);
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveCondoId = scopedCondoId ?? condominiumId;
+      return await SupabaseService.adminGetAllResidents(effectiveCondoId);
     } catch (e) {
       console.error('[Admin] Failed to fetch residents (online required):', e);
       return [];
@@ -1802,7 +1962,9 @@ class DataService {
    */
   async adminGetAllRestaurants(condominiumId?: number): Promise<Restaurant[]> {
     try {
-      return await SupabaseService.adminGetAllRestaurants(condominiumId);
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveCondoId = scopedCondoId ?? condominiumId;
+      return await SupabaseService.adminGetAllRestaurants(effectiveCondoId);
     } catch (e) {
       console.error('[Admin] Failed to fetch restaurants (online required):', e);
       return [];
@@ -1852,7 +2014,9 @@ class DataService {
    */
   async adminGetAllSports(condominiumId?: number): Promise<Sport[]> {
     try {
-      return await SupabaseService.adminGetAllSports(condominiumId);
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveCondoId = scopedCondoId ?? condominiumId;
+      return await SupabaseService.adminGetAllSports(effectiveCondoId);
     } catch (e) {
       console.error('[Admin] Failed to fetch sports (online required):', e);
       return [];
@@ -2053,7 +2217,12 @@ class DataService {
    */
   async adminGetCondominiumStats(): Promise<CondominiumStats[]> {
     try {
-      return await SupabaseService.adminGetCondominiumStats();
+      const stats = await SupabaseService.adminGetCondominiumStats();
+      const scopedCondoId = this.getAdminScopeCondoId();
+      if (scopedCondoId) {
+        return stats.filter(stat => stat.id === scopedCondoId);
+      }
+      return stats;
     } catch (e) {
       console.error('[Admin] Failed to fetch condominium stats (online required):', e);
       return [];
@@ -2072,7 +2241,9 @@ class DataService {
     targetTable?: string;
   }, limit: number = 100, offset: number = 0): Promise<{ logs: AuditLog[], total: number }> {
     try {
-      return await SupabaseService.adminGetAuditLogs(filters, limit, offset);
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveFilters = scopedCondoId ? { ...filters, condominiumId: scopedCondoId } : filters;
+      return await SupabaseService.adminGetAuditLogs(effectiveFilters, limit, offset);
     } catch (e) {
       console.error('[Admin] Failed to fetch audit logs (online required):', e);
       return { logs: [], total: 0 };
@@ -2092,6 +2263,28 @@ class DataService {
     } catch (e) {
       console.error('[Admin] Failed to fetch device registration errors (online required):', e);
       return { errors: [], total: 0 };
+    }
+  }
+
+  /**
+   * Get count of items pending synchronization in local IndexedDB
+   * Used to determine if sync button should be active
+   */
+  async getPendingSyncCount(): Promise<number> {
+    try {
+      const pendingVisits = await db.visits
+        .where('sync_status')
+        .equals(SyncStatus.PENDING_SYNC)
+        .count();
+
+      const pendingIncidents = await db.incidents
+        .where('sync_status')
+        .equals(SyncStatus.PENDING_SYNC)
+        .count();
+
+      return pendingVisits + pendingIncidents;
+    } catch (e) {
+      return 0;
     }
   }
 }

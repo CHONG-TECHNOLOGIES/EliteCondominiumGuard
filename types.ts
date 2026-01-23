@@ -1,7 +1,8 @@
 
 export enum UserRole {
   ADMIN = 'ADMIN',
-  GUARD = 'GUARD'
+  GUARD = 'GUARD',
+  SUPER_ADMIN = 'SUPER_ADMIN'
 }
 
 export enum VisitType {
@@ -128,7 +129,7 @@ export interface ServiceTypeConfig {
 }
 
 export interface Restaurant {
-  id: number;             // SERIAL in Supabase
+  id: string;             // UUID in Supabase
   condominium_id: number; // INT4
   name: string;
   description?: string;
@@ -137,7 +138,7 @@ export interface Restaurant {
 }
 
 export interface Sport {
-  id: number;             // SERIAL in Supabase
+  id: string;             // UUID in Supabase
   condominium_id: number; // INT4
   name: string;
   description?: string;
@@ -160,10 +161,10 @@ export interface Visit {
   service_type?: string;         // Nome do serviço (para exibição)
   service_type_id?: number;      // INT4 (references service_types)
 
-  restaurant_id?: number;        // INT4 for restaurant visits
+  restaurant_id?: string;        // UUID for restaurant visits
   restaurant_name?: string;      // Nome do restaurante (para exibição)
 
-  sport_id?: number;             // INT4 for sport visits
+  sport_id?: string;             // UUID for sport visits
   sport_name?: string;           // Nome do desporto (para exibição)
 
   unit_id?: number;              // INT4 (references units) - optional for restaurant/sport visits
@@ -195,7 +196,7 @@ export interface IncidentStatus {
 }
 
 export interface Incident {
-  id: number;                    // SERIAL in Supabase
+  id: string;                    // UUID in Supabase
   reported_at: string;           // timestamptz
   resident_id: number;           // INT4 (references residents)
   resident?: Resident;           // Populated from join

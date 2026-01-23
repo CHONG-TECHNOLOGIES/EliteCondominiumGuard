@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ApprovalMode, Unit } from '../types';
+import { api } from '../services/dataService';
 import {
   getAvailableApprovalModes,
   initiatePhoneCall,
@@ -79,6 +80,9 @@ export default function ApprovalModeSelector({
   const availableModes = getAvailableApprovalModes(isOnline, unit); // Pass unit for contextual logic
   const residentPhones = unit ? getResidentPhones(unit) : [];
   const hasAppInstalled = unit ? unitHasAppInstalled(unit) : false;
+  const preferredPhone = residentPhones[0] || visitorPhone || '';
+  const preferredPhoneSource = residentPhones.length > 0 ? 'resident' : 'visitor';
+  const unitLabel = unit ? `${unit.code_block || ''} ${unit.number}`.trim() : '';
 
   // Auto-select appropriate mode when online/offline status changes or unit changes
   useEffect(() => {
@@ -98,14 +102,29 @@ export default function ApprovalModeSelector({
     }
   }, [isOnline, unit, availableModes, selectedMode, onModeSelect, hasAppInstalled]);
 
-  const handlePhoneCall = () => {
-    const phoneToCall = residentPhones[0] || visitorPhone;
+  const handlePhoneCall = async () => {
+    const phoneToCall = preferredPhone;
     if (!phoneToCall) {
-      alert('Nenhum número de telefone disponível para esta unidade.');
+      alert('Nenhum n?mero de telefone dispon?vel para esta unidade.');
+      return;
+    }
+
+    const confirmMessage = unitLabel
+      ? `Confirmar chamada para ${phoneToCall} (Unidade ${unitLabel})?`
+      : `Confirmar chamada para ${phoneToCall}?`;
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
     setCalling(true);
+    await api.logCallInitiated({
+      phone: phoneToCall,
+      source: preferredPhoneSource,
+      unitId: unit?.id,
+      unitLabel: unitLabel || undefined,
+      approvalMode: ApprovalMode.PHONE,
+      context: 'approval_mode_selector'
+    });
     initiatePhoneCall(phoneToCall);
     setTimeout(() => setCalling(false), 2000);
   };
@@ -206,7 +225,7 @@ export default function ApprovalModeSelector({
                   {config.mode === ApprovalMode.PHONE && (
                     <button
                       onClick={handlePhoneCall}
-                      disabled={calling || (!residentPhones[0] && !visitorPhone)}
+                      disabled={calling || !preferredPhone}
                       className={`
                         w-full py-3 px-4 rounded-lg font-bold text-sm
                         flex items-center justify-center gap-2
@@ -219,7 +238,7 @@ export default function ApprovalModeSelector({
                       `}
                     >
                       <PhoneOutgoing size={18} className={calling ? 'animate-pulse' : ''} />
-                      {calling ? 'Chamando...' : `Ligar: ${residentPhones[0] || visitorPhone || 'N/A'}`}
+                      {calling ? 'Chamando...' : `Ligar: ${preferredPhone || 'N/A'}`}
                     </button>
                   )}
 

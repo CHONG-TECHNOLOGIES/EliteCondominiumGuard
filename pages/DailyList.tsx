@@ -39,11 +39,28 @@ export default function DailyList() {
   };
 
   const handleContactResident = (visit: Visit) => {
-    if (visit.visitor_phone) {
-      window.open(`tel:${visit.visitor_phone}`, '_self');
-    } else {
-      alert('Número de telefone não disponível para este visitante.');
+    if (!visit.visitor_phone) {
+      alert('N?mero de telefone n?o dispon?vel para este visitante.');
+      return;
     }
+
+    const unitLabel = visit.unit_block && visit.unit_number
+      ? `${visit.unit_block} ${visit.unit_number}`
+      : undefined;
+
+    showConfirm(`Confirmar chamada para ${visit.visitor_phone}?`, async () => {
+      await api.logCallInitiated({
+        phone: visit.visitor_phone,
+        source: 'visitor',
+        visitId: visit.id,
+        unitId: visit.unit_id,
+        unitLabel,
+        context: 'daily_list',
+        targetTable: 'visits',
+        targetId: visit.id
+      });
+      window.open(`tel:${visit.visitor_phone}`, '_self');
+    });
   };
 
   const getStatusBadge = (status: VisitStatus) => {

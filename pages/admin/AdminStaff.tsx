@@ -57,7 +57,7 @@ export default function AdminStaff() {
       showToast('warning', 'Nome e Sobrenome são obrigatórios');
       return;
     }
-    if (!formData.condominium_id) {
+    if (!formData.condominium_id && formData.role !== UserRole.SUPER_ADMIN) {
       showToast('warning', 'Condomínio é obrigatório');
       return;
     }
@@ -96,7 +96,7 @@ export default function AdminStaff() {
       showToast('warning', 'Nome e Sobrenome são obrigatórios');
       return;
     }
-    if (!formData.condominium_id) {
+    if (!formData.condominium_id && formData.role !== UserRole.SUPER_ADMIN) {
       showToast('warning', 'Condomínio é obrigatório');
       return;
     }
@@ -204,12 +204,15 @@ export default function AdminStaff() {
   };
 
   const getCondominiumName = (condoId?: number) => {
-    if (!condoId) return 'Não Atribuído';
+    if (!condoId) return 'Global';
     const condo = condominiums.find(c => c.id === condoId);
     return condo?.name || 'Desconhecido';
   };
 
   const getRoleBadge = (role: UserRole) => {
+    if (role === UserRole.SUPER_ADMIN) {
+      return <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800">SUPER ADMIN</span>;
+    }
     if (role === UserRole.ADMIN) {
       return <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">ADMIN</span>;
     }
@@ -273,6 +276,7 @@ export default function AdminStaff() {
           <option value="">Todas as Funções</option>
           <option value={UserRole.GUARD}>Guarda</option>
           <option value={UserRole.ADMIN}>Admin</option>
+          <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
         </select>
       </div>
 
@@ -302,7 +306,9 @@ export default function AdminStaff() {
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
                   <div className="p-3 bg-slate-50 rounded-lg">
-                    {staffMember.role === UserRole.ADMIN ? (
+                    {staffMember.role === UserRole.SUPER_ADMIN ? (
+                      <Shield className="text-rose-600" size={32} />
+                    ) : staffMember.role === UserRole.ADMIN ? (
                       <Shield className="text-purple-600" size={32} />
                     ) : (
                       <Users className="text-blue-600" size={32} />
@@ -424,6 +430,7 @@ export default function AdminStaff() {
                 >
                   <option value={UserRole.GUARD}>Guarda</option>
                   <option value={UserRole.ADMIN}>Admin</option>
+                  <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
                 </select>
               </div>
               <div>
@@ -533,6 +540,7 @@ export default function AdminStaff() {
                 >
                   <option value={UserRole.GUARD}>Guarda</option>
                   <option value={UserRole.ADMIN}>Admin</option>
+                  <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
                 </select>
               </div>
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
