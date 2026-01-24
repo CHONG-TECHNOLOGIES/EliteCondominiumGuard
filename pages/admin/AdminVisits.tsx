@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { UserCheck, Loader2, Search, Download, X, FileText } from 'lucide-react';
+import { UserCheck, Loader2, Search, Download, X, FileText, RotateCcw, History } from 'lucide-react';
 import { api } from '../../services/dataService';
-import { Visit, Condominium, VisitStatus, VisitTypeConfig, ServiceTypeConfig } from '../../types';
+import { Visit, VisitEvent, Condominium, VisitStatus, VisitTypeConfig, ServiceTypeConfig } from '../../types';
 import { useToast } from '../../components/Toast';
 import { exportVisitsToCSV, exportVisitsToPDF } from '../../utils/csvExport';
 
@@ -37,6 +37,12 @@ export default function AdminVisits() {
     action: VisitStatus | null;
   }>({ isOpen: false, visit: null, action: null });
   const [residentAware, setResidentAware] = useState(false);
+  const [eventModal, setEventModal] = useState<{
+    isOpen: boolean;
+    visit: Visit | null;
+    events: VisitEvent[];
+    loading: boolean;
+  }>({ isOpen: false, visit: null, events: [], loading: false });
 
   // Reload when date range or condominium changes
   // Also reload when filters change AND we're using backend filtering
@@ -116,6 +122,16 @@ export default function AdminVisits() {
     setResidentAware(false);
   };
 
+  const openEventModal = async (visit: Visit) => {
+    setEventModal({ isOpen: true, visit, events: [], loading: true });
+    const events = await api.getVisitEvents(visit.id);
+    setEventModal({ isOpen: true, visit, events, loading: false });
+  };
+
+  const closeEventModal = () => {
+    setEventModal({ isOpen: false, visit: null, events: [], loading: false });
+  };
+
   // Confirm and execute status update
   const confirmStatusUpdate = async () => {
     if (!confirmModal.visit || !confirmModal.action) return;
@@ -167,6 +183,23 @@ export default function AdminVisits() {
         return <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-800">SAIU</span>;
       default:
         return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800">DESCONHECIDO</span>;
+    }
+  };
+
+  const getStatusDotClass = (status: VisitStatus) => {
+    switch (status) {
+      case VisitStatus.PENDING:
+        return 'bg-yellow-500';
+      case VisitStatus.APPROVED:
+        return 'bg-green-500';
+      case VisitStatus.DENIED:
+        return 'bg-red-500';
+      case VisitStatus.INSIDE:
+        return 'bg-blue-500';
+      case VisitStatus.LEFT:
+        return 'bg-slate-500';
+      default:
+        return 'bg-slate-400';
     }
   };
 
@@ -233,6 +266,18 @@ export default function AdminVisits() {
     }
     exportVisitsToPDF(filteredVisits);
     showToast('success', `${filteredVisits.length} visitas exportadas para PDF`);
+  };
+
+  const handleClearFilters = () => {
+    const today = new Date().toISOString().split('T')[0];
+
+    setSearchTerm('');
+    setFilterCondoId(null);
+    setFilterStatus('');
+    setFilterVisitType('');
+    setFilterServiceType('');
+    setStartDate(today);
+    setEndDate(today);
   };
 
   return (
@@ -346,6 +391,16 @@ export default function AdminVisits() {
           </div>
         </div>
       </div>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={handleClearFilters}
+          className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+        >
+          <RotateCcw size={18} />
+          Limpar filtros
+        </button>
+      </div>
 
       {/* Visits List */}
       {loading ? (
@@ -454,10 +509,81 @@ export default function AdminVisits() {
                       Marcar Saída
                     </button>
                   )}
+                  <button
+                    onClick={() => openEventModal(visit)}
+                    className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <History size={16} />
+                    Historico
+                  </button>
                 </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Event History Modal */}
+      {eventModal.isOpen && eventModal.visit && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
+          onClick={closeEventModal}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 rounded-t-xl bg-slate-900">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Historico da Visita</h2>
+                <button
+                  onClick={closeEventModal}
+                  className="text-white/80 hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <p className="text-sm text-slate-200 mt-1">
+                {eventModal.visit.visitor_name} • {eventModal.visit.visit_type || 'N/A'}
+              </p>
+            </div>
+
+            <div className="p-6">
+              {eventModal.loading ? (
+                <div className="flex items-center justify-center py-8 text-slate-500">
+                  <Loader2 className="animate-spin mr-2" size={20} />
+                  A carregar eventos...
+                </div>
+              ) : eventModal.events.length === 0 ? (
+                <div className="text-center text-slate-500 py-8">
+                  Sem eventos registados.
+                </div>
+              ) : (
+                <div className="relative pl-6 space-y-6">
+                  <div className="absolute left-2 top-2 bottom-2 w-px bg-slate-200" />
+                  {eventModal.events.map((event) => (
+                    <div
+                      key={`${event.id}-${event.event_at}`}
+                      className="relative"
+                    >
+                      <div className={`absolute -left-1.5 top-1.5 w-3 h-3 rounded-full ${getStatusDotClass(event.status)}`} />
+                      <div className="border border-slate-200 rounded-lg px-4 py-3 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          {getStatusBadge(event.status)}
+                          <span className="text-sm text-slate-600">
+                            {formatDateTime(event.event_at)}
+                          </span>
+                        </div>
+                        {event.actor_id && (
+                          <span className="text-xs text-slate-400">ID Guard: {event.actor_id}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

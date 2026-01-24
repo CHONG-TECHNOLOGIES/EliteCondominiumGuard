@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { Visit, Unit, VisitTypeConfig, ServiceTypeConfig, Staff, Condominium, Restaurant, Sport, Incident, IncidentType, IncidentStatus, Device } from '../types';
+import { Visit, VisitEvent, Unit, VisitTypeConfig, ServiceTypeConfig, Staff, Condominium, Restaurant, Sport, Incident, IncidentType, IncidentStatus, Device } from '../types';
 
 export interface AppSetting {
   key: string;
@@ -8,6 +8,7 @@ export interface AppSetting {
 
 export class CondoDatabase extends Dexie {
   visits!: Table<Visit>;
+  visitEvents!: Table<VisitEvent>;
   units!: Table<Unit>;
   visitTypes!: Table<VisitTypeConfig>;
   serviceTypes!: Table<ServiceTypeConfig>;
@@ -67,10 +68,21 @@ export class CondoDatabase extends Dexie {
     (this as Dexie).version(8).stores({
       visits: 'id, condominium_id, status, sync_status, check_in_at, device_id'
     });
+
+    // Version 9: Add visit events table for visit status tracking
+    (this as Dexie).version(9).stores({
+      visitEvents: 'id, visit_id, status, sync_status, event_at'
+    });
+
+    // Version 10: Auto-increment visitEvents primary key for local inserts
+    (this as Dexie).version(10).stores({
+      visitEvents: '++id, visit_id, status, sync_status, event_at'
+    });
   }
 
   async clearAllData() {
     await this.visits.clear();
+    await this.visitEvents.clear();
     await this.units.clear();
     await this.visitTypes.clear();
     await this.serviceTypes.clear();

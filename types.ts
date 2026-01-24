@@ -185,6 +185,17 @@ export interface Visit {
   sync_status: SyncStatus;       // 'SINCRONIZADO' or 'PENDENTE_ENVIO'
 }
 
+export interface VisitEvent {
+  id?: number;                   // SERIAL in Supabase
+  created_at?: string;           // timestamptz
+  visit_id: number;              // INT4 (references visits)
+  status: VisitStatus;
+  event_at: string;              // timestamptz
+  actor_id?: number;             // INT4 (references staff)
+  device_id?: string;            // UUID (references devices)
+  sync_status: SyncStatus;       // 'SINCRONIZADO' or 'PENDENTE_ENVIO'
+}
+
 export interface IncidentType {
   code: string;                  // Primary key
   label: string;                 // Display name

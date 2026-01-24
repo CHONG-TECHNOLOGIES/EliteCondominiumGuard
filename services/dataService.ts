@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { ApprovalMode, Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
+import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 
@@ -235,6 +235,7 @@ class DataService {
       db.incidentTypes.count(),
       db.incidentStatuses.count(),
       db.incidents.count(),
+      db.visitEvents.count(),
       db.visits.count()
     ]);
 
@@ -1084,6 +1085,85 @@ class DataService {
     );
   }
 
+  async getVisitEvents(visitId: number): Promise<VisitEvent[]> {
+    const localEvents = await db.visitEvents
+      .where('visit_id')
+      .equals(visitId)
+      .toArray();
+
+    if (localEvents.length > 0) {
+      if (this.isBackendHealthy && visitId > 0) {
+        this.refreshVisitEvents(visitId);
+      }
+      return localEvents.sort((a, b) =>
+        new Date(a.event_at).getTime() - new Date(b.event_at).getTime()
+      );
+    }
+
+    if (this.isBackendHealthy && visitId > 0) {
+      return await this.refreshVisitEvents(visitId);
+    }
+
+    return [];
+  }
+
+  private async refreshVisitEvents(visitId: number): Promise<VisitEvent[]> {
+    if (!this.isBackendHealthy || visitId <= 0) return [];
+
+    try {
+      const events = await SupabaseService.getVisitEvents(visitId);
+      if (events.length) {
+        const normalized = events.map((event) => ({
+          ...event,
+          sync_status: SyncStatus.SYNCED
+        }));
+        await db.visitEvents.bulkPut(normalized);
+      }
+      return events.sort((a, b) =>
+        new Date(a.event_at).getTime() - new Date(b.event_at).getTime()
+      );
+    } catch (e) {
+      this.backendHealthScore--;
+      return [];
+    }
+  }
+
+  private getVisitEventActorId(explicitActorId?: number): number | undefined {
+    if (explicitActorId) return explicitActorId;
+    return this.getStoredUser()?.id;
+  }
+
+  private async createVisitEvent(
+    visitId: number,
+    status: VisitStatus,
+    eventAt: string,
+    actorId?: number
+  ): Promise<void> {
+    const event: VisitEvent = {
+      visit_id: visitId,
+      status,
+      event_at: eventAt,
+      actor_id: this.getVisitEventActorId(actorId),
+      device_id: this.currentDeviceId || undefined,
+      sync_status: SyncStatus.PENDING_SYNC
+    };
+
+    const localId = await db.visitEvents.add(event);
+
+    if (!this.isBackendHealthy || visitId <= 0) return;
+
+    try {
+      const createdEvent = await SupabaseService.createVisitEvent(event);
+      if (createdEvent) {
+        createdEvent.sync_status = SyncStatus.SYNCED;
+        await db.visitEvents.delete(localId);
+        await db.visitEvents.put(createdEvent);
+      }
+    } catch (e) {
+      this.backendHealthScore--;
+    }
+  }
+
   async createVisit(visitData: Partial<Visit> & { photo_data_url?: string }): Promise<Visit> {
     if (!visitData.visit_type_id) {
       throw new Error("visit_type_id is required");
@@ -1152,6 +1232,12 @@ class DataService {
         if (createdVisit) {
           createdVisit.sync_status = SyncStatus.SYNCED;
           await db.visits.put(createdVisit);
+          await this.createVisitEvent(
+            createdVisit.id,
+            createdVisit.status,
+            createdVisit.check_in_at,
+            createdVisit.guard_id
+          );
           console.log("[DataService] Visit saved to Supabase and cached locally:", createdVisit.id);
           return createdVisit;
         } else {
@@ -1176,6 +1262,12 @@ class DataService {
           photo_data_url: visitData.photo_data_url // Store base64 for later upload
         };
         await db.visits.put(tempVisit);
+        await this.createVisitEvent(
+          tempVisit.id,
+          tempVisit.status,
+          tempVisit.check_in_at,
+          tempVisit.guard_id
+        );
         console.warn("[DataService] Visit saved locally with temp ID, will sync later");
         return tempVisit;
       }
@@ -1196,6 +1288,12 @@ class DataService {
         photo_data_url: visitData.photo_data_url // Store base64 for later upload
       };
       await db.visits.put(tempVisit);
+      await this.createVisitEvent(
+        tempVisit.id,
+        tempVisit.status,
+        tempVisit.check_in_at,
+        tempVisit.guard_id
+      );
       console.warn("[DataService] Offline: Visit saved locally with temp ID, will sync when online");
       return tempVisit;
     }
@@ -1212,11 +1310,16 @@ class DataService {
       visit.check_out_at = new Date().toISOString();
     }
 
+    const eventAt = status === VisitStatus.LEFT && visit.check_out_at
+      ? visit.check_out_at
+      : new Date().toISOString();
+
     // Mark as pending sync
     visit.sync_status = SyncStatus.PENDING_SYNC;
 
     // Update locally
     await db.visits.put(visit);
+    await this.createVisitEvent(visitId, status, eventAt);
 
     // Try to sync if online
     if (this.isBackendHealthy) {
@@ -1259,7 +1362,12 @@ class DataService {
         .equals(SyncStatus.PENDING_SYNC)
         .toArray();
 
-      const totalPending = pendingVisits.length + pendingIncidents.length;
+      let pendingVisitEvents = await db.visitEvents
+        .where('sync_status')
+        .equals(SyncStatus.PENDING_SYNC)
+        .toArray();
+
+      const totalPending = pendingVisits.length + pendingIncidents.length + pendingVisitEvents.length;
 
       // Emit start event
       this.emitSyncEvent('sync:start', {
@@ -1304,6 +1412,10 @@ class DataService {
             await db.visits.delete(visit.id); // Delete temp ID
             createdVisit.sync_status = SyncStatus.SYNCED;
             await db.visits.put(createdVisit); // Add server version
+            await db.visitEvents
+              .where('visit_id')
+              .equals(visit.id)
+              .modify({ visit_id: createdVisit.id });
             totalSynced++;
             console.log("[DataService] Synced pending visit:", visit.id, "-> new ID:", createdVisit.id);
 
@@ -1321,6 +1433,39 @@ class DataService {
             error: `Erro ao sincronizar visita: ${e instanceof Error ? e.message : 'Erro desconhecido'}`
           });
           break; // Stop on first failure
+        }
+      }
+
+      pendingVisitEvents = await db.visitEvents
+        .where('sync_status')
+        .equals(SyncStatus.PENDING_SYNC)
+        .toArray();
+
+      // Sync pending visit events
+      for (const visitEvent of pendingVisitEvents) {
+        try {
+          const createdEvent = await SupabaseService.createVisitEvent(visitEvent);
+          if (createdEvent) {
+            createdEvent.sync_status = SyncStatus.SYNCED;
+            if (visitEvent.id != null) {
+              await db.visitEvents.delete(visitEvent.id);
+            }
+            await db.visitEvents.put(createdEvent);
+            totalSynced++;
+
+            this.emitSyncEvent('sync:progress', {
+              synced: totalSynced,
+              total: totalPending,
+              message: `Evento de visita sincronizado (${totalSynced}/${totalPending})`
+            });
+          }
+        } catch (e) {
+          console.error("[DataService] Failed to sync visit event:", visitEvent.id, e);
+          this.backendHealthScore--;
+          this.emitSyncEvent('sync:error', {
+            error: `Erro ao sincronizar evento da visita: ${e instanceof Error ? e.message : 'Erro desconhecido'}`
+          });
+          break;
         }
       }
 
@@ -2176,7 +2321,14 @@ class DataService {
    */
   async adminUpdateVisitStatus(id: number, status: VisitStatus): Promise<Visit | null> {
     try {
-      return await SupabaseService.adminUpdateVisitStatus(id, status);
+      const visit = await SupabaseService.adminUpdateVisitStatus(id, status);
+      if (visit) {
+        const eventAt = status === VisitStatus.LEFT && visit.check_out_at
+          ? visit.check_out_at
+          : new Date().toISOString();
+        await this.createVisitEvent(visit.id, status, eventAt);
+      }
+      return visit;
     } catch (e) {
       console.error('[Admin] Failed to update visit status (online required):', e);
       return null;

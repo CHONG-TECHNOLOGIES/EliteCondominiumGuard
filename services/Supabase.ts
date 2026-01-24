@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
+import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
 
 /**
  * Serviço Real de API Supabase
@@ -323,6 +323,44 @@ export const SupabaseService = {
     } catch (err: any) {
       console.error("Update Visit Status Error:", err.message || JSON.stringify(err));
       return false;
+    }
+  },
+
+  async createVisitEvent(event: VisitEvent): Promise<VisitEvent | null> {
+    if (!supabase) return null;
+
+    const { sync_status, id, created_at, ...payload } = event;
+    const cleanedPayload = Object.fromEntries(
+      Object.entries(payload).map(([key, value]) => [
+        key,
+        value === '' ? null : value
+      ])
+    );
+
+    try {
+      const { data, error } = await supabase
+        .rpc('create_visit_event', { p_data: cleanedPayload });
+
+      if (error) throw error;
+      return data as VisitEvent;
+    } catch (err: any) {
+      console.error("Create Visit Event Error:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  async getVisitEvents(visitId: number): Promise<VisitEvent[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .rpc('get_visit_events', { p_visit_id: visitId });
+
+      if (error) throw error;
+      return (data as VisitEvent[]) || [];
+    } catch (err: any) {
+      console.error("Get Visit Events Error:", err.message || JSON.stringify(err));
+      return [];
     }
   },
 
