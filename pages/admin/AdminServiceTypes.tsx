@@ -1,8 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Wrench, Plus, Edit2, Trash2, Loader2, Search, X } from 'lucide-react';
+import {
+  Wrench, Plus, Edit2, Trash2, Loader2, Search, X,
+  Hammer, Droplets, Zap, Wifi, Sparkles, Flower2, Truck, MoreHorizontal
+} from 'lucide-react';
 import { api } from '../../services/dataService';
 import { ServiceTypeConfig } from '../../types';
 import { useToast } from '../../components/Toast';
+
+// Map service name to icon based on keywords (same logic as NewEntry.tsx)
+const getServiceIcon = (name: string, size: number = 32) => {
+  const s = name.toLowerCase();
+  if (s.includes("obras") || s.includes("construção")) return <Hammer size={size} />;
+  if (s.includes("canalização") || s.includes("canalizacao")) return <Droplets size={size} />;
+  if (s.includes("electri") || s.includes("eletri")) return <Zap size={size} />;
+  if (s.includes("internet") || s.includes("tv")) return <Wifi size={size} />;
+  if (s.includes("limpeza")) return <Sparkles size={size} />;
+  if (s.includes("jardinagem")) return <Flower2 size={size} />;
+  if (s.includes("mudanças") || s.includes("mudancas")) return <Truck size={size} />;
+  return <MoreHorizontal size={size} />;
+};
 
 export default function AdminServiceTypes() {
   const { showToast, showConfirm } = useToast();
@@ -170,8 +186,8 @@ export default function AdminServiceTypes() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-orange-50 rounded-lg">
-                    <Wrench className="text-orange-600" size={32} />
+                  <div className="p-3 bg-orange-50 rounded-lg text-orange-600">
+                    {getServiceIcon(serviceType.name, 32)}
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-slate-900">{serviceType.name}</h3>

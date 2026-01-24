@@ -1,9 +1,11 @@
 /**
- * CSV Export Utilities
- * Provides functions to export data to CSV format
+ * Export Utilities
+ * Provides functions to export data to CSV and PDF formats
  */
 
 import { Visit, Incident } from '../types';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 /**
  * Convert array of objects to CSV string
@@ -147,4 +149,114 @@ export function exportIncidentsToCSV(incidents: Incident[], filename?: string): 
   const csvContent = convertToCSV(incidents, headers, accessor);
   const defaultFilename = `incidentes_${new Date().toISOString().split('T')[0]}.csv`;
   downloadCSV(csvContent, filename || defaultFilename);
+}
+
+/**
+ * Get status label in Portuguese
+ */
+function getStatusLabel(status: string): string {
+  const statusMap: Record<string, string> = {
+    'PENDING': 'Pendente',
+    'APPROVED': 'Autorizado',
+    'DENIED': 'Negado',
+    'INSIDE': 'No Interior',
+    'LEFT': 'Saiu'
+  };
+  return statusMap[status] || status;
+}
+
+/**
+ * Export visits to PDF
+ */
+export function exportVisitsToPDF(visits: Visit[], filename?: string): void {
+  const doc = new jsPDF('landscape', 'mm', 'a4');
+
+  // Title
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Relatório de Visitas', 14, 15);
+
+  // Date range info
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  const dateStr = new Date().toLocaleString('pt-PT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  doc.text(`Gerado em: ${dateStr}`, 14, 22);
+  doc.text(`Total de registos: ${visits.length}`, 14, 27);
+
+  // Table headers
+  const headers = [
+    'Nome',
+    'Documento',
+    'Telefone',
+    'Tipo',
+    'Unidade',
+    'Estado',
+    'Entrada',
+    'Saída'
+  ];
+
+  // Table data
+  const data = visits.map(visit => [
+    visit.visitor_name || '',
+    visit.visitor_doc || '',
+    visit.visitor_phone || '',
+    visit.visit_type || '',
+    visit.unit_block && visit.unit_number ? `${visit.unit_block} ${visit.unit_number}` : '',
+    getStatusLabel(visit.status),
+    formatDateTime(visit.check_in_at).replace(',', ''),
+    visit.check_out_at ? formatDateTime(visit.check_out_at).replace(',', '') : ''
+  ]);
+
+  // Generate table
+  autoTable(doc, {
+    head: [headers],
+    body: data,
+    startY: 32,
+    styles: {
+      fontSize: 8,
+      cellPadding: 2,
+    },
+    headStyles: {
+      fillColor: [30, 64, 175], // blue-800
+      textColor: 255,
+      fontStyle: 'bold',
+    },
+    alternateRowStyles: {
+      fillColor: [248, 250, 252], // slate-50
+    },
+    columnStyles: {
+      0: { cellWidth: 40 }, // Nome
+      1: { cellWidth: 30 }, // Documento
+      2: { cellWidth: 30 }, // Telefone
+      3: { cellWidth: 25 }, // Tipo
+      4: { cellWidth: 25 }, // Unidade
+      5: { cellWidth: 25 }, // Estado
+      6: { cellWidth: 35 }, // Entrada
+      7: { cellWidth: 35 }, // Saída
+    },
+  });
+
+  // Footer
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(
+      `Página ${i} de ${pageCount} - Elite AccessControl`,
+      doc.internal.pageSize.width / 2,
+      doc.internal.pageSize.height - 10,
+      { align: 'center' }
+    );
+  }
+
+  // Save PDF
+  const defaultFilename = `visitas_${new Date().toISOString().split('T')[0]}.pdf`;
+  doc.save(filename || defaultFilename);
 }

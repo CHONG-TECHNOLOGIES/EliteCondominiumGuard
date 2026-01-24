@@ -1,8 +1,137 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Plus, Edit2, Trash2, Loader2, Search, X, Building2, Home } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Users, Plus, Edit2, Trash2, Loader2, Search, X, Building2, Home, ChevronDown, Check } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { Resident, Condominium, Unit } from '../../types';
 import { useToast } from '../../components/Toast';
+
+// Searchable Select Component
+interface SearchableSelectProps {
+  options: { value: number | string; label: string }[];
+  value: number | string | null;
+  onChange: (value: number | string | null) => void;
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
+  alwaysVisibleValues?: Array<number | string>;
+  className?: string;
+}
+
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder = 'Selecione...',
+  searchPlaceholder = 'Pesquisar...',
+  emptyMessage = 'Nenhum resultado encontrado',
+  alwaysVisibleValues = [],
+  className = ''
+}: SearchableSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filteredOptions = options.filter(option =>
+    alwaysVisibleValues.includes(option.value) ||
+    option.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const handleSelect = (optionValue: number | string) => {
+    onChange(optionValue);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(null);
+    setSearch('');
+  };
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left flex items-center justify-between cursor-pointer"
+      >
+        <span className={selectedOption ? 'text-slate-900' : 'text-slate-500'}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <div className="flex items-center gap-1">
+          {selectedOption && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="p-1 hover:bg-slate-100 rounded transition-colors"
+            >
+              <X size={14} className="text-slate-400" />
+            </button>
+          )}
+          <ChevronDown size={18} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
+          <div className="p-2 border-b border-slate-200">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                ref={inputRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {filteredOptions.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                {emptyMessage}
+              </div>
+            ) : (
+              filteredOptions.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleSelect(option.value)}
+                  className={`w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center justify-between transition-colors ${
+                    option.value === value ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  {option.value === value && <Check size={16} className="text-blue-600" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminResidents() {
   const { showToast, showConfirm } = useToast();
@@ -193,7 +322,15 @@ export default function AdminResidents() {
     <div className="p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Residentes</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-slate-900">Gestão de Residentes</h1>
+            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">
+              {filteredResidents.length === residents.length
+                ? `${residents.length} total`
+                : `${filteredResidents.length} de ${residents.length}`
+              }
+            </span>
+          </div>
           <p className="text-slate-600">Gerir residentes e proprietários das unidades</p>
         </div>
         <button
@@ -220,16 +357,18 @@ export default function AdminResidents() {
             className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <select
-          value={filterCondoId || ''}
-          onChange={(e) => setFilterCondoId(e.target.value ? parseInt(e.target.value) : null)}
-          className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Todos os Condomínios</option>
-          {condominiums.map(condo => (
-            <option key={condo.id} value={condo.id}>{condo.name}</option>
-          ))}
-        </select>
+        <SearchableSelect
+          options={[
+            { value: 'ALL', label: 'Todos os Condomínios' },
+            ...condominiums.map(condo => ({ value: condo.id, label: condo.name }))
+          ]}
+          value={filterCondoId}
+          onChange={(val) => setFilterCondoId(val === 'ALL' ? null : val as number | null)}
+          placeholder="Todos os condomínios"
+          searchPlaceholder="Pesquisar condomínio..."
+          emptyMessage="Nenhum condomínio encontrado"
+          alwaysVisibleValues={['ALL']}
+        />
       </div>
 
       {/* Residents List */}
@@ -335,25 +474,22 @@ export default function AdminResidents() {
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   Condomínio <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={formData.condominium_id || ''}
-                  onChange={(e) =>
+                <SearchableSelect
+                  options={condominiums
+                    .filter(c => c.status === 'ACTIVE')
+                    .map(condo => ({ value: condo.id, label: condo.name }))}
+                  value={formData.condominium_id}
+                  onChange={(val) =>
                     setFormData({
                       ...formData,
-                      condominium_id: e.target.value ? parseInt(e.target.value) : null,
+                      condominium_id: val as number | null,
                       unit_id: null
                     })
                   }
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Selecione um condomínio</option>
-                  {condominiums
-                    .filter(c => c.status === 'ACTIVE')
-                    .map(condo => (
-                      <option key={condo.id} value={condo.id}>{condo.name}</option>
-                    ))
-                  }
-                </select>
+                  placeholder="Selecione um condom?nio"
+                  searchPlaceholder="Pesquisar condom?nio..."
+                  emptyMessage="Nenhum condom?nio encontrado"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -463,13 +599,23 @@ export default function AdminResidents() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Condomínio (Apenas Leitura)
+                  Condomínio <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  value={getCondominiumName(selectedResident.condominium_id)}
-                  disabled
-                  className="w-full px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-600 cursor-not-allowed"
+                <SearchableSelect
+                  options={condominiums
+                    .filter(c => c.status === 'ACTIVE')
+                    .map(condo => ({ value: condo.id, label: condo.name }))}
+                  value={formData.condominium_id}
+                  onChange={(val) =>
+                    setFormData({
+                      ...formData,
+                      condominium_id: val as number | null,
+                      unit_id: null
+                    })
+                  }
+                  placeholder="Selecione um condomínio"
+                  searchPlaceholder="Pesquisar condomínio..."
+                  emptyMessage="Nenhum condomínio encontrado"
                 />
               </div>
               <div>
