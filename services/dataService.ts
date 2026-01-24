@@ -1668,6 +1668,42 @@ class DataService {
   }
 
   /**
+   * Admin: Get all visits with full filtering (for long date ranges >= 6 months)
+   * ONLINE ONLY - Admin requires active internet connection
+   * Uses backend filtering for better performance with large datasets
+   * @param startDate - Start date filter (ISO string)
+   * @param endDate - End date filter (ISO string)
+   * @param condominiumId - Optional filter by specific condominium
+   * @param visitType - Optional filter by visit type name
+   * @param serviceType - Optional filter by service type name
+   * @param status - Optional filter by status
+   */
+  async adminGetAllVisitsFiltered(
+    startDate?: string,
+    endDate?: string,
+    condominiumId?: number,
+    visitType?: string,
+    serviceType?: string,
+    status?: string
+  ): Promise<Visit[]> {
+    try {
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveCondoId = scopedCondoId ?? condominiumId;
+      return await SupabaseService.adminGetAllVisitsFiltered(
+        startDate,
+        endDate,
+        effectiveCondoId,
+        visitType,
+        serviceType,
+        status
+      );
+    } catch (e) {
+      console.error('[Admin] Failed to fetch filtered visits (online required):', e);
+      return [];
+    }
+  }
+
+  /**
    * Admin: Get all incidents across all condominiums
    * ONLINE ONLY - Admin requires active internet connection
    * @param condominiumId - Optional filter by specific condominium

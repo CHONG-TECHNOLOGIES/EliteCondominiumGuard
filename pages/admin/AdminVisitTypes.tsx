@@ -1,8 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, Plus, Edit2, Trash2, Loader2, Search, X, Check, XIcon } from 'lucide-react';
+import {
+  Tag, Plus, Edit2, Trash2, Loader2, Search, X, Check, XIcon,
+  User, Package, Truck, Wrench, GraduationCap, UtensilsCrossed,
+  Dumbbell, Users, Car, Bike, Building, Heart, Briefcase,
+  type LucideIcon
+} from 'lucide-react';
 import { api } from '../../services/dataService';
 import { VisitTypeConfig } from '../../types';
 import { useToast } from '../../components/Toast';
+
+// Map icon_key to Lucide icons
+const ICON_MAP: Record<string, LucideIcon> = {
+  user: User,
+  users: Users,
+  package: Package,
+  truck: Truck,
+  wrench: Wrench,
+  graduation: GraduationCap,
+  restaurant: UtensilsCrossed,
+  utensils: UtensilsCrossed,
+  sport: Dumbbell,
+  dumbbell: Dumbbell,
+  car: Car,
+  bike: Bike,
+  building: Building,
+  heart: Heart,
+  briefcase: Briefcase,
+  tag: Tag,
+};
+
+const getIconForKey = (iconKey: string): LucideIcon => {
+  const key = iconKey.toLowerCase();
+  return ICON_MAP[key] || Tag;
+};
 
 export default function AdminVisitTypes() {
   const { showToast, showConfirm } = useToast();
@@ -184,9 +214,14 @@ export default function AdminVisitTypes() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
-                  <div className="p-3 bg-purple-50 rounded-lg">
-                    <Tag className="text-purple-600" size={32} />
-                  </div>
+                  {(() => {
+                    const IconComponent = getIconForKey(visitType.icon_key);
+                    return (
+                      <div className="p-3 bg-purple-50 rounded-lg">
+                        <IconComponent className="text-purple-600" size={32} />
+                      </div>
+                    );
+                  })()}
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-slate-900 mb-2">{visitType.name}</h3>
                     <div className="flex flex-wrap gap-2 mb-2">

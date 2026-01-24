@@ -817,6 +817,66 @@ export const SupabaseService = {
   },
 
   /**
+   * Admin: Get all visits with full filtering (for long date ranges >= 6 months)
+   * Uses RPC function with backend filtering for better performance
+   * @param startDate - Optional start date filter (ISO string)
+   * @param endDate - Optional end date filter (ISO string)
+   * @param condominiumId - Optional condominium filter
+   * @param visitType - Optional visit type name filter
+   * @param serviceType - Optional service type name filter
+   * @param status - Optional status filter
+   */
+  async adminGetAllVisitsFiltered(
+    startDate?: string,
+    endDate?: string,
+    condominiumId?: number,
+    visitType?: string,
+    serviceType?: string,
+    status?: string
+  ): Promise<Visit[]> {
+    if (!supabase) {
+      console.error('[SupabaseService] Supabase client not initialized');
+      return [];
+    }
+
+    try {
+      console.log('[SupabaseService] Calling admin_get_all_visits_filtered RPC with params:', {
+        p_start_date: startDate || null,
+        p_end_date: endDate || null,
+        p_condominium_id: condominiumId || null,
+        p_visit_type: visitType || null,
+        p_service_type: serviceType || null,
+        p_status: status || null
+      });
+
+      const { data, error } = await supabase.rpc('admin_get_all_visits_filtered', {
+        p_start_date: startDate || null,
+        p_end_date: endDate || null,
+        p_condominium_id: condominiumId || null,
+        p_visit_type: visitType || null,
+        p_service_type: serviceType || null,
+        p_status: status || null
+      });
+
+      if (error) {
+        console.error('[SupabaseService] RPC error:', error);
+        throw error;
+      }
+
+      console.log('[SupabaseService] RPC returned:', data?.length || 0, 'filtered visits');
+      return (data || []) as Visit[];
+    } catch (err: any) {
+      console.error('[SupabaseService] Error fetching filtered visits via RPC:', {
+        message: err.message,
+        details: err.details,
+        hint: err.hint,
+        code: err.code
+      });
+      return [];
+    }
+  },
+
+  /**
    * Admin: Get all incidents across all condominiums
    * Uses RPC function for better performance and security
    * @param condominiumId - Optional condominium filter
@@ -1209,8 +1269,32 @@ export const SupabaseService = {
     if (!supabase) return [];
 
     try {
+      if (condominiumId == null) {
+        const { data: condos, error: condoError } = await supabase
+          .rpc('get_condominiums');
+
+        if (condoError) throw condoError;
+
+        const condoList = (condos as Condominium[]) || [];
+        if (condoList.length === 0) return [];
+
+        const results = await Promise.all(
+          condoList.map((condo) =>
+            supabase.rpc('admin_get_residents', { p_condominium_id: condo.id })
+          )
+        );
+
+        const combined: any[] = [];
+        for (const result of results) {
+          if (result.error) throw result.error;
+          combined.push(...(result.data || []));
+        }
+
+        return combined;
+      }
+
       const { data, error } = await supabase
-        .rpc('admin_get_residents', { p_condominium_id: condominiumId || null });
+        .rpc('admin_get_residents', { p_condominium_id: condominiumId });
 
       if (error) throw error;
       return data || [];
