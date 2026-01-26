@@ -34,6 +34,7 @@ import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
 import { SyncOverlay } from './components/SyncOverlay';
 import type { SyncEventDetail } from './services/dataService';
+import { ThemeProvider } from './context/ThemeContext';
 
 // --- Auth Context ---
 interface AuthContextType {
@@ -503,48 +504,50 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <AuthContext.Provider value={{ user, login, logout }}>
-        <PWAUpdateNotification />
-        <PWAInstallPrompt />
-        <SyncOverlay
-          isVisible={syncState.isVisible}
-          status={syncState.status}
-          message={syncState.message}
-          itemsTotal={syncState.total}
-          itemsSynced={syncState.synced}
-        />
-        <HashRouter>
-          <Routes>
-            <Route path="/setup" element={<Setup />} />
-            <Route path="/login" element={<ConfigGuard><Login /></ConfigGuard>} />
+      <ThemeProvider>
+        <AuthContext.Provider value={{ user, login, logout }}>
+          <PWAUpdateNotification />
+          <PWAInstallPrompt />
+          <SyncOverlay
+            isVisible={syncState.isVisible}
+            status={syncState.status}
+            message={syncState.message}
+            itemsTotal={syncState.total}
+            itemsSynced={syncState.synced}
+          />
+          <HashRouter>
+            <Routes>
+              <Route path="/setup" element={<Setup />} />
+              <Route path="/login" element={<ConfigGuard><Login /></ConfigGuard>} />
 
-            {/* Admin Routes */}
-            <Route path="/admin" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/condominiums" element={<ConfigGuard><AdminRoute><AdminLayout><AdminCondominiums /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/devices" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDevices /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/staff" element={<ConfigGuard><AdminRoute><AdminLayout><AdminStaff /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/units" element={<ConfigGuard><AdminRoute><AdminLayout><AdminUnits /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/residents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminResidents /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/restaurants" element={<ConfigGuard><AdminRoute><AdminLayout><AdminRestaurants /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/sports" element={<ConfigGuard><AdminRoute><AdminLayout><AdminSports /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/visits" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisits /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/incidents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminIncidents /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/config/visit-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisitTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/config/service-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminServiceTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/analytics" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAnalytics /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/audit-logs" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAuditLogs /></AdminLayout></AdminRoute></ConfigGuard>} />
-            <Route path="/admin/device-registration-errors" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDeviceRegistrationErrors /></AdminLayout></AdminRoute></ConfigGuard>} />
+              {/* Admin Routes */}
+              <Route path="/admin" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/condominiums" element={<ConfigGuard><AdminRoute><AdminLayout><AdminCondominiums /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/devices" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDevices /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/staff" element={<ConfigGuard><AdminRoute><AdminLayout><AdminStaff /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/units" element={<ConfigGuard><AdminRoute><AdminLayout><AdminUnits /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/residents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminResidents /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/restaurants" element={<ConfigGuard><AdminRoute><AdminLayout><AdminRestaurants /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/sports" element={<ConfigGuard><AdminRoute><AdminLayout><AdminSports /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/visits" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisits /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/incidents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminIncidents /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/config/visit-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisitTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/config/service-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminServiceTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/analytics" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAnalytics /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/audit-logs" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAuditLogs /></AdminLayout></AdminRoute></ConfigGuard>} />
+              <Route path="/admin/device-registration-errors" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDeviceRegistrationErrors /></AdminLayout></AdminRoute></ConfigGuard>} />
 
-            {/* Guard Routes */}
-            <Route path="/" element={<ConfigGuard><ProtectedRoute><Dashboard /></ProtectedRoute></ConfigGuard>} />
-            <Route path="/new-entry" element={<ConfigGuard><ProtectedRoute><NewEntry /></ProtectedRoute></ConfigGuard>} />
-            <Route path="/day-list" element={<ConfigGuard><ProtectedRoute><DailyList /></ProtectedRoute></ConfigGuard>} />
-            <Route path="/incidents" element={<ConfigGuard><ProtectedRoute><Incidents /></ProtectedRoute></ConfigGuard>} />
+              {/* Guard Routes */}
+              <Route path="/" element={<ConfigGuard><ProtectedRoute><Dashboard /></ProtectedRoute></ConfigGuard>} />
+              <Route path="/new-entry" element={<ConfigGuard><ProtectedRoute><NewEntry /></ProtectedRoute></ConfigGuard>} />
+              <Route path="/day-list" element={<ConfigGuard><ProtectedRoute><DailyList /></ProtectedRoute></ConfigGuard>} />
+              <Route path="/incidents" element={<ConfigGuard><ProtectedRoute><Incidents /></ProtectedRoute></ConfigGuard>} />
 
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </HashRouter>
-      </AuthContext.Provider>
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </HashRouter>
+        </AuthContext.Provider>
+      </ThemeProvider>
     </ToastProvider>
   );
 }

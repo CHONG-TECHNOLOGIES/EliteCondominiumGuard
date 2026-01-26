@@ -258,3 +258,8 @@ export interface CondominiumStats {
   total_incidents_open: number;     // Count of open/acknowledged incidents
   status: 'ACTIVE' | 'INACTIVE';
 }
+
+export enum Theme {
+  ELITE = 'ELITE',
+  MIDNIGHT = 'MIDNIGHT'
+}

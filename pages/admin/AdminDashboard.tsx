@@ -58,16 +58,15 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, icon, color
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 transition-all ${
-        onClick ? 'cursor-pointer hover:shadow-md hover:border-slate-300' : ''
-      }`}
+      className={`bg-bg-surface rounded-xl shadow-sm border border-border-main p-6 transition-all ${onClick ? 'cursor-pointer hover:shadow-md hover:border-accent/40' : ''
+        }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-slate-600 mb-2">{title}</p>
-          <p className="text-3xl font-bold text-slate-900">{value}</p>
+          <p className="text-sm font-medium text-text-dim mb-2">{title}</p>
+          <p className="text-3xl font-bold text-text-main">{value}</p>
           {subtitle && (
-            <p className="text-sm text-slate-500 mt-2">{subtitle}</p>
+            <p className="text-sm text-text-dim mt-2">{subtitle}</p>
           )}
         </div>
         <div className={`${colorClasses[color]} p-3 rounded-lg`}>
@@ -141,8 +140,8 @@ export default function AdminDashboard() {
       <div className="p-6 max-w-7xl mx-auto">
         <div className="flex items-center justify-center h-96">
           <div className="text-center">
-            <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-            <p className="text-slate-600 font-medium">Carregando dashboard...</p>
+            <Loader2 className="animate-spin text-accent mx-auto mb-4" size={48} />
+            <p className="text-text-dim font-medium">Carregando dashboard...</p>
           </div>
         </div>
       </div>
@@ -155,10 +154,10 @@ export default function AdminDashboard() {
       <div className="mb-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            <h1 className="text-3xl font-bold text-text-main mb-2">
               Dashboard Administrativo
             </h1>
-            <p className="text-slate-600">
+            <p className="text-text-dim">
               Bem-vindo, <strong>{user?.first_name}</strong>! Aqui está uma visão geral do sistema.
             </p>
           </div>
@@ -166,11 +165,10 @@ export default function AdminDashboard() {
             <button
               onClick={handleSync}
               disabled={syncing || pendingSyncCount === 0}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm ${
-                pendingSyncCount > 0
-                  ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors shadow-sm ${pendingSyncCount > 0
+                ? 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                }`}
               title={pendingSyncCount === 0 ? 'Não há dados para sincronizar' : `${pendingSyncCount} item(s) pendente(s)`}
             >
               <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} />
@@ -182,8 +180,8 @@ export default function AdminDashboard() {
 
       {/* Infrastructure Stats */}
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
-          <Activity size={24} className="text-blue-600" />
+        <h2 className="text-xl font-bold text-text-main mb-4 flex items-center gap-2">
+          <Activity size={24} className="text-accent" />
           Infraestrutura
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -222,7 +220,7 @@ export default function AdminDashboard() {
 
       {/* Residents */}
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <h2 className="text-xl font-bold text-text-main mb-4 flex items-center gap-2">
           <UserCircle size={24} className="text-purple-600" />
           Residentes
         </h2>
@@ -253,7 +251,7 @@ export default function AdminDashboard() {
 
       {/* Visits Today */}
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <h2 className="text-xl font-bold text-text-main mb-4 flex items-center gap-2">
           <ClipboardList size={24} className="text-green-600" />
           Visitas Hoje
         </h2>
@@ -288,7 +286,7 @@ export default function AdminDashboard() {
 
       {/* Incidents */}
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+        <h2 className="text-xl font-bold text-text-main mb-4 flex items-center gap-2">
           <AlertTriangle size={24} className="text-red-600" />
           Incidentes
         </h2>
@@ -318,37 +316,37 @@ export default function AdminDashboard() {
 
       {/* Quick Actions */}
       <div className="mb-8">
-        <h2 className="text-xl font-bold text-slate-800 mb-4">Ações Rápidas</h2>
+        <h2 className="text-xl font-bold text-text-main mb-4">Ações Rápidas</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={() => navigate('/admin/condominiums')}
-            className="bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-blue-400 rounded-xl p-6 text-left transition-all"
+            className="bg-bg-surface hover:bg-secondary/5 border-2 border-border-main hover:border-accent rounded-xl p-6 text-left transition-all"
           >
             <Building2 size={32} className="text-blue-600 mb-3" />
-            <h3 className="font-bold text-slate-900 mb-1">Gerir Condomínios</h3>
-            <p className="text-sm text-slate-600">
+            <h3 className="font-bold text-text-main mb-1">Gerir Condomínios</h3>
+            <p className="text-sm text-text-dim">
               Criar, editar ou desativar condomínios
             </p>
           </button>
 
           <button
             onClick={() => navigate('/admin/staff')}
-            className="bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-purple-400 rounded-xl p-6 text-left transition-all"
+            className="bg-bg-surface hover:bg-secondary/5 border-2 border-border-main hover:border-accent rounded-xl p-6 text-left transition-all"
           >
             <Users size={32} className="text-purple-600 mb-3" />
-            <h3 className="font-bold text-slate-900 mb-1">Gerir Pessoal</h3>
-            <p className="text-sm text-slate-600">
+            <h3 className="font-bold text-text-main mb-1">Gerir Pessoal</h3>
+            <p className="text-sm text-text-dim">
               Adicionar guardas e administradores
             </p>
           </button>
 
           <button
             onClick={() => navigate('/admin/analytics')}
-            className="bg-white hover:bg-slate-50 border-2 border-slate-200 hover:border-green-400 rounded-xl p-6 text-left transition-all"
+            className="bg-bg-surface hover:bg-secondary/5 border-2 border-border-main hover:border-accent rounded-xl p-6 text-left transition-all"
           >
             <TrendingUp size={32} className="text-green-600 mb-3" />
-            <h3 className="font-bold text-slate-900 mb-1">Ver Analytics</h3>
-            <p className="text-sm text-slate-600">
+            <h3 className="font-bold text-text-main mb-1">Ver Analytics</h3>
+            <p className="text-sm text-text-dim">
               Relatórios e estatísticas detalhadas
             </p>
           </button>

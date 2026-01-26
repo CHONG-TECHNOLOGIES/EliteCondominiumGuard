@@ -1,80 +1,109 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
-    
-    <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#0f172a" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="AccesControl" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    
-    <!-- App Description -->
-    <meta name="description" content="Sistema de gestão de portaria para condomínios com suporte offline" />
-    <meta name="keywords" content="condomínio, portaria, segurança, gestão, offline" />
-    
-    <!-- Manifest -->
-    <link rel="manifest" href="/manifest.json" />
-    
-    <!-- Icons -->
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
-    
-    <title>Elite AccesControl</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              primary: '#0f172a', // Slate 900
-              secondary: '#334155', // Slate 700
-              accent: '#0ea5e9', // Sky 500
-              success: '#10b981', // Emerald 500
-              warning: '#f59e0b', // Amber 500
-              danger: '#ef4444', // Red 500
-            }
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="AccesControl" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- App Description -->
+  <meta name="description" content="Sistema de gestão de portaria para condomínios com suporte offline" />
+  <meta name="keywords" content="condomínio, portaria, segurança, gestão, offline" />
+
+  <!-- Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Icons -->
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <link rel="apple-touch-icon" href="/icon.svg" />
+
+  <title>Elite AccesControl</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: 'var(--color-primary)',
+            secondary: 'var(--color-secondary)',
+            accent: 'var(--color-accent)',
+            success: 'var(--color-success)',
+            warning: 'var(--color-warning)',
+            danger: 'var(--color-danger)',
+            'bg-root': 'var(--color-bg-root)',
+            'bg-surface': 'var(--color-bg-surface)',
+            'text-main': 'var(--color-text-main)',
+            'text-dim': 'var(--color-text-dim)',
+            'border-main': 'var(--color-border-main)',
           }
         }
       }
-    </script>
-    
-    <style>
-      /* Kiosk Mode Tweaks */
-      body {
-        overscroll-behavior-y: none; /* Prevent pull-to-refresh */
-        -webkit-user-select: none; /* Disable text selection */
-        user-select: none;
-        touch-action: manipulation;
-      }
-      input, textarea {
-        -webkit-user-select: text;
-        user-select: text;
-      }
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      
-      /* PWA Install Prompt */
-      .install-prompt {
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 9999;
-        max-width: 90%;
-      }
-    </style>
-    
-    <script type="importmap">
+    }
+  </script>
+
+  <style id="theme-variables">
+    :root {
+      --color-primary: #0f172a;
+      --color-secondary: #334155;
+      --color-accent: #0ea5e9;
+      --color-success: #10b981;
+      --color-warning: #f59e0b;
+      --color-danger: #ef4444;
+      --color-bg-root: #f1f5f9;
+      --color-bg-surface: #ffffff;
+      --color-text-main: #0f172a;
+      --color-text-dim: #64748b;
+      --color-border-main: #e2e8f0;
+    }
+  </style>
+
+  <style>
+    /* Kiosk Mode Tweaks */
+    body {
+      overscroll-behavior-y: none;
+      /* Prevent pull-to-refresh */
+      -webkit-user-select: none;
+      /* Disable text selection */
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    input,
+    textarea {
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* PWA Install Prompt */
+    .install-prompt {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      max-width: 90%;
+    }
+  </style>
+
+  <script type="importmap">
 {
   "imports": {
     "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
@@ -89,10 +118,12 @@
   }
 }
 </script>
-    <link rel="stylesheet" href="/index.css">
-  </head>
-  <body class="bg-slate-100 text-slate-900 h-screen w-screen overflow-hidden">
-    <div id="root" class="h-full w-full"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+  <link rel="stylesheet" href="/index.css">
+</head>
+
+<body class="bg-bg-root text-text-main h-screen w-screen overflow-hidden">
+  <div id="root" class="h-full w-full"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
 </html>

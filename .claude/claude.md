@@ -4,9 +4,9 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**Elite AccessControl** is an offline-first Progressive Web App (PWA) for condominium and building security gate management. Guards can register visits, deliveries, and incidents even without internet connectivity, with automatic synchronization when connection is restored.
+**Elite AccessControl** is an Progressive Web App (PWA) for condominium and building security gate management. Guards can register visits, deliveries, and incidents even without internet connectivity, with automatic synchronization when connection is restored.
 
-**Stack**: React 19 + TypeScript, Vite 6, Dexie.js (IndexedDB), Supabase (PostgreSQL backend), Tailwind CSS, Google Gemini AI, Leaflet (maps)
+**Stack**: React 19 + TypeScript, Vite 6, Dexie.js (IndexedDB), Supabase (PostgreSQL backend), Tailwind CSS, Leaflet (maps)
 
 ## Development Commands
 
@@ -65,7 +65,6 @@ Vercel provides **automatic CI/CD out of the box** when you connect your Git rep
    - Add:
      - `VITE_SUPABASE_URL`
      - `VITE_SUPABASE_ANON_KEY`
-     - `VITE_GEMINI_API_KEY`
    - Set for: Production, Preview, Development
 
 3. **Automatic Deployments**:
@@ -548,19 +547,6 @@ AudioService.testSound()
 - Permission storage in localStorage
 - Auto-initialization on login if previously granted
 
-### AI Concierge (geminiService.ts)
-
-Guards can ask questions to an AI assistant:
-
-```typescript
-const response = await askConcierge(question, condoContext);
-```
-
-**Configuration**:
-- Model: `gemini-2.5-flash`
-- Max output tokens: 150 (brief responses)
-- Language: Portuguese (Portugal)
-- System instruction for guard assistance context
 
 ### PWA Lifecycle Tracking (pwaLifecycleService.ts)
 
@@ -686,6 +672,7 @@ HashRouter (# based URLs for compatibility)
 2. Query IndexedDB for `sync_status: PENDING_SYNC` records
 3. Verify `update_device_heartbeat()` is running (every 5 min)
 4. Check browser Network tab for failed Supabase RPC calls
+5. Whenever possbible get information in supabase mcp regarding tables,rpc,rls,view,buckets
 
 ### Common Patterns
 
