@@ -9,7 +9,7 @@ import { audioService } from '../services/audioService';
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useContext(AuthContext);
-  
+
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [pin, setPin] = useState('');
@@ -45,10 +45,10 @@ export default function Login() {
 
   const confirmReset = async () => {
     if (adminPin === '123456') {
-       await api.resetDevice();
+      await api.resetDevice();
     } else {
-       alert("Código Inválido");
-       setAdminPin('');
+      alert("Código Inválido");
+      setAdminPin('');
     }
   };
 
@@ -100,18 +100,22 @@ export default function Login() {
   };
 
   const handleBackspace = () => setPin(prev => prev.slice(0, -1));
-  const handleClear = () => setPin('');
+  const handleClear = () => {
+    setPin('');
+    setFirstName('');
+    setLastName('');
+  };
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-slate-900 overflow-hidden">
       <div className="relative w-full md:w-1/2 lg:w-2/3 h-[30vh] md:h-full bg-slate-800 shrink-0">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: 'url("https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop")' }}
         ></div>
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px]"></div>
         <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10">
-          <div 
+          <div
             onClick={handleSecretTap}
             className="w-16 h-16 md:w-24 md:h-24 bg-blue-600 rounded-2xl md:rounded-3xl flex items-center justify-center mb-4 md:mb-6 shadow-2xl shadow-blue-500/30 cursor-pointer active:scale-95 transition-transform"
           >
@@ -122,8 +126,8 @@ export default function Login() {
             Sistema Inteligente de Controlo de Acessos.
           </p>
           <div className="mt-2 md:mt-12 px-4 py-2 bg-white/10 backdrop-blur-md rounded-lg md:rounded-2xl border border-white/10">
-             <p className="text-[10px] md:text-xs uppercase tracking-widest text-blue-200 font-bold mb-0 md:mb-1">Condomínio</p>
-             <p className="text-sm md:text-2xl font-bold text-white">{condoName || '...'}</p>
+            <p className="text-[10px] md:text-xs uppercase tracking-widest text-blue-200 font-bold mb-0 md:mb-1">Condomínio</p>
+            <p className="text-sm md:text-2xl font-bold text-white">{condoName || '...'}</p>
           </div>
         </div>
       </div>
@@ -142,8 +146,8 @@ export default function Login() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Nome</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
                   className="w-full px-3 py-2 md:px-4 md:py-3 bg-white border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold text-slate-800"
@@ -151,9 +155,9 @@ export default function Login() {
                 />
               </div>
               <div>
-                 <label className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Apelido</label>
-                 <input 
-                  type="text" 
+                <label className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Apelido</label>
+                <input
+                  type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   className="w-full px-3 py-2 md:px-4 md:py-3 bg-white border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold text-slate-800"
@@ -187,8 +191,8 @@ export default function Login() {
               <button type="button" onClick={() => handlePinClick('0')} className="bg-white border-b-2 md:border-b-4 border-slate-200 rounded-lg md:rounded-xl text-xl md:text-2xl font-bold text-slate-700 active:translate-y-1 active:border-b-0 transition-all hover:bg-slate-50 flex items-center justify-center">0</button>
               <button type="button" onClick={handleBackspace} className="bg-slate-100 border-b-2 md:border-b-4 border-slate-200 rounded-lg md:rounded-xl text-slate-600 active:translate-y-1 active:border-b-0 transition-all flex items-center justify-center"><Delete size={20} /></button>
             </div>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={loading || pin.length < 3}
               className="w-full py-3 md:py-5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-lg font-bold rounded-xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
@@ -201,8 +205,8 @@ export default function Login() {
         <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-2xl p-6 w-full max-w-xs shadow-2xl">
             <h3 className="text-lg font-bold text-center mb-4">Reset de Quiosque</h3>
-            <input 
-              type="password" 
+            <input
+              type="password"
               className="w-full text-center text-2xl p-2 border-2 rounded-xl mb-4"
               placeholder="PIN Mestre"
               value={adminPin}
