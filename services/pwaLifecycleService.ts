@@ -6,6 +6,8 @@
 import { getDeviceIdentifier } from './deviceUtils';
 import { SupabaseService } from './Supabase';
 
+import { db } from './db';
+
 class PWALifecycleService {
   private isInstalled: boolean = false;
 
@@ -46,6 +48,9 @@ class PWALifecycleService {
       console.log('[PWA Lifecycle] App was installed');
       this.isInstalled = true;
       this.markAsInstalled();
+
+      // CRITICAL: Clear all old data on first install to ensure a clean state
+      void this.clearAllDataOnInstall();
     });
 
     // Listen for display mode changes
@@ -189,6 +194,36 @@ class PWALifecycleService {
       }
     } catch (err) {
       console.error('[PWA Lifecycle] Error during background decommission:', err);
+    }
+  }
+
+  /**
+   * Clear all local storage and IndexedDB data
+   * Used on fresh installations to prevent data carry-over
+   */
+  private async clearAllDataOnInstall() {
+    console.warn('[PWA Lifecycle] Performing fresh install data cleanup...');
+
+    try {
+      // 1. Clear IndexedDB
+      await db.clearAllData();
+
+      // 2. Clear localStorage (except PWA metadata)
+      const pwaInstalled = localStorage.getItem('pwa_installed');
+      const pwaInstallDate = localStorage.getItem('pwa_install_date');
+
+      localStorage.clear();
+
+      // Restore PWA metadata
+      if (pwaInstalled) localStorage.setItem('pwa_installed', pwaInstalled);
+      if (pwaInstallDate) localStorage.setItem('pwa_install_date', pwaInstallDate);
+
+      // 3. Clear session storage
+      sessionStorage.clear();
+
+      console.log('[PWA Lifecycle] ✅ Fresh install cleanup complete');
+    } catch (err) {
+      console.error('[PWA Lifecycle] Failed to clear data on install:', err);
     }
   }
 

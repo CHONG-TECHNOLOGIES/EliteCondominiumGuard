@@ -85,17 +85,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <header className="bg-primary text-white px-4 py-3 md:px-6 md:py-3 flex items-center justify-between shadow-md z-10 shrink-0 border-b border-slate-800">
         <div className="flex items-center gap-3 md:gap-4 overflow-hidden flex-1">
           <div onClick={() => navigate('/')} className="cursor-pointer flex items-center gap-3 shrink-0">
-             <div className="bg-slate-800 p-1.5 rounded-lg border border-slate-700">
-               <ShieldCheck className="text-accent w-5 h-5 md:w-6 md:h-6" />
-             </div>
-             <div className="flex flex-col justify-center">
-                <span className="text-[10px] text-accent/80 font-bold uppercase tracking-widest leading-none hidden md:block mb-0.5">
-                  Elite AccesControl
-                </span>
-                <h1 className="text-base md:text-xl font-bold tracking-tight text-white leading-tight truncate max-w-[180px] md:max-w-md">
-                  {condoName || 'Elite AccesControl'}
-                </h1>
-             </div>
+            <div className="bg-slate-800 p-1.5 rounded-lg border border-slate-700">
+              <ShieldCheck className="text-accent w-5 h-5 md:w-6 md:h-6" />
+            </div>
+            <div className="flex flex-col justify-center">
+              <span className="text-[10px] text-accent/80 font-bold uppercase tracking-widest leading-none hidden md:block mb-0.5">
+                Elite AccesControl
+              </span>
+              <h1 className="text-base md:text-xl font-bold tracking-tight text-white leading-tight truncate max-w-[180px] md:max-w-md">
+                {condoName || 'Elite AccesControl'}
+              </h1>
+            </div>
           </div>
           <div className="h-8 w-px bg-slate-700 hidden sm:block"></div>
           <span className="text-sm md:text-lg font-medium text-slate-300 truncate hidden xs:block">
@@ -108,17 +108,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <span className="hidden sm:inline">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
           </div>
           <div className="flex items-center gap-3 pl-3 border-l border-slate-700">
-             <div className="text-right hidden md:block">
-                <p className="text-sm font-bold leading-tight text-white">{user?.first_name} {user?.last_name}</p>
-                {user?.id && <p className="text-[10px] text-slate-400 uppercase tracking-wider">ID: {String(user.id).substring(0, 4)}...</p>}
-             </div>
-             <button 
+            <div className="text-right hidden md:block">
+              <p className="text-sm font-bold leading-tight text-white">{user?.first_name} {user?.last_name}</p>
+              {user?.id && <p className="text-[10px] text-slate-400 uppercase tracking-wider">ID: {String(user.id).substring(0, 4)}...</p>}
+            </div>
+            <button
               onClick={logout}
               className="p-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 hover:text-red-400 transition-colors"
               title="Sair"
-             >
-               <LogOut size={18} className="md:w-5 md:h-5" />
-             </button>
+            >
+              <LogOut size={18} className="md:w-5 md:h-5" />
+            </button>
           </div>
         </div>
       </header>
@@ -386,27 +386,28 @@ export default function App() {
 
   const login = (staff: Staff) => {
     setUser(staff);
-    // Persist auth state to survive PWA updates
-    localStorage.setItem('auth_user', JSON.stringify(staff));
+    // Use sessionStorage instead of localStorage so the session doesn't survive 
+    // the app being fully closed or "reinstalled".
+    sessionStorage.setItem('auth_user', JSON.stringify(staff));
   };
 
   const logout = () => {
     setUser(null);
     // Clear persisted auth state
-    localStorage.removeItem('auth_user');
+    sessionStorage.removeItem('auth_user');
   };
 
   useEffect(() => {
-    // Restore auth state from localStorage (survives PWA updates)
-    const storedUser = localStorage.getItem('auth_user');
+    // Restore auth state from sessionStorage (doesn't survive app closure/reinstall)
+    const storedUser = sessionStorage.getItem('auth_user');
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser) as Staff;
         setUser(parsedUser);
-        console.log('[App] ✅ Auth state restored from localStorage');
+        console.log('[App] ✅ Auth state restored from sessionStorage');
       } catch (e) {
         console.error('[App] Failed to restore auth state:', e);
-        localStorage.removeItem('auth_user'); // Clean up corrupted data
+        sessionStorage.removeItem('auth_user'); // Clean up corrupted data
       }
     }
 
