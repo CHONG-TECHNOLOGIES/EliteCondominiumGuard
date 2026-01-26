@@ -365,9 +365,10 @@ Each tablet must be configured before use:
 
 ### 5. Database Schema (IndexedDB via Dexie)
 
-**Tables** (services/db.ts - Version 8):
+**Tables** (services/db.ts - Version 10):
 ```typescript
 visits          // User visits with sync_status and device_id
+visitEvents     // Visit status change events (audit trail)
 units           // Condominium units (cached)
 visitTypes      // Visit type configs (cached)
 serviceTypes    // Service type configs (cached)
@@ -384,6 +385,7 @@ devices         // Device registry (cached)
 
 **Critical Indexes**:
 - `visits`: `id, condominium_id, status, sync_status, check_in_at, device_id`
+- `visitEvents`: `++id, visit_id, status, sync_status, event_at` (auto-increment for local)
 - `staff`: `id, condominium_id, [first_name+last_name]` (compound index for login)
 - `units`: `id, condominium_id, code_block, number`
 
@@ -428,6 +430,14 @@ get_service_types()
 ```
 
 **Database Migrations**: Located in `database/*.sql` (apply manually to Supabase)
+
+**Storage Buckets** (Supabase Storage):
+```
+staff-photos    // Staff profile photos (5MB max, jpeg/png/webp)
+condo-logos     // Condominium logos (2MB max, jpeg/png/webp/svg)
+```
+
+Both buckets are public for read access. Setup via `setup_storage_buckets.sql`.
 
 ### 8. PWA Configuration (vite.config.ts)
 
@@ -766,6 +776,9 @@ SQL migration files in `database/` must be applied manually to Supabase:
 - `add_otp_system.sql` - OTP verification for residents
 - `add_pin_reset_rpcs.sql` - PIN reset functionality
 - `add_resident_app_tracking.sql` - Resident app installation tracking
+- `create_audit_log.sql` - RPC function for creating audit logs
+- `setup_storage_buckets.sql` - Storage buckets configuration (staff-photos, condo-logos)
+- `add_visit_events.sql` - Visit events table for status tracking history
 
 ---
 
@@ -822,6 +835,7 @@ interface Staff {
   condominium_id: number;
   condominium?: Condominium;
   role: UserRole;
+  photo_url?: string;         // URL da foto do staff (bucket: staff-photos)
 }
 ```
 
@@ -959,6 +973,22 @@ interface CondominiumStats {
   status: 'ACTIVE' | 'INACTIVE';
 }
 ```
+
+#### VisitEvent
+```typescript
+interface VisitEvent {
+  id?: number;                   // SERIAL in Supabase (auto-increment local)
+  created_at?: string;           // timestamptz
+  visit_id: number;              // INT4 (references visits)
+  status: VisitStatus;           // Status recorded at this event
+  event_at: string;              // timestamptz - when the status change occurred
+  actor_id?: number;             // INT4 (references staff) - who made the change
+  device_id?: string;            // UUID (references devices) - device used
+  sync_status: SyncStatus;       // 'SINCRONIZADO' or 'PENDENTE_ENVIO'
+}
+```
+
+**Purpose**: Tracks visit status changes over time for audit trail and history display.
 
 ---
 
