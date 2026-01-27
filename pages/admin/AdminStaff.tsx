@@ -354,7 +354,7 @@ export default function AdminStaff() {
       `Deseja realmente remover ${staffMember.first_name} ${staffMember.last_name}?`,
       async () => {
         try {
-          const result = await api.adminDeleteStaff(staffMember.id);
+          const result = await api.adminDeleteStaff(staffMember.id, staffMember.photo_url);
           if (result) {
             await loadData();
             showToast('success', 'Staff removido com sucesso!');

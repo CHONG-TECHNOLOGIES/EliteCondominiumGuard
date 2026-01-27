@@ -3,6 +3,24 @@
 import { supabase } from './supabaseClient';
 import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
 
+const getStoragePathFromPublicUrl = (publicUrl: string, bucket: string): string | null => {
+  if (!publicUrl) return null;
+
+  const publicPrefix = `/storage/v1/object/public/${bucket}/`;
+  if (publicUrl.startsWith(publicPrefix)) {
+    return decodeURIComponent(publicUrl.slice(publicPrefix.length));
+  }
+
+  try {
+    const url = new URL(publicUrl);
+    const index = url.pathname.indexOf(publicPrefix);
+    if (index === -1) return null;
+    return decodeURIComponent(url.pathname.slice(index + publicPrefix.length));
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Serviço Real de API Supabase
  * Responsável apenas pela comunicação direta com o Backend.
@@ -661,7 +679,7 @@ export const SupabaseService = {
       const fileName = `condo-logos/${Date.now()}_${sanitizedName}`;
 
       const { error } = await supabase.storage
-        .from('logo_condominio')
+        .from('condo-logos')
         .upload(fileName, file, {
           contentType: file.type,
           cacheControl: '3600',
@@ -671,7 +689,7 @@ export const SupabaseService = {
       if (error) throw error;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('logo_condominio')
+        .from('condo-logos')
         .getPublicUrl(fileName);
 
       return publicUrl;
@@ -756,6 +774,32 @@ export const SupabaseService = {
         stack: err.stack
       });
       return null;
+    }
+  },
+
+  /**
+   * Deletes a staff photo from Supabase Storage using the public URL
+   * @param photoUrl - Public URL of the staff photo
+   */
+  async deleteStaffPhotoByUrl(photoUrl: string): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const storagePath = getStoragePathFromPublicUrl(photoUrl, 'staff-photos');
+      if (!storagePath) {
+        console.error('[SupabaseService] Unable to resolve staff photo path from URL');
+        return false;
+      }
+
+      const { error } = await supabase.storage
+        .from('staff-photos')
+        .remove([storagePath]);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      console.error('[SupabaseService] Staff photo delete error:', err.message || JSON.stringify(err));
+      return false;
     }
   },
 

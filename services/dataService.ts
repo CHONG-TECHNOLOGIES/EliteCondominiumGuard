@@ -1999,6 +1999,18 @@ class DataService {
   }
 
   /**
+   * Admin: Deactivate all devices for a condominium
+   */
+  async adminDeactivateCondoDevices(condoId: number): Promise<boolean> {
+    try {
+      return await SupabaseService.deactivateCondoDevices(condoId);
+    } catch (e) {
+      console.error('[Admin] Failed to deactivate condominium devices (online required):', e);
+      return false;
+    }
+  }
+
+  /**
    * Admin: Get streets for a condominium
    */
   async adminGetStreets(condoId: number): Promise<any[]> {
@@ -2149,8 +2161,14 @@ class DataService {
   /**
    * Admin: Delete a staff member
    */
-  async adminDeleteStaff(id: number): Promise<boolean> {
+  async adminDeleteStaff(id: number, photoUrl?: string): Promise<boolean> {
     try {
+      if (photoUrl) {
+        const photoDeleted = await SupabaseService.deleteStaffPhotoByUrl(photoUrl);
+        if (!photoDeleted) {
+          console.error('[Admin] Failed to delete staff photo from storage');
+        }
+      }
       return await SupabaseService.adminDeleteStaff(id);
     } catch (e) {
       console.error('[Admin] Failed to delete staff (online required):', e);
