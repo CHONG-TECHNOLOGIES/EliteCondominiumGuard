@@ -1173,7 +1173,7 @@ export const SupabaseService = {
   },
 
   /**
-   * Admin: Create a new staff member
+   * Admin: Create a new staff member (LEGACY - use adminCreateStaffWithPin instead)
    */
   async adminCreateStaff(staff: Partial<Staff>): Promise<Staff | null> {
     if (!supabase) return null;
@@ -1186,7 +1186,8 @@ export const SupabaseService = {
             last_name: staff.last_name,
             condominium_id: staff.condominium_id,
             role: staff.role,
-            pin_hash: staff.pin_hash
+            pin_hash: staff.pin_hash,
+            photo_url: staff.photo_url
           }
         });
 
@@ -1194,6 +1195,63 @@ export const SupabaseService = {
       return data as Staff;
     } catch (err: any) {
       console.error("[Admin] Error creating staff:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Create a new staff member with server-side PIN hashing
+   * @param staff - Staff data with plain text PIN
+   * @param plainPin - Plain text PIN (will be hashed server-side)
+   */
+  async adminCreateStaffWithPin(
+    first_name: string,
+    last_name: string,
+    condominium_id: number | null,
+    role: string,
+    plainPin: string,
+    photo_url?: string
+  ): Promise<Staff | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_create_staff_with_pin', {
+          p_first_name: first_name,
+          p_last_name: last_name,
+          p_condominium_id: condominium_id,
+          p_role: role,
+          p_pin_cleartext: plainPin,
+          p_photo_url: photo_url || null
+        });
+
+      if (error) throw error;
+      return data as Staff;
+    } catch (err: any) {
+      console.error("[Admin] Error creating staff:", err.message || JSON.stringify(err));
+      return null;
+    }
+  },
+
+  /**
+   * Admin: Update staff PIN with server-side hashing
+   * @param staffId - Staff ID
+   * @param plainPin - Plain text PIN (will be hashed server-side)
+   */
+  async adminUpdateStaffPin(staffId: number, plainPin: string): Promise<Staff | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_update_staff_pin', {
+          p_staff_id: staffId,
+          p_pin_cleartext: plainPin
+        });
+
+      if (error) throw error;
+      return data as Staff;
+    } catch (err: any) {
+      console.error("[Admin] Error updating staff PIN:", err.message || JSON.stringify(err));
       return null;
     }
   },

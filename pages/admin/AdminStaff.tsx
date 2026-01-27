@@ -2,18 +2,10 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import { Users, Plus, Edit2, Trash2, Key, Loader2, Search, X, Building2, Shield, Eye, EyeOff, Camera, User, ChevronDown, Check } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { Staff, Condominium, UserRole } from '../../types';
-import bcrypt from 'bcryptjs';
 import { useToast } from '../../components/Toast';
 import CameraCapture from '../../components/CameraCapture';
 import { SupabaseService } from '../../services/Supabase';
 import { AuthContext } from '../../App';
-
-// Configure bcrypt to use browser-compatible random fallback
-bcrypt.setRandomFallback((len: number) => {
-  const buf = new Uint8Array(len);
-  crypto.getRandomValues(buf);
-  return Array.from(buf);
-});
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -125,9 +117,8 @@ function SearchableSelect({
                   key={option.value}
                   type="button"
                   onClick={() => handleSelect(option.value)}
-                  className={`w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center justify-between transition-colors ${
-                    option.value === value ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
-                  }`}
+                  className={`w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center justify-between transition-colors ${option.value === value ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                    }`}
                 >
                   <span>{option.label}</span>
                   {option.value === value && <Check size={16} className="text-blue-600" />}
@@ -157,14 +148,14 @@ export default function AdminStaff() {
   // Available roles based on current user's permissions
   const availableRoles = isSuperAdmin
     ? [
-        { value: UserRole.GUARD, label: 'Guarda' },
-        { value: UserRole.ADMIN, label: 'Admin' },
-        { value: UserRole.SUPER_ADMIN, label: 'Super Admin' }
-      ]
+      { value: UserRole.GUARD, label: 'Guarda' },
+      { value: UserRole.ADMIN, label: 'Admin' },
+      { value: UserRole.SUPER_ADMIN, label: 'Super Admin' }
+    ]
     : [
-        { value: UserRole.GUARD, label: 'Guarda' },
-        { value: UserRole.ADMIN, label: 'Admin' }
-      ];
+      { value: UserRole.GUARD, label: 'Guarda' },
+      { value: UserRole.ADMIN, label: 'Admin' }
+    ];
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
@@ -231,38 +222,43 @@ export default function AdminStaff() {
     try {
       setUploadingPhoto(true);
 
-      // Upload photo if captured
-      let photoUrl: string | null = null;
+      // Create staff first to avoid orphaned photos on insert failure
+      const result = await api.adminCreateStaffWithPin(
+        formData.first_name,
+        formData.last_name,
+        formData.condominium_id,
+        formData.role,
+        formData.pin,
+        undefined
+      );
+
+      if (!result) {
+        showToast('error', 'Erro ao criar staff');
+        return;
+      }
+
+      // Upload photo and update staff only after creation succeeds
       if (photoBase64) {
         const staffName = `${formData.first_name}_${formData.last_name}`;
-        photoUrl = await SupabaseService.uploadStaffPhoto(
+        const photoUrl = await SupabaseService.uploadStaffPhoto(
           photoBase64,
           staffName,
           formData.condominium_id || undefined
         );
-        if (!photoUrl) {
-          showToast('warning', 'Erro ao fazer upload da foto, mas o staff será criado sem foto');
+        if (photoUrl) {
+          const updated = await api.adminUpdateStaff(result.id, { photo_url: photoUrl });
+          if (!updated) {
+            showToast('warning', 'Foto enviada, mas falha ao vincular ao staff');
+          }
+        } else {
+          showToast('warning', 'Erro ao fazer upload da foto, mas o staff foi criado sem foto');
         }
       }
 
-      const pinHash = await bcrypt.hash(formData.pin, 10);
-      const result = await api.adminCreateStaff({
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        condominium_id: formData.condominium_id,
-        role: formData.role,
-        pin_hash: pinHash,
-        photo_url: photoUrl || undefined
-      });
-
-      if (result) {
-        await loadData();
-        setShowCreateModal(false);
-        resetForm();
-        showToast('success', 'Staff criado com sucesso!');
-      } else {
-        showToast('error', 'Erro ao criar staff');
-      }
+      await loadData();
+      setShowCreateModal(false);
+      resetForm();
+      showToast('success', 'Staff criado com sucesso!');
     } catch (error) {
       console.error('Error creating staff:', error);
       showToast('error', 'Erro ao criar staff');
@@ -336,10 +332,8 @@ export default function AdminStaff() {
     }
 
     try {
-      const pinHash = await bcrypt.hash(pinData.newPin, 10);
-      const result = await api.adminUpdateStaff(selectedStaff.id, {
-        pin_hash: pinHash
-      });
+      // Use server-side PIN hashing - send plain PIN to RPC
+      const result = await api.adminUpdateStaffPin(selectedStaff.id, pinData.newPin);
 
       if (result) {
         setShowPinModal(false);
@@ -1010,3 +1004,4 @@ export default function AdminStaff() {
     </div>
   );
 }
+

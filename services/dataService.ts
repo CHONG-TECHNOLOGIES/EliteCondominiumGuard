@@ -805,8 +805,8 @@ class DataService {
         if (staff) {
           if (staff.role !== UserRole.SUPER_ADMIN) {
             if (String(staff.condominium_id) !== String(deviceCondoId)) {
-            throw new Error(`Acesso Negado: Utilizador pertence ao condomínio ${staff.condominium_id}, mas o tablet está no ${deviceCondoId}.`);
-          }
+              throw new Error(`Acesso Negado: Utilizador pertence ao condomínio ${staff.condominium_id}, mas o tablet está no ${deviceCondoId}.`);
+            }
           }
           await this.syncStaff(deviceCondoId); // Sync all staff after a successful login
           await this.refreshConfigs(deviceCondoId);
@@ -1771,7 +1771,7 @@ class DataService {
         const condo = await SupabaseService.getCondominium(scopedCondoId);
         return condo ? [condo] : [];
       }
-        return await SupabaseService.adminGetAllCondominiums();
+      return await SupabaseService.adminGetAllCondominiums();
     } catch (e) {
       console.error('[Admin] Failed to fetch condominiums (online required):', e);
       return [];
@@ -2092,6 +2092,44 @@ class DataService {
       return await SupabaseService.adminCreateStaff(staff);
     } catch (e) {
       console.error('[Admin] Failed to create staff (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Create a new staff member with server-side PIN hashing
+   */
+  async adminCreateStaffWithPin(
+    first_name: string,
+    last_name: string,
+    condominium_id: number | null,
+    role: string,
+    plainPin: string,
+    photo_url?: string
+  ): Promise<Staff | null> {
+    try {
+      return await SupabaseService.adminCreateStaffWithPin(
+        first_name,
+        last_name,
+        condominium_id,
+        role,
+        plainPin,
+        photo_url
+      );
+    } catch (e) {
+      console.error('[Admin] Failed to create staff (online required):', e);
+      return null;
+    }
+  }
+
+  /**
+   * Admin: Update staff PIN with server-side hashing
+   */
+  async adminUpdateStaffPin(staffId: number, plainPin: string): Promise<Staff | null> {
+    try {
+      return await SupabaseService.adminUpdateStaffPin(staffId, plainPin);
+    } catch (e) {
+      console.error('[Admin] Failed to update staff PIN (online required):', e);
       return null;
     }
   }
