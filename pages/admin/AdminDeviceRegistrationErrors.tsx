@@ -73,7 +73,7 @@ export default function AdminDeviceRegistrationErrors() {
   const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+    <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Erros de Registo de Dispositivos</h1>

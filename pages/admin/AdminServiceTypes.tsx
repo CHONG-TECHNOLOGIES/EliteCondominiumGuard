@@ -132,7 +132,7 @@ export default function AdminServiceTypes() {
   );
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+    <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Tipos de Serviço</h1>
@@ -218,7 +218,7 @@ export default function AdminServiceTypes() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
             <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-slate-900">Novo Tipo de Serviço</h2>
               <button
@@ -269,7 +269,7 @@ export default function AdminServiceTypes() {
       {/* Edit Modal */}
       {showEditModal && selectedServiceType && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
             <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-slate-900">Editar Tipo de Serviço</h2>
               <button

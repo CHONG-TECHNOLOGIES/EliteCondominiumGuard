@@ -150,11 +150,11 @@ export default function AdminIncidents() {
   };
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+    <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Incidentes</h1>
-          <p className="text-slate-600">Visualizar e gerir todos os incidentes reportados</p>
+          <h1 className="text-3xl font-bold text-text-main mb-2">Gestão de Incidentes</h1>
+          <p className="text-text-dim">Visualizar e gerir todos os incidentes reportados</p>
         </div>
         <button
           onClick={handleExportCSV}
@@ -175,13 +175,13 @@ export default function AdminIncidents() {
             placeholder="Buscar por descrição, residente..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <select
           value={filterCondoId || ''}
           onChange={(e) => setFilterCondoId(e.target.value ? parseInt(e.target.value) : null)}
-          className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos os Condomínios</option>
           {condominiums.map(condo => (
@@ -191,7 +191,7 @@ export default function AdminIncidents() {
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos os Estados</option>
           <option value="PENDING">Pendente</option>
@@ -202,17 +202,17 @@ export default function AdminIncidents() {
 
       {/* Incidents List */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-slate-600">Carregando incidentes...</p>
+          <p className="text-text-dim">Carregando incidentes...</p>
         </div>
       ) : filteredIncidents.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <AlertTriangle size={64} className="text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
             {searchTerm || filterStatus ? 'Nenhum resultado encontrado' : 'Nenhum incidente reportado'}
           </h3>
-          <p className="text-slate-600">
+          <p className="text-text-dim">
             {searchTerm || filterStatus ? 'Tente ajustar os filtros de pesquisa' : 'Incidentes aparecerão aqui quando forem reportados'}
           </p>
         </div>
@@ -221,7 +221,7 @@ export default function AdminIncidents() {
           {filteredIncidents.map((incident) => (
             <div
               key={incident.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl shadow-sm border border-border-main p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
@@ -238,13 +238,13 @@ export default function AdminIncidents() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-bold text-slate-900">
+                      <h3 className="text-xl font-bold text-text-main">
                         {incident.type_label || incident.type}
                       </h3>
                       {getStatusBadge(incident.status)}
                     </div>
-                    <p className="text-slate-700 mb-3">{incident.description}</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600 mb-2">
+                    <p className="text-text-main mb-3">{incident.description}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-text-dim mb-2">
                       {incident.resident && (
                         <p><span className="font-medium">Residente:</span> {incident.resident.name}</p>
                       )}
@@ -261,8 +261,8 @@ export default function AdminIncidents() {
                     </div>
                     {incident.guard_notes && (
                       <div className="mt-3 p-3 bg-slate-50 rounded-lg">
-                        <p className="text-xs font-medium text-slate-600 mb-1">Notas do Guarda:</p>
-                        <p className="text-sm text-slate-700">{incident.guard_notes}</p>
+                        <p className="text-xs font-medium text-text-dim mb-1">Notas do Guarda:</p>
+                        <p className="text-sm text-text-main">{incident.guard_notes}</p>
                       </div>
                     )}
                     {incident.photo_path && (
@@ -270,7 +270,7 @@ export default function AdminIncidents() {
                         <img
                           src={incident.photo_path}
                           alt="Foto do incidente"
-                          className="w-32 h-32 object-cover rounded-lg border border-slate-200"
+                          className="w-32 h-32 object-cover rounded-lg border border-border-main"
                         />
                       </div>
                     )}
@@ -327,9 +327,9 @@ export default function AdminIncidents() {
       {/* Notes Modal */}
       {showNotesModal && selectedIncident && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">
                 {selectedIncident.status.toUpperCase() === 'RESOLVED' ? 'Ver Notas' : 'Resolver com Notas'}
               </h2>
               <button
@@ -338,40 +338,40 @@ export default function AdminIncidents() {
                   setSelectedIncident(null);
                   setNotes('');
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6">
               <div className="mb-4">
-                <p className="text-sm text-slate-600 mb-2">
+                <p className="text-sm text-text-dim mb-2">
                   <span className="font-medium">Incidente:</span> {selectedIncident.type_label || selectedIncident.type}
                 </p>
-                <p className="text-sm text-slate-700">{selectedIncident.description}</p>
+                <p className="text-sm text-text-main">{selectedIncident.description}</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Notas do Guarda
                 </label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   disabled={selectedIncident.status.toUpperCase() === 'RESOLVED'}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                   rows={5}
                   placeholder="Descreva as ações tomadas para resolver o incidente..."
                 />
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowNotesModal(false);
                   setSelectedIncident(null);
                   setNotes('');
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
               >
                 {selectedIncident.status.toUpperCase() === 'RESOLVED' ? 'Fechar' : 'Cancelar'}
               </button>

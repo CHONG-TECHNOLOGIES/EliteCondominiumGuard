@@ -219,10 +219,10 @@ export default function AdminDevices() {
   );
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+    <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Dispositivos</h1>
-        <p className="text-slate-600">Gerir tablets e dispositivos associados aos condomínios</p>
+        <h1 className="text-3xl font-bold text-text-main mb-2">Gestão de Dispositivos</h1>
+        <p className="text-text-dim">Gerir tablets e dispositivos associados aos condomínios</p>
       </div>
 
       {/* Filters */}
@@ -234,13 +234,13 @@ export default function AdminDevices() {
             placeholder="Buscar por nome ou identificador..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <select
           value={filterCondoId || ''}
           onChange={(e) => setFilterCondoId(e.target.value ? parseInt(e.target.value) : null)}
-          className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos os Condomínios</option>
           {condominiums.map(condo => (
@@ -251,17 +251,17 @@ export default function AdminDevices() {
 
       {/* Devices List */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-slate-600">Carregando dispositivos...</p>
+          <p className="text-text-dim">Carregando dispositivos...</p>
         </div>
       ) : filteredDevices.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Tablet size={64} className="text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
             {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum dispositivo registado'}
           </h3>
-          <p className="text-slate-600">
+          <p className="text-text-dim">
             {searchTerm ? 'Tente buscar com outros termos' : 'Dispositivos serão registados automaticamente quando configurados'}
           </p>
         </div>
@@ -270,7 +270,7 @@ export default function AdminDevices() {
           {filteredDevices.map((device) => (
             <div
               key={device.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl shadow-sm border border-border-main p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
@@ -279,7 +279,7 @@ export default function AdminDevices() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-bold text-slate-900">
+                      <h3 className="text-xl font-bold text-text-main">
                         {device.device_name || 'Dispositivo Sem Nome'}
                       </h3>
                       {getStatusBadge(device.status)}
@@ -298,10 +298,10 @@ export default function AdminDevices() {
                         );
                       })()}
                     </div>
-                    <p className="text-sm text-slate-500 mb-2">
+                    <p className="text-sm text-text-dim mb-2">
                       ID: {device.device_identifier}
                     </p>
-                    <div className="flex items-center gap-4 text-sm text-slate-600">
+                    <div className="flex items-center gap-4 text-sm text-text-dim">
                       <div className="flex items-center gap-2">
                         <Building2 size={16} />
                         <span>{getCondominiumName(device.condominium_id)}</span>
@@ -321,7 +321,7 @@ export default function AdminDevices() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => openDetailsModal(device)}
-                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    className="p-2 text-text-dim hover:bg-bg-root rounded-lg transition-colors"
                     title="Ver Detalhes"
                   >
                     <Info size={20} />
@@ -353,12 +353,12 @@ export default function AdminDevices() {
       {showDetailsModal && selectedDevice && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
+            <div className="p-6 border-b border-border-main flex items-center justify-between sticky top-0 bg-white z-10">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <SettingsIcon className="text-blue-600" size={24} />
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900">Configurações</h2>
+                <h2 className="text-2xl font-bold text-text-main">Configurações</h2>
               </div>
               <button
                 onClick={() => {
@@ -366,14 +366,14 @@ export default function AdminDevices() {
                   setSelectedDevice(null);
                   setDeviceStorage(null);
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
-              <p className="text-slate-600">Gerir dispositivo e preferências</p>
+              <p className="text-text-dim">Gerir dispositivo e preferências</p>
 
               {/* Device Information Section */}
               <div className="bg-slate-800 rounded-xl p-6 text-white">
@@ -489,23 +489,23 @@ export default function AdminDevices() {
               {/* Additional Info */}
               {selectedDevice.configured_at && (
                 <div className="bg-slate-100 rounded-lg p-4">
-                  <p className="text-xs text-slate-600 mb-1">Configurado em:</p>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-xs text-text-dim mb-1">Configurado em:</p>
+                  <p className="text-sm font-semibold text-text-main">
                     {new Date(selectedDevice.configured_at).toLocaleString('pt-PT')}
                   </p>
                 </div>
               )}
               {selectedDevice.last_seen_at && (
                 <div className="bg-slate-100 rounded-lg p-4">
-                  <p className="text-xs text-slate-600 mb-1">Último contacto:</p>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-xs text-text-dim mb-1">Último contacto:</p>
+                  <p className="text-sm font-semibold text-text-main">
                     {new Date(selectedDevice.last_seen_at).toLocaleString('pt-PT')} ({formatLastSeen(selectedDevice.last_seen_at)})
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-200 flex justify-end sticky bottom-0 bg-white">
+            <div className="p-6 border-t border-border-main flex justify-end sticky bottom-0 bg-white">
               <button
                 onClick={() => {
                   setShowDetailsModal(false);
@@ -524,45 +524,45 @@ export default function AdminDevices() {
       {/* Edit Modal */}
       {showEditModal && selectedDevice && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Editar Dispositivo</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Editar Dispositivo</h2>
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedDevice(null);
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Identificador (Apenas Leitura)
                 </label>
                 <input
                   type="text"
                   value={selectedDevice.device_identifier}
                   disabled
-                  className="w-full px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-600 cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-slate-100 border border-border-main bg-bg-surface text-text-main rounded-lg text-text-dim cursor-not-allowed"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Nome do Dispositivo
                 </label>
                 <input
                   type="text"
                   value={formData.device_name}
                   onChange={(e) => setFormData({ ...formData, device_name: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Ex: Portaria Principal"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Condomínio Associado
                 </label>
                 <select
@@ -573,7 +573,7 @@ export default function AdminDevices() {
                       condominium_id: e.target.value ? parseInt(e.target.value) : null
                     })
                   }
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Não Atribuído</option>
                   {condominiums
@@ -585,13 +585,13 @@ export default function AdminDevices() {
                 </select>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedDevice(null);
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancelar
               </button>

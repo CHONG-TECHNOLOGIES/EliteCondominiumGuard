@@ -302,11 +302,11 @@ export default function AdminCondominiums() {
   });
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+    <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold text-slate-900">Gestão de Condomínios</h1>
+            <h1 className="text-3xl font-bold text-text-main">Gestão de Condomínios</h1>
             <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">
               {filteredCondominiums.length === condominiums.length
                 ? `${condominiums.length} total`
@@ -314,7 +314,7 @@ export default function AdminCondominiums() {
               }
             </span>
           </div>
-          <p className="text-slate-600">Criar, editar e gerir condomínios no sistema</p>
+          <p className="text-text-dim">Criar, editar e gerir condomínios no sistema</p>
         </div>
         <button
           onClick={() => {
@@ -337,13 +337,13 @@ export default function AdminCondominiums() {
             placeholder="Buscar por nome ou endereco..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'INACTIVE')}
-          className="w-full sm:w-52 px-3 py-2 border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full sm:w-52 px-3 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           aria-label="Filtrar por status"
         >
           <option value="ALL">Todos</option>
@@ -354,17 +354,17 @@ export default function AdminCondominiums() {
 
       {/* Condominiums List */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-slate-600">Carregando condomínios...</p>
+          <p className="text-text-dim">Carregando condomínios...</p>
         </div>
       ) : filteredCondominiums.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Building2 size={64} className="text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
             {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum condomínio cadastrado'}
           </h3>
-          <p className="text-slate-600">
+          <p className="text-text-dim">
             {searchTerm
               ? 'Tente buscar com outros termos'
               : 'Clique em "Novo Condomínio" para começar'}
@@ -375,7 +375,7 @@ export default function AdminCondominiums() {
           {filteredCondominiums.map((condo) => (
             <div
               key={condo.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl shadow-sm border border-border-main p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
@@ -388,7 +388,7 @@ export default function AdminCondominiums() {
                   )}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-bold text-slate-900">{condo.name}</h3>
+                      <h3 className="text-xl font-bold text-text-main">{condo.name}</h3>
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-bold ${condo.status === 'ACTIVE'
                           ? 'bg-green-100 text-green-800'
@@ -399,13 +399,13 @@ export default function AdminCondominiums() {
                       </span>
                     </div>
                     {condo.address && (
-                      <div className="flex items-center gap-2 text-slate-600 mb-2">
+                      <div className="flex items-center gap-2 text-text-dim mb-2">
                         <MapPin size={16} />
                         <span>{condo.address}</span>
                       </div>
                     )}
                     {(condo.latitude && condo.longitude) && (
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-text-dim">
                         GPS: {condo.latitude.toFixed(6)}, {condo.longitude.toFixed(6)}
                         {condo.gps_radius_meters && ` (Raio: ${condo.gps_radius_meters}m)`}
                       </p>
@@ -440,85 +440,85 @@ export default function AdminCondominiums() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Novo Condomínio</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Novo Condomínio</h2>
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   resetForm();
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Nome <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nome do condomínio"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Endereço</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Endereço</label>
                 <input
                   type="text"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Endereço completo"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Telefone</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Telefone</label>
                 <input
                   type="text"
                   value={formData.phone_number}
                   onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="(00) 00000-0000"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Logo do Condomínio</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Logo do Condomínio</label>
                 <input
                   type="file"
                   accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                   onChange={handleLogoFileChange}
                   disabled={logoUploading}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-slate-500 mt-2">JPG/PNG até 1.5MB</p>
+                <p className="text-xs text-text-dim mt-2">JPG/PNG até 1.5MB</p>
                 {logoPreviewUrl && (
                   <div className="mt-3">
                     <img
                       src={logoPreviewUrl}
                       alt="Pré-visualização do logo"
-                      className="h-20 w-20 rounded-lg object-cover border border-slate-200"
+                      className="h-20 w-20 rounded-lg object-cover border border-border-main"
                     />
                   </div>
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Logo URL (opcional)</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Logo URL (opcional)</label>
                 <input
                   type="text"
                   value={formData.logo_url}
                   onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="https://..."
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Latitude</label>
+                  <label className="block text-sm font-medium text-text-main mb-2">Latitude</label>
                   <input
                     type="number"
                     step="0.000001"
@@ -529,12 +529,12 @@ export default function AdminCondominiums() {
                         latitude: e.target.value ? parseFloat(e.target.value) : undefined
                       })
                     }
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="-23.550520"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Longitude</label>
+                  <label className="block text-sm font-medium text-text-main mb-2">Longitude</label>
                   <input
                     type="number"
                     step="0.000001"
@@ -545,13 +545,13 @@ export default function AdminCondominiums() {
                         longitude: e.target.value ? parseFloat(e.target.value) : undefined
                       })
                     }
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="-46.633308"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Raio GPS (metros)
                 </label>
                 <input
@@ -563,20 +563,20 @@ export default function AdminCondominiums() {
                       gps_radius_meters: parseInt(e.target.value) || 100
                     })
                   }
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="100"
                 />
               </div>
 
-              <div className="border-t border-slate-200 pt-4 mt-4">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Ruas do Condomínio</h3>
+              <div className="border-t border-border-main pt-4 mt-4">
+                <h3 className="text-lg font-bold text-text-main mb-4">Ruas do Condomínio</h3>
 
                 <div className="flex gap-2 mb-4">
                   <input
                     type="text"
                     value={pendingStreetName}
                     onChange={(e) => setPendingStreetName(e.target.value)}
-                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nome da rua"
                   />
                   <button
@@ -590,15 +590,15 @@ export default function AdminCondominiums() {
                 </div>
 
                 {pendingStreets.length === 0 ? (
-                  <p className="text-slate-500 text-center py-4">Nenhuma rua adicionada.</p>
+                  <p className="text-text-dim text-center py-4">Nenhuma rua adicionada.</p>
                 ) : (
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {pendingStreets.map((street) => (
                       <div
                         key={street}
-                        className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200"
+                        className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-border-main"
                       >
-                        <span className="text-slate-700">{street}</span>
+                        <span className="text-text-main">{street}</span>
                         <button
                           onClick={() => handleRemovePendingStreet(street)}
                           className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
@@ -612,13 +612,13 @@ export default function AdminCondominiums() {
                 )}
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   resetForm();
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-bg-root transition-colors"
               >
                 Cancelar
               </button>
@@ -636,85 +636,85 @@ export default function AdminCondominiums() {
       {/* Edit Modal */}
       {showEditModal && selectedCondo && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Editar Condomínio</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Editar Condomínio</h2>
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedCondo(null);
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Nome <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nome do condomínio"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Endereço</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Endereço</label>
                 <input
                   type="text"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Endereço completo"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Telefone</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Telefone</label>
                 <input
                   type="text"
                   value={formData.phone_number}
                   onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="(00) 00000-0000"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Logo do Condomínio</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Logo do Condomínio</label>
                 <input
                   type="file"
                   accept=".jpg,.jpeg,.png,image/jpeg,image/png"
                   onChange={handleLogoFileChange}
                   disabled={logoUploading}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-slate-500 mt-2">JPG/PNG até 1.5MB</p>
+                <p className="text-xs text-text-dim mt-2">JPG/PNG até 1.5MB</p>
                 {logoPreviewUrl && (
                   <div className="mt-3">
                     <img
                       src={logoPreviewUrl}
                       alt="Pré-visualização do logo"
-                      className="h-20 w-20 rounded-lg object-cover border border-slate-200"
+                      className="h-20 w-20 rounded-lg object-cover border border-border-main"
                     />
                   </div>
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Logo URL (opcional)</label>
+                <label className="block text-sm font-medium text-text-main mb-2">Logo URL (opcional)</label>
                 <input
                   type="text"
                   value={formData.logo_url}
                   onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="https://..."
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Latitude</label>
+                  <label className="block text-sm font-medium text-text-main mb-2">Latitude</label>
                   <input
                     type="number"
                     step="0.000001"
@@ -725,12 +725,12 @@ export default function AdminCondominiums() {
                         latitude: e.target.value ? parseFloat(e.target.value) : undefined
                       })
                     }
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="-23.550520"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Longitude</label>
+                  <label className="block text-sm font-medium text-text-main mb-2">Longitude</label>
                   <input
                     type="number"
                     step="0.000001"
@@ -741,13 +741,13 @@ export default function AdminCondominiums() {
                         longitude: e.target.value ? parseFloat(e.target.value) : undefined
                       })
                     }
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="-46.633308"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Raio GPS (metros)
                 </label>
                 <input
@@ -759,21 +759,21 @@ export default function AdminCondominiums() {
                       gps_radius_meters: parseInt(e.target.value) || 100
                     })
                   }
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="100"
                 />
               </div>
 
               {/* Streets Management */}
-              <div className="border-t border-slate-200 pt-4 mt-4">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Ruas do Condomínio</h3>
+              <div className="border-t border-border-main pt-4 mt-4">
+                <h3 className="text-lg font-bold text-text-main mb-4">Ruas do Condomínio</h3>
 
                 <div className="flex gap-2 mb-4">
                   <input
                     type="text"
                     value={newStreetName}
                     onChange={(e) => setNewStreetName(e.target.value)}
-                    className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nome da rua"
                   />
                   <button
@@ -791,12 +791,12 @@ export default function AdminCondominiums() {
                     <Loader2 className="animate-spin text-blue-600 mx-auto" size={24} />
                   </div>
                 ) : streets.length === 0 ? (
-                  <p className="text-slate-500 text-center py-4">Nenhuma rua cadastrada.</p>
+                  <p className="text-text-dim text-center py-4">Nenhuma rua cadastrada.</p>
                 ) : (
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {streets.map((street) => (
-                      <div key={street.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
-                        <span className="text-slate-700">{street.name}</span>
+                      <div key={street.id} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-border-main">
+                        <span className="text-text-main">{street.name}</span>
                         <button
                           onClick={() => handleRemoveStreet(street.id)}
                           className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
@@ -810,13 +810,13 @@ export default function AdminCondominiums() {
                 )}
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedCondo(null);
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-bg-root transition-colors"
               >
                 Cancelar
               </button>

@@ -72,9 +72,9 @@ function SearchableSelect({
     <div ref={containerRef} className={`relative ${className}`}>
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left flex items-center justify-between cursor-pointer"
+        className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-left flex items-center justify-between cursor-pointer"
       >
-        <span className={selectedOption ? 'text-slate-900' : 'text-slate-500'}>
+        <span className={selectedOption ? 'text-text-main' : 'text-text-dim'}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <div className="flex items-center gap-1">
@@ -82,33 +82,33 @@ function SearchableSelect({
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 hover:bg-slate-100 rounded transition-colors"
+              className="p-1 hover:bg-bg-root rounded transition-colors"
             >
-              <X size={14} className="text-slate-400" />
+              <X size={14} className="text-text-dim" />
             </button>
           )}
-          <ChevronDown size={18} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown size={18} className={`text-text-dim transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </div>
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
-          <div className="p-2 border-b border-slate-200">
+        <div className="absolute z-50 w-full mt-1 bg-bg-surface border border-border-main rounded-lg shadow-lg">
+          <div className="p-2 border-b border-border-main">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" size={16} />
               <input
                 ref={inputRef}
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full pl-9 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
           </div>
           <div className="max-h-60 overflow-y-auto">
             {filteredOptions.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-slate-500 text-center">
+              <div className="px-4 py-3 text-sm text-text-dim text-center">
                 {emptyMessage}
               </div>
             ) : (
@@ -117,7 +117,7 @@ function SearchableSelect({
                   key={option.value}
                   type="button"
                   onClick={() => handleSelect(option.value)}
-                  className={`w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center justify-between transition-colors ${option.value === value ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                  className={`w-full px-4 py-2 text-left text-sm hover:bg-bg-root flex items-center justify-between transition-colors ${option.value === value ? 'bg-accent/10 text-accent' : 'text-text-main'
                     }`}
                 >
                   <span>{option.label}</span>
@@ -426,11 +426,11 @@ export default function AdminStaff() {
   });
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+    <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Pessoal</h1>
-          <p className="text-slate-600">Gerir guardas e administradores do sistema</p>
+          <h1 className="text-3xl font-bold text-text-main mb-2">Gestão de Pessoal</h1>
+          <p className="text-text-dim">Gerir guardas e administradores do sistema</p>
         </div>
         <button
           onClick={() => {
@@ -447,19 +447,19 @@ export default function AdminStaff() {
       {/* Filters */}
       <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="relative">
-          <Search className="absolute left-3 top-3 text-slate-400" size={20} />
+          <Search className="absolute left-3 top-3 text-text-dim" size={20} />
           <input
             type="text"
             placeholder="Buscar por nome..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <select
           value={filterCondoId || ''}
           onChange={(e) => setFilterCondoId(e.target.value ? parseInt(e.target.value) : null)}
-          className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos os Condomínios</option>
           {condominiums.map(condo => (
@@ -469,7 +469,7 @@ export default function AdminStaff() {
         <select
           value={filterRole}
           onChange={(e) => setFilterRole(e.target.value)}
-          className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todas as Funções</option>
           <option value={UserRole.GUARD}>Guarda</option>
@@ -480,17 +480,17 @@ export default function AdminStaff() {
 
       {/* Staff List */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-slate-600">Carregando pessoal...</p>
+          <p className="text-text-dim">Carregando pessoal...</p>
         </div>
       ) : filteredStaff.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Users size={64} className="text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
             {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum staff cadastrado'}
           </h3>
-          <p className="text-slate-600">
+          <p className="text-text-dim">
             {searchTerm ? 'Tente buscar com outros termos' : 'Clique em "Novo Staff" para começar'}
           </p>
         </div>
@@ -499,7 +499,7 @@ export default function AdminStaff() {
           {filteredStaff.map((staffMember) => (
             <div
               key={staffMember.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
@@ -523,12 +523,12 @@ export default function AdminStaff() {
                   )}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-bold text-slate-900">
+                      <h3 className="text-xl font-bold text-text-main">
                         {staffMember.first_name} {staffMember.last_name}
                       </h3>
                       {getRoleBadge(staffMember.role)}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                    <div className="flex items-center gap-2 text-sm text-text-dim">
                       <Building2 size={16} />
                       <span>{getCondominiumName(staffMember.condominium_id)}</span>
                     </div>
@@ -566,48 +566,48 @@ export default function AdminStaff() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Novo Staff</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Novo Staff</h2>
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   setShowCreatePin(false);
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Nome <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.first_name}
                     onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Nome"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Sobrenome <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Sobrenome"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Condomínio <span className="text-red-500">*</span>
                 </label>
                 <SearchableSelect
@@ -623,13 +623,13 @@ export default function AdminStaff() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Função <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {availableRoles.map(role => (
                     <option key={role.value} value={role.value}>{role.label}</option>
@@ -637,22 +637,22 @@ export default function AdminStaff() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  PIN <span className="text-red-500">*</span> <span className="text-xs text-slate-500">(mínimo 4 dígitos)</span>
+                <label className="block text-sm font-medium text-text-main mb-2">
+                  PIN <span className="text-red-500">*</span> <span className="text-xs text-text-dim">(mínimo 4 dígitos)</span>
                 </label>
                 <div className="relative">
                   <input
                     type={showCreatePin ? "text" : "password"}
                     value={formData.pin}
                     onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
-                    className="w-full px-4 py-2 pr-12 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 pr-12 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="****"
                     maxLength={6}
                   />
                   <button
                     type="button"
                     onClick={() => setShowCreatePin(!showCreatePin)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-dim hover:text-text-dim transition-colors"
                   >
                     {showCreatePin ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
@@ -661,7 +661,7 @@ export default function AdminStaff() {
 
               {/* Photo capture section */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Foto do Staff
                 </label>
                 {!showCamera ? (
@@ -683,7 +683,7 @@ export default function AdminStaff() {
                       </div>
                     ) : (
                       <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center border-2 border-dashed border-slate-300">
-                        <User size={40} className="text-slate-400" />
+                        <User size={40} className="text-text-dim" />
                       </div>
                     )}
                     <button
@@ -709,7 +709,7 @@ export default function AdminStaff() {
                     <button
                       type="button"
                       onClick={() => setShowCamera(false)}
-                      className="w-full py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                      className="w-full py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
                     >
                       Cancelar
                     </button>
@@ -717,14 +717,14 @@ export default function AdminStaff() {
                 )}
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   setShowCreatePin(false);
                   resetForm();
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
                 disabled={uploadingPhoto}
               >
                 Cancelar
@@ -745,46 +745,46 @@ export default function AdminStaff() {
       {/* Edit Modal */}
       {showEditModal && selectedStaff && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Editar Staff</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Editar Staff</h2>
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedStaff(null);
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Nome <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.first_name}
                     onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Sobrenome <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Condomínio <span className="text-red-500">*</span>
                 </label>
                 <SearchableSelect
@@ -800,13 +800,13 @@ export default function AdminStaff() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Função <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {availableRoles.map(role => (
                     <option key={role.value} value={role.value}>{role.label}</option>
@@ -815,7 +815,7 @@ export default function AdminStaff() {
               </div>
               {/* Photo section */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Foto do Staff
                 </label>
                 {!showCamera ? (
@@ -843,7 +843,7 @@ export default function AdminStaff() {
                       />
                     ) : (
                       <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center border-2 border-dashed border-slate-300">
-                        <User size={40} className="text-slate-400" />
+                        <User size={40} className="text-text-dim" />
                       </div>
                     )}
                     <button
@@ -869,7 +869,7 @@ export default function AdminStaff() {
                     <button
                       type="button"
                       onClick={() => setShowCamera(false)}
-                      className="w-full py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                      className="w-full py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
                     >
                       Cancelar
                     </button>
@@ -883,14 +883,14 @@ export default function AdminStaff() {
                 </p>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedStaff(null);
                   resetForm();
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
                 disabled={uploadingPhoto}
               >
                 Cancelar
@@ -912,8 +912,8 @@ export default function AdminStaff() {
       {showPinModal && selectedStaff && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Alterar PIN</h2>
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Alterar PIN</h2>
               <button
                 onClick={() => {
                   setShowPinModal(false);
@@ -922,7 +922,7 @@ export default function AdminStaff() {
                   setShowNewPin(false);
                   setShowConfirmPin(false);
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
@@ -934,7 +934,7 @@ export default function AdminStaff() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Novo PIN <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -942,21 +942,21 @@ export default function AdminStaff() {
                     type={showNewPin ? "text" : "password"}
                     value={pinData.newPin}
                     onChange={(e) => setPinData({ ...pinData, newPin: e.target.value })}
-                    className="w-full px-4 py-2 pr-12 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 pr-12 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="****"
                     maxLength={6}
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPin(!showNewPin)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-dim hover:text-text-dim transition-colors"
                   >
                     {showNewPin ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Confirmar PIN <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
@@ -964,21 +964,21 @@ export default function AdminStaff() {
                     type={showConfirmPin ? "text" : "password"}
                     value={pinData.confirmPin}
                     onChange={(e) => setPinData({ ...pinData, confirmPin: e.target.value })}
-                    className="w-full px-4 py-2 pr-12 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 pr-12 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="****"
                     maxLength={6}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPin(!showConfirmPin)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-dim hover:text-text-dim transition-colors"
                   >
                     {showConfirmPin ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowPinModal(false);
@@ -987,7 +987,7 @@ export default function AdminStaff() {
                   setShowNewPin(false);
                   setShowConfirmPin(false);
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancelar
               </button>

@@ -144,11 +144,11 @@ export default function AdminSports() {
   );
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+    <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Desportos</h1>
-          <p className="text-slate-600">Gerir instalações desportivas e áreas recreativas</p>
+          <h1 className="text-3xl font-bold text-text-main mb-2">Gestão de Desportos</h1>
+          <p className="text-text-dim">Gerir instalações desportivas e áreas recreativas</p>
         </div>
         <button
           onClick={() => {
@@ -171,13 +171,13 @@ export default function AdminSports() {
             placeholder="Buscar por nome ou descrição..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <select
           value={filterCondoId || ''}
           onChange={(e) => setFilterCondoId(e.target.value ? parseInt(e.target.value) : null)}
-          className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos os Condomínios</option>
           {condominiums.map(condo => (
@@ -188,17 +188,17 @@ export default function AdminSports() {
 
       {/* Sports List */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-slate-600">Carregando desportos...</p>
+          <p className="text-text-dim">Carregando desportos...</p>
         </div>
       ) : filteredSports.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Dumbbell size={64} className="text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
             {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum desporto cadastrado'}
           </h3>
-          <p className="text-slate-600">
+          <p className="text-text-dim">
             {searchTerm
               ? 'Tente buscar com outros termos'
               : 'Clique em "Novo Desporto" para começar'}
@@ -209,7 +209,7 @@ export default function AdminSports() {
           {filteredSports.map((sport) => (
             <div
               key={sport.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl shadow-sm border border-border-main p-4 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3 flex-1">
@@ -218,21 +218,21 @@ export default function AdminSports() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-lg font-bold text-slate-900">
+                      <h3 className="text-lg font-bold text-text-main">
                         {sport.name}
                       </h3>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                         sport.status === 'ACTIVE'
                           ? 'bg-green-100 text-green-700'
-                          : 'bg-slate-100 text-slate-700'
+                          : 'bg-slate-100 text-text-main'
                       }`}>
                         {sport.status === 'ACTIVE' ? 'Ativo' : 'Inativo'}
                       </span>
                     </div>
                     {sport.description && (
-                      <p className="text-sm text-slate-600 mb-2">{sport.description}</p>
+                      <p className="text-sm text-text-dim mb-2">{sport.description}</p>
                     )}
-                    <div className="flex items-center gap-1 text-sm text-slate-500">
+                    <div className="flex items-center gap-1 text-sm text-text-dim">
                       <Building2 size={14} />
                       <span>{getCondominiumName(sport.condominium_id)}</span>
                     </div>
@@ -263,19 +263,19 @@ export default function AdminSports() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Novo Desporto</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Novo Desporto</h2>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Condomínio <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -286,7 +286,7 @@ export default function AdminSports() {
                       condominium_id: e.target.value ? parseInt(e.target.value) : null
                     })
                   }
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Selecione um condomínio</option>
                   {condominiums
@@ -298,47 +298,47 @@ export default function AdminSports() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Nome <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nome do desporto ou instalação"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Descrição
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Breve descrição do desporto ou instalação"
                   rows={3}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Status <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as 'ACTIVE' | 'INACTIVE' })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="ACTIVE">Ativo</option>
                   <option value="INACTIVE">Inativo</option>
                 </select>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancelar
               </button>
@@ -356,76 +356,76 @@ export default function AdminSports() {
       {/* Edit Modal */}
       {showEditModal && selectedSport && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Editar Desporto</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Editar Desporto</h2>
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedSport(null);
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Condomínio (Apenas Leitura)
                 </label>
                 <input
                   type="text"
                   value={getCondominiumName(selectedSport.condominium_id)}
                   disabled
-                  className="w-full px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-600 cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-slate-100 border border-border-main bg-bg-surface text-text-main rounded-lg text-text-dim cursor-not-allowed"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Nome <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nome do desporto ou instalação"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Descrição
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Breve descrição do desporto ou instalação"
                   rows={3}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Status <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as 'ACTIVE' | 'INACTIVE' })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="ACTIVE">Ativo</option>
                   <option value="INACTIVE">Inativo</option>
                 </select>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedSport(null);
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancelar
               </button>

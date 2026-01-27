@@ -69,9 +69,9 @@ function SearchableSelect({
     <div ref={containerRef} className={`relative ${className}`}>
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left flex items-center justify-between cursor-pointer"
+        className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left flex items-center justify-between cursor-pointer"
       >
-        <span className={selectedOption ? 'text-slate-900' : 'text-slate-500'}>
+        <span className={selectedOption ? 'text-text-main' : 'text-text-dim'}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <div className="flex items-center gap-1">
@@ -79,7 +79,7 @@ function SearchableSelect({
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 hover:bg-slate-100 rounded transition-colors"
+              className="p-1 hover:bg-bg-root rounded transition-colors"
             >
               <X size={14} className="text-slate-400" />
             </button>
@@ -89,8 +89,8 @@ function SearchableSelect({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
-          <div className="p-2 border-b border-slate-200">
+        <div className="absolute z-50 w-full mt-1 bg-bg-surface border border-border-main rounded-lg shadow-lg">
+          <div className="p-2 border-b border-border-main">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
@@ -99,13 +99,13 @@ function SearchableSelect({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full pl-9 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
           </div>
           <div className="max-h-60 overflow-y-auto">
             {filteredOptions.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-slate-500 text-center">
+              <div className="px-4 py-3 text-sm text-text-dim text-center">
                 {emptyMessage}
               </div>
             ) : (
@@ -115,7 +115,7 @@ function SearchableSelect({
                   type="button"
                   onClick={() => handleSelect(option.value)}
                   className={`w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center justify-between transition-colors ${
-                    option.value === value ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                    option.value === value ? 'bg-blue-50 text-blue-700' : 'text-text-main'
                   }`}
                 >
                   <span>{option.label}</span>
@@ -273,11 +273,11 @@ export default function AdminUnits() {
   );
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+    <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold text-slate-900">Gestão de Unidades</h1>
+            <h1 className="text-3xl font-bold text-text-main">Gestão de Unidades</h1>
             <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">
               {filteredUnits.length === units.length
                 ? `${units.length} total`
@@ -285,7 +285,7 @@ export default function AdminUnits() {
               }
             </span>
           </div>
-          <p className="text-slate-600">Gerir apartamentos e frações dos condomínios</p>
+          <p className="text-text-dim">Gerir apartamentos e frações dos condomínios</p>
         </div>
         <button
           onClick={() => {
@@ -308,7 +308,7 @@ export default function AdminUnits() {
             placeholder="Buscar por bloco, número ou edifício..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <SearchableSelect
@@ -323,17 +323,17 @@ export default function AdminUnits() {
 
       {/* Units List */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-slate-600">Carregando unidades...</p>
+          <p className="text-text-dim">Carregando unidades...</p>
         </div>
       ) : filteredUnits.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Home size={64} className="text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
             {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhuma unidade cadastrada'}
           </h3>
-          <p className="text-slate-600">
+          <p className="text-text-dim">
             {searchTerm
               ? 'Tente buscar com outros termos'
               : 'Clique em "Nova Unidade" para começar'}
@@ -344,7 +344,7 @@ export default function AdminUnits() {
           {filteredUnits.map((unit) => (
             <div
               key={unit.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl shadow-sm border border-border-main p-4 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3 flex-1">
@@ -353,22 +353,22 @@ export default function AdminUnits() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-lg font-bold text-slate-900">
+                      <h3 className="text-lg font-bold text-text-main">
                         {unit.code_block} {unit.number}
                       </h3>
                       {unit.floor !== null && unit.floor !== undefined && (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-text-main">
                           Piso {unit.floor}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-slate-600">
+                    <div className="flex items-center gap-4 text-sm text-text-dim">
                       <div className="flex items-center gap-1">
                         <Building2 size={14} />
                         <span>{getCondominiumName(unit.condominium_id)}</span>
                       </div>
                       {unit.building_name && (
-                        <span className="text-slate-500">• Edifício: {unit.building_name}</span>
+                        <span className="text-text-dim">• Edifício: {unit.building_name}</span>
                       )}
                     </div>
                     {unit.residents && unit.residents.length > 0 && (
@@ -403,19 +403,19 @@ export default function AdminUnits() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Nova Unidade</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Nova Unidade</h2>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Condomínio <span className="text-red-500">*</span>
                 </label>
                 <SearchableSelect
@@ -437,33 +437,33 @@ export default function AdminUnits() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Bloco <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.code_block}
                     onChange={(e) => setFormData({ ...formData, code_block: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="A, B, C..."
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Número <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.number}
                     onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="101, 202..."
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Piso</label>
+                  <label className="block text-sm font-medium text-text-main mb-2">Piso</label>
                   <input
                     type="number"
                     value={formData.floor !== undefined ? formData.floor : ''}
@@ -473,28 +473,28 @@ export default function AdminUnits() {
                         floor: e.target.value ? parseInt(e.target.value) : undefined
                       })
                     }
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="0, 1, 2..."
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Nome do Edifício
                   </label>
                   <input
                     type="text"
                     value={formData.building_name}
                     onChange={(e) => setFormData({ ...formData, building_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Torre Sul, Bloco Norte..."
                   />
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancelar
               </button>
@@ -512,60 +512,60 @@ export default function AdminUnits() {
       {/* Edit Modal */}
       {showEditModal && selectedUnit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Editar Unidade</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Editar Unidade</h2>
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedUnit(null);
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Condomínio (Apenas Leitura)
                 </label>
                 <input
                   type="text"
                   value={getCondominiumName(selectedUnit.condominium_id)}
                   disabled
-                  className="w-full px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-600 cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-slate-100 border border-border-main bg-bg-surface text-text-main rounded-lg text-text-dim cursor-not-allowed"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Bloco <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.code_block}
                     onChange={(e) => setFormData({ ...formData, code_block: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="A, B, C..."
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Número <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={formData.number}
                     onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="101, 202..."
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Piso</label>
+                  <label className="block text-sm font-medium text-text-main mb-2">Piso</label>
                   <input
                     type="number"
                     value={formData.floor !== undefined ? formData.floor : ''}
@@ -575,31 +575,31 @@ export default function AdminUnits() {
                         floor: e.target.value ? parseInt(e.target.value) : undefined
                       })
                     }
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="0, 1, 2..."
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-text-main mb-2">
                     Nome do Edifício
                   </label>
                   <input
                     type="text"
                     value={formData.building_name}
                     onChange={(e) => setFormData({ ...formData, building_name: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Torre Sul, Bloco Norte..."
                   />
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedUnit(null);
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancelar
               </button>

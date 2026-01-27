@@ -281,7 +281,7 @@ export default function AdminVisits() {
   };
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+    <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Visitas</h1>
@@ -530,7 +530,7 @@ export default function AdminVisits() {
           onClick={closeEventModal}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-[95vw] md:max-w-md lg:max-w-xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-6 py-4 rounded-t-xl bg-slate-900">
@@ -594,7 +594,7 @@ export default function AdminVisits() {
           onClick={closeConfirmModal}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

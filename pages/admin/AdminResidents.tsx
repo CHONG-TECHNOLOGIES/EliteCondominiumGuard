@@ -72,9 +72,9 @@ function SearchableSelect({
     <div ref={containerRef} className={`relative ${className}`}>
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left flex items-center justify-between cursor-pointer"
+        className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left flex items-center justify-between cursor-pointer"
       >
-        <span className={selectedOption ? 'text-slate-900' : 'text-slate-500'}>
+        <span className={selectedOption ? 'text-text-main' : 'text-text-dim'}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <div className="flex items-center gap-1">
@@ -82,7 +82,7 @@ function SearchableSelect({
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 hover:bg-slate-100 rounded transition-colors"
+              className="p-1 hover:bg-bg-root rounded transition-colors"
             >
               <X size={14} className="text-slate-400" />
             </button>
@@ -92,8 +92,8 @@ function SearchableSelect({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
-          <div className="p-2 border-b border-slate-200">
+        <div className="absolute z-50 w-full mt-1 bg-bg-surface border border-border-main rounded-lg shadow-lg">
+          <div className="p-2 border-b border-border-main">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input
@@ -102,13 +102,13 @@ function SearchableSelect({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="w-full pl-9 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               />
             </div>
           </div>
           <div className="max-h-60 overflow-y-auto">
             {filteredOptions.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-slate-500 text-center">
+              <div className="px-4 py-3 text-sm text-text-dim text-center">
                 {emptyMessage}
               </div>
             ) : (
@@ -118,7 +118,7 @@ function SearchableSelect({
                   type="button"
                   onClick={() => handleSelect(option.value)}
                   className={`w-full px-4 py-2 text-left text-sm hover:bg-blue-50 flex items-center justify-between transition-colors ${
-                    option.value === value ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                    option.value === value ? 'bg-blue-50 text-blue-700' : 'text-text-main'
                   }`}
                 >
                   <span>{option.label}</span>
@@ -319,11 +319,11 @@ export default function AdminResidents() {
   );
 
   return (
-    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+    <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold text-slate-900">Gestão de Residentes</h1>
+            <h1 className="text-3xl font-bold text-text-main">Gestão de Residentes</h1>
             <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">
               {filteredResidents.length === residents.length
                 ? `${residents.length} total`
@@ -331,7 +331,7 @@ export default function AdminResidents() {
               }
             </span>
           </div>
-          <p className="text-slate-600">Gerir residentes e proprietários das unidades</p>
+          <p className="text-text-dim">Gerir residentes e proprietários das unidades</p>
         </div>
         <button
           onClick={() => {
@@ -354,7 +354,7 @@ export default function AdminResidents() {
             placeholder="Buscar por nome, email ou telefone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
         <SearchableSelect
@@ -373,17 +373,17 @@ export default function AdminResidents() {
 
       {/* Residents List */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-slate-600">Carregando residentes...</p>
+          <p className="text-text-dim">Carregando residentes...</p>
         </div>
       ) : filteredResidents.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Users size={64} className="text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
             {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum residente cadastrado'}
           </h3>
-          <p className="text-slate-600">
+          <p className="text-text-dim">
             {searchTerm
               ? 'Tente buscar com outros termos'
               : 'Clique em "Novo Residente" para começar'}
@@ -394,7 +394,7 @@ export default function AdminResidents() {
           {filteredResidents.map((resident) => (
             <div
               key={resident.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow"
+              className="bg-white rounded-xl shadow-sm border border-border-main p-4 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3 flex-1">
@@ -403,7 +403,7 @@ export default function AdminResidents() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-lg font-bold text-slate-900">
+                      <h3 className="text-lg font-bold text-text-main">
                         {resident.name}
                       </h3>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
@@ -414,7 +414,7 @@ export default function AdminResidents() {
                         {resident.type === 'OWNER' ? 'Proprietário' : 'Inquilino'}
                       </span>
                     </div>
-                    <div className="space-y-1 text-sm text-slate-600">
+                    <div className="space-y-1 text-sm text-text-dim">
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1">
                           <Building2 size={14} />
@@ -426,10 +426,10 @@ export default function AdminResidents() {
                         </div>
                       </div>
                       {resident.email && (
-                        <p className="text-slate-500">{resident.email}</p>
+                        <p className="text-text-dim">{resident.email}</p>
                       )}
                       {resident.phone && (
-                        <p className="text-slate-500">{resident.phone}</p>
+                        <p className="text-text-dim">{resident.phone}</p>
                       )}
                     </div>
                   </div>
@@ -459,19 +459,19 @@ export default function AdminResidents() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Novo Residente</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Novo Residente</h2>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Condomínio <span className="text-red-500">*</span>
                 </label>
                 <SearchableSelect
@@ -492,7 +492,7 @@ export default function AdminResidents() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Unidade <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -504,7 +504,7 @@ export default function AdminResidents() {
                     })
                   }
                   disabled={!formData.condominium_id}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
                 >
                   <option value="">Selecione uma unidade</option>
                   {units.map(unit => (
@@ -515,57 +515,57 @@ export default function AdminResidents() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Nome <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nome completo do residente"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                  <label className="block text-sm font-medium text-text-main mb-2">Email</label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="email@exemplo.com"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Telefone</label>
+                  <label className="block text-sm font-medium text-text-main mb-2">Telefone</label>
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="+351 912 345 678"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Tipo <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value as 'OWNER' | 'TENANT' })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="OWNER">Proprietário</option>
                   <option value="TENANT">Inquilino</option>
                 </select>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancelar
               </button>
@@ -583,22 +583,22 @@ export default function AdminResidents() {
       {/* Edit Modal */}
       {showEditModal && selectedResident && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Editar Residente</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Editar Residente</h2>
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedResident(null);
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Condomínio <span className="text-red-500">*</span>
                 </label>
                 <SearchableSelect
@@ -619,7 +619,7 @@ export default function AdminResidents() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Unidade <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -630,7 +630,7 @@ export default function AdminResidents() {
                       unit_id: e.target.value ? parseInt(e.target.value) : null
                     })
                   }
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Selecione uma unidade</option>
                   {units.map(unit => (
@@ -641,60 +641,60 @@ export default function AdminResidents() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Nome <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Nome completo do residente"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                  <label className="block text-sm font-medium text-text-main mb-2">Email</label>
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="email@exemplo.com"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Telefone</label>
+                  <label className="block text-sm font-medium text-text-main mb-2">Telefone</label>
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="+351 912 345 678"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Tipo <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value as 'OWNER' | 'TENANT' })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="OWNER">Proprietário</option>
                   <option value="TENANT">Inquilino</option>
                 </select>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedResident(null);
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Cancelar
               </button>
