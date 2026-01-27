@@ -1,40 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Staff, UserRole } from './types';
 import { api } from './services/dataService';
 import { getDeviceIdentifier } from './services/deviceUtils';
 import { audioService } from './services/audioService';
 import { pwaLifecycleService } from './services/pwaLifecycleService';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import NewEntry from './pages/NewEntry';
-import DailyList from './pages/DailyList';
-import Incidents from './pages/Incidents';
-import Setup from './pages/Setup';
 import { Wifi, WifiOff, LogOut, ShieldCheck, Loader2, RefreshCw, KeyRound, Copy, Check } from 'lucide-react';
 import { AdminRoute } from './components/AdminRoute';
 import { AdminLayout } from './components/AdminLayout';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminCondominiums from './pages/admin/AdminCondominiums';
-import AdminDevices from './pages/admin/AdminDevices';
-import AdminStaff from './pages/admin/AdminStaff';
-import AdminUnits from './pages/admin/AdminUnits';
-import AdminResidents from './pages/admin/AdminResidents';
-import AdminRestaurants from './pages/admin/AdminRestaurants';
-import AdminSports from './pages/admin/AdminSports';
-import AdminVisits from './pages/admin/AdminVisits';
-import AdminIncidents from './pages/admin/AdminIncidents';
-import AdminVisitTypes from './pages/admin/AdminVisitTypes';
-import AdminServiceTypes from './pages/admin/AdminServiceTypes';
-import AdminAnalytics from './pages/admin/AdminAnalytics';
-import AdminAuditLogs from './pages/admin/AdminAuditLogs';
-import AdminDeviceRegistrationErrors from './pages/admin/AdminDeviceRegistrationErrors';
 import { ToastProvider } from './components/Toast';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { PWAUpdateNotification } from './components/PWAUpdateNotification';
 import { SyncOverlay } from './components/SyncOverlay';
 import type { SyncEventDetail } from './services/dataService';
 import { ThemeProvider } from './context/ThemeContext';
+import { SpeedInsights } from '@vercel/speed-insights/react';
+
+const Login = React.lazy(() => import('./pages/Login'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const NewEntry = React.lazy(() => import('./pages/NewEntry'));
+const DailyList = React.lazy(() => import('./pages/DailyList'));
+const Incidents = React.lazy(() => import('./pages/Incidents'));
+const Setup = React.lazy(() => import('./pages/Setup'));
+
+const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminCondominiums = React.lazy(() => import('./pages/admin/AdminCondominiums'));
+const AdminDevices = React.lazy(() => import('./pages/admin/AdminDevices'));
+const AdminStaff = React.lazy(() => import('./pages/admin/AdminStaff'));
+const AdminUnits = React.lazy(() => import('./pages/admin/AdminUnits'));
+const AdminResidents = React.lazy(() => import('./pages/admin/AdminResidents'));
+const AdminRestaurants = React.lazy(() => import('./pages/admin/AdminRestaurants'));
+const AdminSports = React.lazy(() => import('./pages/admin/AdminSports'));
+const AdminVisits = React.lazy(() => import('./pages/admin/AdminVisits'));
+const AdminIncidents = React.lazy(() => import('./pages/admin/AdminIncidents'));
+const AdminVisitTypes = React.lazy(() => import('./pages/admin/AdminVisitTypes'));
+const AdminServiceTypes = React.lazy(() => import('./pages/admin/AdminServiceTypes'));
+const AdminAnalytics = React.lazy(() => import('./pages/admin/AdminAnalytics'));
+const AdminAuditLogs = React.lazy(() => import('./pages/admin/AdminAuditLogs'));
+const AdminDeviceRegistrationErrors = React.lazy(() => import('./pages/admin/AdminDeviceRegistrationErrors'));
+
+const PageLoader: React.FC = () => (
+  <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+    <Loader2 className="animate-spin text-sky-500 mb-4" size={48} />
+    <p className="text-lg font-semibold">A carregar...</p>
+  </div>
+);
 
 // --- Auth Context ---
 interface AuthContextType {
@@ -515,36 +525,39 @@ export default function App() {
             itemsTotal={syncState.total}
             itemsSynced={syncState.synced}
           />
+          <SpeedInsights />
           <HashRouter>
-            <Routes>
-              <Route path="/setup" element={<Setup />} />
-              <Route path="/login" element={<ConfigGuard><Login /></ConfigGuard>} />
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/setup" element={<Setup />} />
+                <Route path="/login" element={<ConfigGuard><Login /></ConfigGuard>} />
 
-              {/* Admin Routes */}
-              <Route path="/admin" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/condominiums" element={<ConfigGuard><AdminRoute><AdminLayout><AdminCondominiums /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/devices" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDevices /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/staff" element={<ConfigGuard><AdminRoute><AdminLayout><AdminStaff /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/units" element={<ConfigGuard><AdminRoute><AdminLayout><AdminUnits /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/residents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminResidents /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/restaurants" element={<ConfigGuard><AdminRoute><AdminLayout><AdminRestaurants /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/sports" element={<ConfigGuard><AdminRoute><AdminLayout><AdminSports /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/visits" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisits /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/incidents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminIncidents /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/config/visit-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisitTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/config/service-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminServiceTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/analytics" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAnalytics /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/audit-logs" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAuditLogs /></AdminLayout></AdminRoute></ConfigGuard>} />
-              <Route path="/admin/device-registration-errors" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDeviceRegistrationErrors /></AdminLayout></AdminRoute></ConfigGuard>} />
+                {/* Admin Routes */}
+                <Route path="/admin" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDashboard /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/condominiums" element={<ConfigGuard><AdminRoute><AdminLayout><AdminCondominiums /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/devices" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDevices /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/staff" element={<ConfigGuard><AdminRoute><AdminLayout><AdminStaff /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/units" element={<ConfigGuard><AdminRoute><AdminLayout><AdminUnits /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/residents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminResidents /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/restaurants" element={<ConfigGuard><AdminRoute><AdminLayout><AdminRestaurants /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/sports" element={<ConfigGuard><AdminRoute><AdminLayout><AdminSports /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/visits" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisits /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/incidents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminIncidents /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/config/visit-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisitTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/config/service-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminServiceTypes /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/analytics" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAnalytics /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/audit-logs" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAuditLogs /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/device-registration-errors" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDeviceRegistrationErrors /></AdminLayout></AdminRoute></ConfigGuard>} />
 
-              {/* Guard Routes */}
-              <Route path="/" element={<ConfigGuard><ProtectedRoute><Dashboard /></ProtectedRoute></ConfigGuard>} />
-              <Route path="/new-entry" element={<ConfigGuard><ProtectedRoute><NewEntry /></ProtectedRoute></ConfigGuard>} />
-              <Route path="/day-list" element={<ConfigGuard><ProtectedRoute><DailyList /></ProtectedRoute></ConfigGuard>} />
-              <Route path="/incidents" element={<ConfigGuard><ProtectedRoute><Incidents /></ProtectedRoute></ConfigGuard>} />
+                {/* Guard Routes */}
+                <Route path="/" element={<ConfigGuard><ProtectedRoute><Dashboard /></ProtectedRoute></ConfigGuard>} />
+                <Route path="/new-entry" element={<ConfigGuard><ProtectedRoute><NewEntry /></ProtectedRoute></ConfigGuard>} />
+                <Route path="/day-list" element={<ConfigGuard><ProtectedRoute><DailyList /></ProtectedRoute></ConfigGuard>} />
+                <Route path="/incidents" element={<ConfigGuard><ProtectedRoute><Incidents /></ProtectedRoute></ConfigGuard>} />
 
-              <Route path="*" element={<Navigate to="/" />} />
-            </Routes>
+                <Route path="*" element={<Navigate to="/" />} />
+              </Routes>
+            </Suspense>
           </HashRouter>
         </AuthContext.Provider>
       </ThemeProvider>
