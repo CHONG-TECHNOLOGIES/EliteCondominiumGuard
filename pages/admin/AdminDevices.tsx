@@ -198,7 +198,7 @@ export default function AdminDevices() {
       // 7-15 minutes = warning (missed 1 heartbeat)
       return {
         status: 'warning',
-        label: 'Conexão Instável',
+        label: 'Sem sinal há 7-15 minutos',
         color: 'bg-yellow-500',
         icon: Wifi
       };

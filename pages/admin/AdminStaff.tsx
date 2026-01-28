@@ -417,6 +417,9 @@ export default function AdminStaff() {
     return <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">GUARDA</span>;
   };
 
+  const getStaffPhotoUrl = (photoUrl?: string | null) => SupabaseService.getStaffPhotoPublicUrl(photoUrl);
+  const selectedStaffPhotoUrl = selectedStaff ? getStaffPhotoUrl(selectedStaff.photo_url) : null;
+
   const filteredStaff = staff.filter(s => {
     const matchesSearch =
       s.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -496,70 +499,73 @@ export default function AdminStaff() {
         </div>
       ) : (
         <div className="grid gap-4">
-          {filteredStaff.map((staffMember) => (
-            <div
-              key={staffMember.id}
-              className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-6 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-4 flex-1">
-                  {/* Staff Photo or Icon */}
-                  {staffMember.photo_url ? (
-                    <img
-                      src={staffMember.photo_url}
-                      alt={`${staffMember.first_name} ${staffMember.last_name}`}
-                      className="w-14 h-14 rounded-full object-cover border-2 border-slate-200"
-                    />
-                  ) : (
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      {staffMember.role === UserRole.SUPER_ADMIN ? (
-                        <Shield className="text-rose-600" size={32} />
-                      ) : staffMember.role === UserRole.ADMIN ? (
-                        <Shield className="text-purple-600" size={32} />
-                      ) : (
-                        <Users className="text-blue-600" size={32} />
-                      )}
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-bold text-text-main">
-                        {staffMember.first_name} {staffMember.last_name}
-                      </h3>
-                      {getRoleBadge(staffMember.role)}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-text-dim">
-                      <Building2 size={16} />
-                      <span>{getCondominiumName(staffMember.condominium_id)}</span>
+          {filteredStaff.map((staffMember) => {
+            const staffPhotoUrl = getStaffPhotoUrl(staffMember.photo_url);
+            return (
+              <div
+                key={staffMember.id}
+                className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-6 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4 flex-1">
+                    {/* Staff Photo or Icon */}
+                    {staffPhotoUrl ? (
+                      <img
+                        src={staffPhotoUrl}
+                        alt={`${staffMember.first_name} ${staffMember.last_name}`}
+                        className="w-14 h-14 rounded-full object-cover border-2 border-slate-200"
+                      />
+                    ) : (
+                      <div className="p-3 bg-slate-50 rounded-lg">
+                        {staffMember.role === UserRole.SUPER_ADMIN ? (
+                          <Shield className="text-rose-600" size={32} />
+                        ) : staffMember.role === UserRole.ADMIN ? (
+                          <Shield className="text-purple-600" size={32} />
+                        ) : (
+                          <Users className="text-blue-600" size={32} />
+                        )}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-xl font-bold text-text-main">
+                          {staffMember.first_name} {staffMember.last_name}
+                        </h3>
+                        {getRoleBadge(staffMember.role)}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-text-dim">
+                        <Building2 size={16} />
+                        <span>{getCondominiumName(staffMember.condominium_id)}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => openPinModal(staffMember)}
-                    className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                    title="Alterar PIN"
-                  >
-                    <Key size={20} />
-                  </button>
-                  <button
-                    onClick={() => openEditModal(staffMember)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Editar"
-                  >
-                    <Edit2 size={20} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(staffMember)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Remover"
-                  >
-                    <Trash2 size={20} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openPinModal(staffMember)}
+                      className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                      title="Alterar PIN"
+                    >
+                      <Key size={20} />
+                    </button>
+                    <button
+                      onClick={() => openEditModal(staffMember)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      <Edit2 size={20} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(staffMember)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Remover"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -835,9 +841,9 @@ export default function AdminStaff() {
                           <X size={14} />
                         </button>
                       </div>
-                    ) : selectedStaff.photo_url ? (
+                    ) : selectedStaffPhotoUrl ? (
                       <img
-                        src={selectedStaff.photo_url}
+                        src={selectedStaffPhotoUrl}
                         alt="Staff"
                         className="w-24 h-24 rounded-full object-cover border-4 border-slate-300"
                       />
@@ -852,7 +858,7 @@ export default function AdminStaff() {
                       className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
                     >
                       <Camera size={20} />
-                      {photoBase64 || selectedStaff.photo_url ? 'Trocar Foto' : 'Tirar Foto'}
+                      {photoBase64 || selectedStaffPhotoUrl ? 'Trocar Foto' : 'Tirar Foto'}
                     </button>
                   </div>
                 ) : (
@@ -1004,4 +1010,3 @@ export default function AdminStaff() {
     </div>
   );
 }
-

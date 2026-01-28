@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Info, Trash2, RefreshCw, Wifi, Database, HardDrive } from 'lucide-react';
+import { Settings as SettingsIcon, Info, Trash2, RefreshCw, Wifi, Database, HardDrive, Camera } from 'lucide-react';
 import { api } from '../services/dataService';
 import { UninstallConfirmDialog } from '../components/UninstallConfirmDialog';
 import { getDeviceIdentifier } from '../services/deviceUtils';
+import { PhotoQuality } from '../types';
 
 const Settings: React.FC = () => {
   const [condoName, setCondoName] = useState('');
@@ -14,6 +15,7 @@ const Settings: React.FC = () => {
     quota: string;
     percentage: string;
   } | null>(null);
+  const [photoQuality, setPhotoQuality] = useState<PhotoQuality>(PhotoQuality.MEDIUM);
 
   useEffect(() => {
     const handleOnlineStatus = () => setIsOnline(api.checkOnline());
@@ -30,6 +32,9 @@ const Settings: React.FC = () => {
 
     // Get storage info
     loadStorageInfo();
+
+    // Load photo quality setting
+    api.getPhotoQuality().then(setPhotoQuality);
 
     return () => {
       window.removeEventListener('online', handleOnlineStatus);
@@ -56,6 +61,11 @@ const Settings: React.FC = () => {
     } catch (err) {
       console.error('Error getting storage info:', err);
     }
+  };
+
+  const handlePhotoQualityChange = async (quality: PhotoQuality) => {
+    setPhotoQuality(quality);
+    await api.setPhotoQuality(quality);
   };
 
   const handleUninstall = async () => {
@@ -152,6 +162,61 @@ const Settings: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Photo Quality (Data Saving) */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-4">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Camera size={20} />
+              Qualidade das Fotos
+            </h2>
+          </div>
+          <div className="p-6">
+            <p className="text-sm text-slate-600 mb-4">
+              Reduza o consumo de dados escolhendo uma qualidade menor para as fotos capturadas.
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                onClick={() => handlePhotoQualityChange(PhotoQuality.HIGH)}
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  photoQuality === PhotoQuality.HIGH
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <p className="font-bold text-slate-800">Alta</p>
+                <p className="text-xs text-slate-500">~300KB</p>
+              </button>
+              <button
+                onClick={() => handlePhotoQualityChange(PhotoQuality.MEDIUM)}
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  photoQuality === PhotoQuality.MEDIUM
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <p className="font-bold text-slate-800">Média</p>
+                <p className="text-xs text-slate-500">~150KB</p>
+              </button>
+              <button
+                onClick={() => handlePhotoQualityChange(PhotoQuality.LOW)}
+                className={`p-4 rounded-xl border-2 transition-all ${
+                  photoQuality === PhotoQuality.LOW
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <p className="font-bold text-slate-800">Baixa</p>
+                <p className="text-xs text-slate-500">~50KB</p>
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-3">
+              {photoQuality === PhotoQuality.LOW && '💡 Modo poupança ativo - ideal para dados móveis'}
+              {photoQuality === PhotoQuality.MEDIUM && '⚖️ Equilíbrio entre qualidade e tamanho'}
+              {photoQuality === PhotoQuality.HIGH && '📷 Máxima qualidade - consome mais dados'}
+            </p>
+          </div>
+        </div>
 
         {/* Actions */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">

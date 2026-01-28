@@ -809,6 +809,26 @@ export const SupabaseService = {
   },
 
   /**
+   * Resolve a staff photo URL or path into a public URL for the staff-photos bucket.
+   */
+  getStaffPhotoPublicUrl(photoUrl?: string | null): string | null {
+    if (!supabase || !photoUrl) return null;
+
+    if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+      return photoUrl;
+    }
+
+    const storagePath = getStoragePathFromPublicUrl(photoUrl, 'staff-photos');
+    if (!storagePath) return null;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('staff-photos')
+      .getPublicUrl(storagePath);
+
+    return publicUrl || null;
+  },
+
+  /**
    * Deletes a staff photo from Supabase Storage using the public URL
    * @param photoUrl - Public URL of the staff photo
    */

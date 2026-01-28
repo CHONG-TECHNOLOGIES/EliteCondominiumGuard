@@ -263,3 +263,10 @@ export enum Theme {
   ELITE = 'ELITE',
   MIDNIGHT = 'MIDNIGHT'
 }
+
+// Photo quality levels for compression (data saving)
+export enum PhotoQuality {
+  HIGH = 'HIGH',       // 0.75 scale, 0.85 JPEG quality (~300KB)
+  MEDIUM = 'MEDIUM',   // 0.50 scale, 0.70 JPEG quality (~150KB)
+  LOW = 'LOW'          // 0.25 scale, 0.50 JPEG quality (~50KB)
+}

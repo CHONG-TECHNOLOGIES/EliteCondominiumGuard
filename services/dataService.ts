@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
+import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 
@@ -1756,6 +1756,34 @@ class DataService {
   }
 
   checkOnline(): boolean { return this.isOnline; }
+
+  // --- PHOTO QUALITY SETTINGS (Data Saving) ---
+
+  private readonly photoQualityKey = 'photo_quality';
+
+  /**
+   * Get current photo quality setting
+   * Returns MEDIUM as default if not set
+   */
+  async getPhotoQuality(): Promise<PhotoQuality> {
+    try {
+      const setting = await db.settings.get(this.photoQualityKey);
+      if (setting?.value && Object.values(PhotoQuality).includes(setting.value)) {
+        return setting.value as PhotoQuality;
+      }
+      return PhotoQuality.MEDIUM; // Default
+    } catch {
+      return PhotoQuality.MEDIUM;
+    }
+  }
+
+  /**
+   * Set photo quality setting
+   * Stored in IndexedDB for offline persistence
+   */
+  async setPhotoQuality(quality: PhotoQuality): Promise<void> {
+    await db.settings.put({ key: this.photoQualityKey, value: quality });
+  }
 
   // --- ADMIN METHODS (Online-Only, Cross-Condominium Access) ---
   // NOTE: Admin users must be online. No offline fallback or caching.

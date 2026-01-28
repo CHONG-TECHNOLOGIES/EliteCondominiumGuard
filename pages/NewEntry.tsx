@@ -4,7 +4,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { api } from '../services/dataService';
-import { Unit, VisitType, ApprovalMode, VisitStatus, VisitTypeConfig, ServiceTypeConfig, Restaurant, Sport } from '../types';
+import { Unit, VisitType, ApprovalMode, VisitStatus, VisitTypeConfig, ServiceTypeConfig, Restaurant, Sport, PhotoQuality } from '../types';
 import CameraCapture from '../components/CameraCapture';
 import ErrorBoundary from '../components/ErrorBoundary';
 import ApprovalModeSelector from '../components/ApprovalModeSelector';
@@ -58,6 +58,7 @@ export default function NewEntry() {
   const [unitSearch, setUnitSearch] = useState('');
 
   const [isOffline, setIsOffline] = useState(!api.checkOnline());
+  const [photoQuality, setPhotoQuality] = useState<PhotoQuality>(PhotoQuality.MEDIUM);
 
   // QR Question Modal State
   const [showQrQuestionModal, setShowQrQuestionModal] = useState(false);
@@ -73,6 +74,8 @@ export default function NewEntry() {
       api.getServiceTypes().then(setServiceTypes);
       api.getRestaurants().then(setRestaurants);
       api.getSports().then(setSports);
+      // Load photo quality setting for data saving
+      api.getPhotoQuality().then(setPhotoQuality);
     }
     window.addEventListener('offline', () => setIsOffline(true));
     window.addEventListener('online', () => setIsOffline(false));
@@ -566,6 +569,7 @@ export default function NewEntry() {
                   onCapture={handlePhotoCapture}
                   mode={approvalMode === ApprovalMode.QR_SCAN ? 'scan' : 'photo'}
                   onQrScanned={handleQrScanned}
+                  photoQuality={photoQuality}
                 />
               </ErrorBoundary>
             )}

@@ -1,14 +1,23 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, RefreshCw, Check } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { PhotoQuality } from '../types';
+
+// Photo quality configuration for data saving
+const QUALITY_CONFIG: Record<PhotoQuality, { scale: number; jpegQuality: number }> = {
+  [PhotoQuality.HIGH]: { scale: 0.75, jpegQuality: 0.85 },
+  [PhotoQuality.MEDIUM]: { scale: 0.5, jpegQuality: 0.7 },
+  [PhotoQuality.LOW]: { scale: 0.25, jpegQuality: 0.5 }
+};
 
 interface CameraCaptureProps {
   onCapture: (base64Image: string) => void;
   mode?: 'photo' | 'scan';
   onQrScanned?: (qrData: string) => void;
+  photoQuality?: PhotoQuality; // For data saving
 }
 
-const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, mode = 'photo', onQrScanned }) => {
+const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, mode = 'photo', onQrScanned, photoQuality = PhotoQuality.MEDIUM }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -121,22 +130,29 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, mode = 'photo'
       const video = videoRef.current;
       const canvas = canvasRef.current;
 
-      console.log('📸 Capturing photo...', { videoWidth: video.videoWidth, videoHeight: video.videoHeight });
+      // Get quality settings based on photo quality prop
+      const config = QUALITY_CONFIG[photoQuality];
 
-      // Set canvas size to video size (scaled down for performance/storage)
-      const scale = 0.5;
-      canvas.width = video.videoWidth * scale;
-      canvas.height = video.videoHeight * scale;
+      console.log('📸 Capturing photo...', {
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight,
+        quality: photoQuality,
+        scale: config.scale,
+        jpegQuality: config.jpegQuality
+      });
+
+      // Set canvas size based on quality setting (for data saving)
+      canvas.width = video.videoWidth * config.scale;
+      canvas.height = video.videoHeight * config.scale;
 
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.7); // Compress
-        console.log('✅ Photo captured! Size:', dataUrl.length, 'bytes');
+        const dataUrl = canvas.toDataURL('image/jpeg', config.jpegQuality);
+        const sizeKB = Math.round(dataUrl.length * 0.75 / 1024); // Approximate KB
+        console.log(`✅ Photo captured! Quality: ${photoQuality}, Size: ~${sizeKB}KB`);
         setCapturedImage(dataUrl);
         onCapture(dataUrl);
-        // Optional: Stop camera after capture to save battery?
-        // Keeping it running for retakes for now.
       }
     } else {
       console.error('❌ Cannot capture: video or canvas ref is null');
