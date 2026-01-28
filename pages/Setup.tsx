@@ -161,7 +161,7 @@ export default function Setup() {
               <button
                 key={condo.id}
                 onClick={() => setSelectedCondoId(condo.id)}
-                className={`text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 hover:shadow-md ${selectedCondoId === condo.id
+                className={`group text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 hover:shadow-md ${selectedCondoId === condo.id
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-slate-100 bg-white hover:border-blue-300'
                   }`}
@@ -171,7 +171,7 @@ export default function Setup() {
                     <img
                       src={condo.logo_url}
                       alt={`Logo ${condo.name}`}
-                      className="h-7 w-7 object-contain"
+                      className="h-7 w-7 object-contain transition-transform duration-200 ease-out group-hover:scale-110"
                       onError={() => setLogoErrors(prev => ({ ...prev, [condo.id]: true }))}
                     />
                   ) : (
@@ -219,7 +219,7 @@ export default function Setup() {
                   <img
                     src={selectedCondo.logo_url}
                     alt={`Logo ${selectedCondo.name}`}
-                    className="h-7 w-7 object-contain"
+                    className="h-7 w-7 object-contain transition-transform duration-200 ease-out hover:scale-110"
                     onError={() => setLogoErrors(prev => ({ ...prev, [selectedCondo.id]: true }))}
                   />
                 ) : (
