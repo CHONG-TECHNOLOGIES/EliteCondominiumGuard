@@ -236,6 +236,13 @@ export default function AdminCondominiums() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const condoName = formData.name.trim();
+    if (!condoName) {
+      showToast('warning', 'Informe o nome do condomínio antes de enviar o logo');
+      event.target.value = '';
+      return;
+    }
+
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     if (!allowedTypes.includes(file.type)) {
       showToast('warning', 'Formato inválido. Use JPG ou PNG');
@@ -259,7 +266,7 @@ export default function AdminCondominiums() {
     setLogoUploading(true);
 
     try {
-      const uploadedUrl = await api.adminUploadCondoLogo(file);
+      const uploadedUrl = await api.adminUploadCondoLogo(file, condoName);
       if (uploadedUrl) {
         setFormData((prev) => ({ ...prev, logo_url: uploadedUrl }));
         setLogoPreviewUrl(uploadedUrl);

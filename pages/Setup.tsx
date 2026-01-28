@@ -19,6 +19,7 @@ export default function Setup() {
   const [adminPin, setAdminPin] = useState('');
   const [adminName, setAdminName] = useState('');
   const [replaceError, setReplaceError] = useState('');
+  const [logoErrors, setLogoErrors] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     loadCondos();
@@ -104,6 +105,7 @@ export default function Setup() {
   );
 
   const selectedCondo = condos.find(c => c.id === selectedCondoId);
+  const isLogoAvailable = (condo: Condominium) => Boolean(condo.logo_url && !logoErrors[condo.id]);
 
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -165,7 +167,16 @@ export default function Setup() {
                   }`}
               >
                 <div className={`mt-1 p-2 rounded-lg ${selectedCondoId === condo.id ? 'bg-blue-200 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                  <Building size={20} />
+                  {isLogoAvailable(condo) ? (
+                    <img
+                      src={condo.logo_url}
+                      alt={`Logo ${condo.name}`}
+                      className="h-7 w-7 object-contain"
+                      onError={() => setLogoErrors(prev => ({ ...prev, [condo.id]: true }))}
+                    />
+                  ) : (
+                    <Building size={20} />
+                  )}
                 </div>
                 <div>
                   <h3 className={`font-bold ${selectedCondoId === condo.id ? 'text-blue-900' : 'text-slate-800'}`}>
@@ -204,7 +215,16 @@ export default function Setup() {
             </p>
             <div className="bg-slate-50 w-full p-4 rounded-xl border border-slate-200 mb-6 flex items-center gap-3 text-left">
               <div className="bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
-                <Building className="text-blue-600" size={24} />
+                {isLogoAvailable(selectedCondo) ? (
+                  <img
+                    src={selectedCondo.logo_url}
+                    alt={`Logo ${selectedCondo.name}`}
+                    className="h-7 w-7 object-contain"
+                    onError={() => setLogoErrors(prev => ({ ...prev, [selectedCondo.id]: true }))}
+                  />
+                ) : (
+                  <Building className="text-blue-600" size={24} />
+                )}
               </div>
               <div>
                 <p className="font-bold text-slate-800">{selectedCondo.name}</p>

@@ -689,7 +689,7 @@ export const SupabaseService = {
    * @param file - Image file (png/jpg/jpeg)
    * @returns Public URL of the uploaded logo, or null if upload fails
    */
-  async uploadCondoLogo(file: File): Promise<string | null> {
+  async uploadCondoLogo(file: File, condoName?: string): Promise<string | null> {
     if (!supabase) {
       console.error('[SupabaseService] Supabase client not initialized');
       return null;
@@ -697,10 +697,20 @@ export const SupabaseService = {
 
     try {
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const fileName = `condo-logos/${Date.now()}_${sanitizedName}`;
+      const safeFileName = sanitizedName || 'logo';
+      const rawCondoName = condoName?.trim() || '';
+      const condoSlug = rawCondoName
+        ? rawCondoName
+          .replace(/[^a-zA-Z0-9]+/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .toLowerCase()
+        : 'condominio';
+      const safeCondoSlug = condoSlug || 'condominio';
+      const bucketName = 'logo_condominio';
+      const fileName = `${safeCondoSlug}/${Date.now()}_${safeFileName}`;
 
       const { error } = await supabase.storage
-        .from('condo-logos')
+        .from(bucketName)
         .upload(fileName, file, {
           contentType: file.type,
           cacheControl: '3600',
@@ -710,7 +720,7 @@ export const SupabaseService = {
       if (error) throw error;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('condo-logos')
+        .from(bucketName)
         .getPublicUrl(fileName);
 
       return publicUrl;

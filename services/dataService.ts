@@ -2065,9 +2065,9 @@ class DataService {
   /**
    * Admin: Upload condominium logo
    */
-  async adminUploadCondoLogo(file: File): Promise<string | null> {
+  async adminUploadCondoLogo(file: File, condoName?: string): Promise<string | null> {
     try {
-      return await SupabaseService.uploadCondoLogo(file);
+      return await SupabaseService.uploadCondoLogo(file, condoName);
     } catch (e) {
       console.error('[Admin] Failed to upload condominium logo (online required):', e);
       return null;
