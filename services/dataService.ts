@@ -2003,7 +2003,23 @@ class DataService {
    */
   async adminDeactivateCondoDevices(condoId: number): Promise<boolean> {
     try {
-      return await SupabaseService.deactivateCondoDevices(condoId);
+      const devices = await SupabaseService.adminGetAllDevices(condoId);
+      if (devices.length === 0) return true;
+
+      for (const device of devices) {
+        if (!device.id) {
+          console.error('[Admin] Device missing id, cannot deactivate:', device);
+          return false;
+        }
+
+        const updated = await SupabaseService.adminUpdateDevice(device.id, {
+          status: 'INACTIVE',
+          condominium_id: null
+        });
+        if (!updated) return false;
+      }
+
+      return true;
     } catch (e) {
       console.error('[Admin] Failed to deactivate condominium devices (online required):', e);
       return false;

@@ -284,8 +284,8 @@ export default function AdminVisits() {
     <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Gestão de Visitas</h1>
-          <p className="text-slate-600">Visualizar e gerir todas as visitas registadas</p>
+          <h1 className="text-3xl font-bold text-text-main mb-2">Gestão de Visitas</h1>
+          <p className="text-text-dim">Visualizar e gerir todas as visitas registadas</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -317,13 +317,13 @@ export default function AdminVisits() {
               placeholder="Buscar por nome, documento, unidade..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <select
             value={filterCondoId || ''}
             onChange={(e) => setFilterCondoId(e.target.value ? parseInt(e.target.value) : null)}
-            className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Todos os Condomínios</option>
             {condominiums.map(condo => (
@@ -333,7 +333,7 @@ export default function AdminVisits() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Todos os Estados</option>
             <option value={VisitStatus.PENDING}>Pendente</option>
@@ -350,7 +350,7 @@ export default function AdminVisits() {
               setFilterVisitType(e.target.value);
               setFilterServiceType(''); // Reset service type when visit type changes
             }}
-            className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">Todos os Tipos de Visita</option>
             {visitTypes.map(vt => (
@@ -361,7 +361,7 @@ export default function AdminVisits() {
             <select
               value={filterServiceType}
               onChange={(e) => setFilterServiceType(e.target.value)}
-              className="px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos os Tipos de Serviço</option>
               {serviceTypes.map(st => (
@@ -372,21 +372,21 @@ export default function AdminVisits() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Data Início</label>
+            <label className="block text-sm font-medium text-text-main mb-1">Data Início</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Data Fim</label>
+            <label className="block text-sm font-medium text-text-main mb-1">Data Fim</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
@@ -395,7 +395,7 @@ export default function AdminVisits() {
         <button
           type="button"
           onClick={handleClearFilters}
-          className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center gap-2"
+          className="px-4 py-2 border border-border-main text-text-main rounded-lg hover:bg-bg-root transition-colors flex items-center gap-2"
         >
           <RotateCcw size={18} />
           Limpar filtros
@@ -404,17 +404,17 @@ export default function AdminVisits() {
 
       {/* Visits List */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-slate-600">Carregando visitas...</p>
+          <p className="text-text-dim">Carregando visitas...</p>
         </div>
       ) : filteredVisits.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-8 text-center">
           <UserCheck size={64} className="text-slate-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-slate-800 mb-2">
+          <h3 className="text-xl font-bold text-text-main mb-2">
             {searchTerm || filterStatus ? 'Nenhum resultado encontrado' : 'Nenhuma visita registada'}
           </h3>
-          <p className="text-slate-600">
+          <p className="text-text-dim">
             {searchTerm || filterStatus ? 'Tente ajustar os filtros de pesquisa' : 'Visitas aparecerão aqui quando forem registadas'}
           </p>
         </div>
@@ -423,7 +423,7 @@ export default function AdminVisits() {
           {filteredVisits.map((visit) => (
             <div
               key={visit.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
@@ -441,12 +441,12 @@ export default function AdminVisits() {
                   )}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-bold text-slate-900">
+                      <h3 className="text-xl font-bold text-text-main">
                         {visit.visitor_name}
                       </h3>
                       {getStatusBadge(visit.status)}
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-slate-600 mb-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-text-dim mb-3">
                       {visit.visitor_doc && (
                         <p><span className="font-medium">Documento:</span> {visit.visitor_doc}</p>
                       )}
@@ -472,7 +472,7 @@ export default function AdminVisits() {
                       )}
                     </div>
                     {visit.reason && (
-                      <p className="text-sm text-slate-500 italic">Motivo: {visit.reason}</p>
+                      <p className="text-sm text-text-dim italic">Motivo: {visit.reason}</p>
                     )}
                   </div>
                 </div>
@@ -511,7 +511,7 @@ export default function AdminVisits() {
                   )}
                   <button
                     onClick={() => openEventModal(visit)}
-                    className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                    className="px-4 py-2 border border-border-main text-text-main rounded-lg hover:bg-bg-root transition-colors text-sm font-medium flex items-center justify-center gap-2"
                   >
                     <History size={16} />
                     Historico
@@ -530,7 +530,7 @@ export default function AdminVisits() {
           onClick={closeEventModal}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl w-full max-w-[95vw] md:max-w-md lg:max-w-xl max-h-[90vh] overflow-y-auto"
+            className="bg-bg-surface rounded-xl shadow-2xl w-full max-w-[95vw] md:max-w-md lg:max-w-xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-6 py-4 rounded-t-xl bg-slate-900">
@@ -550,32 +550,32 @@ export default function AdminVisits() {
 
             <div className="p-6">
               {eventModal.loading ? (
-                <div className="flex items-center justify-center py-8 text-slate-500">
+                <div className="flex items-center justify-center py-8 text-text-dim">
                   <Loader2 className="animate-spin mr-2" size={20} />
                   A carregar eventos...
                 </div>
               ) : eventModal.events.length === 0 ? (
-                <div className="text-center text-slate-500 py-8">
+                <div className="text-center text-text-dim py-8">
                   Sem eventos registados.
                 </div>
               ) : (
                 <div className="relative pl-6 space-y-6">
-                  <div className="absolute left-2 top-2 bottom-2 w-px bg-slate-200" />
+                  <div className="absolute left-2 top-2 bottom-2 w-px bg-border-main" />
                   {eventModal.events.map((event) => (
                     <div
                       key={`${event.id}-${event.event_at}`}
                       className="relative"
                     >
                       <div className={`absolute -left-1.5 top-1.5 w-3 h-3 rounded-full ${getStatusDotClass(event.status)}`} />
-                      <div className="border border-slate-200 rounded-lg px-4 py-3 flex items-center justify-between gap-4">
+                      <div className="border border-border-main rounded-lg px-4 py-3 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                           {getStatusBadge(event.status)}
-                          <span className="text-sm text-slate-600">
+                          <span className="text-sm text-text-dim">
                             {formatDateTime(event.event_at)}
                           </span>
                         </div>
                         {event.actor_id && (
-                          <span className="text-xs text-slate-400">ID Guard: {event.actor_id}</span>
+                          <span className="text-xs text-text-dim">ID Guard: {event.actor_id}</span>
                         )}
                       </div>
                     </div>
@@ -594,7 +594,7 @@ export default function AdminVisits() {
           onClick={closeConfirmModal}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl max-h-[90vh] overflow-y-auto"
+            className="bg-bg-surface rounded-xl shadow-2xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -621,7 +621,7 @@ export default function AdminVisits() {
             {/* Content */}
             <div className="p-6">
               {/* Visitor Photo and Name */}
-              <div className="flex items-center gap-4 mb-6 pb-4 border-b border-slate-200">
+              <div className="flex items-center gap-4 mb-6 pb-4 border-b border-border-main">
                 {confirmModal.visit.photo_url ? (
                   <img
                     src={confirmModal.visit.photo_url}
@@ -634,7 +634,7 @@ export default function AdminVisits() {
                   </div>
                 )}
                 <div>
-                  <h3 className="text-2xl font-bold text-slate-900">
+                  <h3 className="text-2xl font-bold text-text-main">
                     {confirmModal.visit.visitor_name}
                   </h3>
                   {getStatusBadge(confirmModal.visit.status)}
@@ -644,61 +644,61 @@ export default function AdminVisits() {
               {/* Visit Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 {confirmModal.visit.visitor_doc && (
-                  <div className="bg-slate-50 p-3 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase font-medium">Documento</p>
-                    <p className="text-slate-900 font-semibold">{confirmModal.visit.visitor_doc}</p>
+                  <div className="bg-bg-root p-3 rounded-lg">
+                    <p className="text-xs text-text-dim uppercase font-medium">Documento</p>
+                    <p className="text-text-main font-semibold">{confirmModal.visit.visitor_doc}</p>
                   </div>
                 )}
                 {confirmModal.visit.visitor_phone && (
-                  <div className="bg-slate-50 p-3 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase font-medium">Telefone</p>
-                    <p className="text-slate-900 font-semibold">{confirmModal.visit.visitor_phone}</p>
+                  <div className="bg-bg-root p-3 rounded-lg">
+                    <p className="text-xs text-text-dim uppercase font-medium">Telefone</p>
+                    <p className="text-text-main font-semibold">{confirmModal.visit.visitor_phone}</p>
                   </div>
                 )}
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <p className="text-xs text-slate-500 uppercase font-medium">Tipo de Visita</p>
-                  <p className="text-slate-900 font-semibold">{confirmModal.visit.visit_type || 'N/A'}</p>
+                <div className="bg-bg-root p-3 rounded-lg">
+                  <p className="text-xs text-text-dim uppercase font-medium">Tipo de Visita</p>
+                  <p className="text-text-main font-semibold">{confirmModal.visit.visit_type || 'N/A'}</p>
                 </div>
                 {confirmModal.visit.service_type && (
-                  <div className="bg-slate-50 p-3 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase font-medium">Tipo de Serviço</p>
-                    <p className="text-slate-900 font-semibold">{confirmModal.visit.service_type}</p>
+                  <div className="bg-bg-root p-3 rounded-lg">
+                    <p className="text-xs text-text-dim uppercase font-medium">Tipo de Serviço</p>
+                    <p className="text-text-main font-semibold">{confirmModal.visit.service_type}</p>
                   </div>
                 )}
                 {confirmModal.visit.unit_block && confirmModal.visit.unit_number && (
-                  <div className="bg-slate-50 p-3 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase font-medium">Unidade</p>
-                    <p className="text-slate-900 font-semibold">
+                  <div className="bg-bg-root p-3 rounded-lg">
+                    <p className="text-xs text-text-dim uppercase font-medium">Unidade</p>
+                    <p className="text-text-main font-semibold">
                       {confirmModal.visit.unit_block} {confirmModal.visit.unit_number}
                     </p>
                   </div>
                 )}
                 {confirmModal.visit.restaurant_name && (
-                  <div className="bg-slate-50 p-3 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase font-medium">Restaurante</p>
-                    <p className="text-slate-900 font-semibold">{confirmModal.visit.restaurant_name}</p>
+                  <div className="bg-bg-root p-3 rounded-lg">
+                    <p className="text-xs text-text-dim uppercase font-medium">Restaurante</p>
+                    <p className="text-text-main font-semibold">{confirmModal.visit.restaurant_name}</p>
                   </div>
                 )}
                 {confirmModal.visit.sport_name && (
-                  <div className="bg-slate-50 p-3 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase font-medium">Desporto</p>
-                    <p className="text-slate-900 font-semibold">{confirmModal.visit.sport_name}</p>
+                  <div className="bg-bg-root p-3 rounded-lg">
+                    <p className="text-xs text-text-dim uppercase font-medium">Desporto</p>
+                    <p className="text-text-main font-semibold">{confirmModal.visit.sport_name}</p>
                   </div>
                 )}
-                <div className="bg-slate-50 p-3 rounded-lg">
-                  <p className="text-xs text-slate-500 uppercase font-medium">Data/Hora Entrada</p>
-                  <p className="text-slate-900 font-semibold">{formatDateTime(confirmModal.visit.check_in_at)}</p>
+                <div className="bg-bg-root p-3 rounded-lg">
+                  <p className="text-xs text-text-dim uppercase font-medium">Data/Hora Entrada</p>
+                  <p className="text-text-main font-semibold">{formatDateTime(confirmModal.visit.check_in_at)}</p>
                 </div>
                 {confirmModal.visit.condominium_name && (
-                  <div className="bg-slate-50 p-3 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase font-medium">Condomínio</p>
-                    <p className="text-slate-900 font-semibold">{confirmModal.visit.condominium_name}</p>
+                  <div className="bg-bg-root p-3 rounded-lg">
+                    <p className="text-xs text-text-dim uppercase font-medium">Condomínio</p>
+                    <p className="text-text-main font-semibold">{confirmModal.visit.condominium_name}</p>
                   </div>
                 )}
                 {confirmModal.visit.approval_mode && (
-                  <div className="bg-slate-50 p-3 rounded-lg">
-                    <p className="text-xs text-slate-500 uppercase font-medium">Modo de Aprovação</p>
-                    <p className="text-slate-900 font-semibold">{confirmModal.visit.approval_mode}</p>
+                  <div className="bg-bg-root p-3 rounded-lg">
+                    <p className="text-xs text-text-dim uppercase font-medium">Modo de Aprovação</p>
+                    <p className="text-text-main font-semibold">{confirmModal.visit.approval_mode}</p>
                   </div>
                 )}
               </div>
@@ -746,7 +746,7 @@ export default function AdminVisits() {
               <div className="flex gap-3">
                 <button
                   onClick={closeConfirmModal}
-                  className="flex-1 px-4 py-3 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors font-medium"
+                  className="flex-1 px-4 py-3 bg-bg-root text-text-main rounded-lg hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors font-medium"
                 >
                   Cancelar
                 </button>

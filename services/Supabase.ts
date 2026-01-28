@@ -6,19 +6,40 @@ import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, In
 const getStoragePathFromPublicUrl = (publicUrl: string, bucket: string): string | null => {
   if (!publicUrl) return null;
 
-  const publicPrefix = `/storage/v1/object/public/${bucket}/`;
-  if (publicUrl.startsWith(publicPrefix)) {
-    return decodeURIComponent(publicUrl.slice(publicPrefix.length));
-  }
+  const normalizePath = (path: string): string | null => {
+    const publicPrefix = `/storage/v1/object/public/${bucket}/`;
+    const signedPrefix = `/storage/v1/object/sign/${bucket}/`;
+    const bucketPrefix = `/${bucket}/`;
+
+    if (path.includes(publicPrefix)) {
+      return decodeURIComponent(path.slice(path.indexOf(publicPrefix) + publicPrefix.length));
+    }
+    if (path.includes(signedPrefix)) {
+      return decodeURIComponent(path.slice(path.indexOf(signedPrefix) + signedPrefix.length));
+    }
+    if (path.startsWith(bucketPrefix)) {
+      return decodeURIComponent(path.slice(bucketPrefix.length));
+    }
+    if (path.startsWith(`${bucket}/`)) {
+      return decodeURIComponent(path.slice(bucket.length + 1));
+    }
+
+    const cleaned = path.startsWith('/') ? path.slice(1) : path;
+    return cleaned ? decodeURIComponent(cleaned) : null;
+  };
+
+  const trimmed = publicUrl.trim();
 
   try {
-    const url = new URL(publicUrl);
-    const index = url.pathname.indexOf(publicPrefix);
-    if (index === -1) return null;
-    return decodeURIComponent(url.pathname.slice(index + publicPrefix.length));
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      const url = new URL(trimmed);
+      return normalizePath(url.pathname);
+    }
   } catch {
-    return null;
+    // Fall through to raw path parsing below.
   }
+
+  return normalizePath(trimmed);
 };
 
 /**

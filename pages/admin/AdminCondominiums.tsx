@@ -122,8 +122,8 @@ export default function AdminCondominiums() {
     const action = newStatus === 'ACTIVE' ? 'ativar' : 'desativar';
     const isDeactivating = newStatus === 'INACTIVE';
     const confirmMessage = isDeactivating
-      ? `Ao desativar o condom?nio "${condo.name}", todos os dispositivos associados tamb?m ser?o desativados. Confirmar?`
-      : `Deseja realmente ${action} o condom?nio "${condo.name}"?`;
+      ? `Ao desativar o condominio "${condo.name}", todos os dispositivos associados tambem serao desativados e desassociados (condominium_id removido). Confirmar?`
+      : `Deseja realmente ${action} o condominio "${condo.name}"?`;
 
     showConfirm(
       confirmMessage,
@@ -132,20 +132,20 @@ export default function AdminCondominiums() {
           if (isDeactivating) {
             const devicesDeactivated = await api.adminDeactivateCondoDevices(condo.id);
             if (!devicesDeactivated) {
-              showToast('error', 'Falha ao desativar dispositivos. Condom?nio n?o foi alterado.');
+              showToast('error', 'Falha ao desativar dispositivos. Condominio nao foi alterado.');
               return;
             }
           }
           const result = await api.adminToggleCondominiumStatus(condo.id, newStatus);
           if (result) {
             await loadCondominiums();
-            showToast('success', `Condom?nio ${action === 'ativar' ? 'ativado' : 'desativado'} com sucesso!`);
+            showToast('success', `Condominio ${action === 'ativar' ? 'ativado' : 'desativado'} com sucesso!`);
           } else {
-            showToast('error', `Erro ao ${action} condom?nio`);
+            showToast('error', `Erro ao ${action} condominio`);
           }
         } catch (error) {
           console.error('Error toggling status:', error);
-          showToast('error', `Erro ao ${action} condom?nio`);
+          showToast('error', `Erro ao ${action} condominio`);
         }
       }
     );

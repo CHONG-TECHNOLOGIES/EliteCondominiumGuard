@@ -158,8 +158,8 @@ export default function AdminAnalytics() {
     <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Analytics & Relatórios</h1>
-          <p className="text-slate-600">Visualizar estatísticas e localização dos condomínios em tempo real</p>
+          <h1 className="text-3xl font-bold text-text-main mb-2">Analytics & Relatórios</h1>
+          <p className="text-text-dim">Visualizar estatísticas e localização dos condomínios em tempo real</p>
         </div>
         <button
           onClick={refreshData}
@@ -180,7 +180,7 @@ export default function AdminAnalytics() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Pesquisar por nome ou endereço do condomínio..."
-            className="w-full pl-12 pr-12 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-12 pr-12 py-3 border border-border-main bg-bg-surface text-text-main rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
           {searchQuery && (
             <button
@@ -193,7 +193,7 @@ export default function AdminAnalytics() {
           )}
         </div>
         {searchQuery && (
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-sm text-text-dim">
             {filteredStats.length === 0 ? (
               <span className="text-amber-600">Nenhum condomínio encontrado</span>
             ) : (
@@ -217,50 +217,50 @@ export default function AdminAnalytics() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-blue-50 rounded-lg">
               <MapPin className="text-blue-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-slate-600">Condomínios Ativos</p>
-              <p className="text-2xl font-bold text-slate-900">{filteredStats.length}</p>
+              <p className="text-sm text-text-dim">Condomínios Ativos</p>
+              <p className="text-2xl font-bold text-text-main">{filteredStats.length}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-green-50 rounded-lg">
               <Users className="text-green-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-slate-600">Visitas Hoje</p>
+              <p className="text-sm text-text-dim">Visitas Hoje</p>
               <p className="text-2xl font-bold text-green-600">{totalVisits}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-red-50 rounded-lg">
               <AlertTriangle className="text-red-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-slate-600">Incidentes Abertos</p>
+              <p className="text-sm text-text-dim">Incidentes Abertos</p>
               <p className="text-2xl font-bold text-red-600">{totalIncidents}</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-purple-50 rounded-lg">
               <BarChart3 className="text-purple-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-slate-600">Última Atualização</p>
-              <p className="text-sm font-bold text-slate-900">
+              <p className="text-sm text-text-dim">Última Atualização</p>
+              <p className="text-sm font-bold text-text-main">
                 {lastUpdated ? formatTime(lastUpdated) : '--:--:--'}
               </p>
             </div>
@@ -270,23 +270,23 @@ export default function AdminAnalytics() {
 
       {/* Map */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-slate-600">Carregando mapa...</p>
+          <p className="text-text-dim">Carregando mapa...</p>
         </div>
       ) : condosWithCoords.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-8 text-center">
           <MapPin size={64} className="text-slate-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-slate-800 mb-2">Sem Dados de Localização</h3>
-          <p className="text-slate-600">
+          <h3 className="text-xl font-bold text-text-main mb-2">Sem Dados de Localização</h3>
+          <p className="text-text-dim">
             Nenhum condomínio tem coordenadas GPS configuradas para exibição no mapa
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-4 border-b border-slate-200">
-            <h2 className="text-lg font-bold text-slate-900">Mapa de Condomínios</h2>
-            <p className="text-sm text-slate-600">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main overflow-hidden">
+          <div className="p-4 border-b border-border-main">
+            <h2 className="text-lg font-bold text-text-main">Mapa de Condomínios</h2>
+            <p className="text-sm text-text-dim">
               Badges verdes = Visitas hoje | Badges vermelhos = Incidentes abertos
             </p>
           </div>
@@ -349,15 +349,15 @@ export default function AdminAnalytics() {
       )}
 
       {/* Condominium List */}
-      <div className="mt-6 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h2 className="text-xl font-bold text-slate-900 mb-4">Lista de Condomínios</h2>
+      <div className="mt-6 bg-bg-surface rounded-xl shadow-sm border border-border-main p-6">
+        <h2 className="text-xl font-bold text-text-main mb-4">Lista de Condomínios</h2>
         {filteredStats.length === 0 ? (
           <div className="text-center py-12">
             <Search size={48} className="text-slate-300 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-800 mb-2">
+            <h3 className="text-lg font-bold text-text-main mb-2">
               {searchQuery ? 'Nenhum condomínio encontrado' : 'Sem dados disponíveis'}
             </h3>
-            <p className="text-slate-600">
+            <p className="text-text-dim">
               {searchQuery
                 ? 'Tente ajustar sua pesquisa ou limpar os filtros'
                 : 'Nenhum condomínio cadastrado no sistema'}
@@ -368,15 +368,15 @@ export default function AdminAnalytics() {
             {filteredStats.map((condo) => (
               <div
                 key={condo.id}
-                className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                className="p-4 border border-border-main rounded-lg hover:bg-bg-root transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <MapPin className="text-blue-600" size={20} />
                     <div>
-                      <h3 className="font-bold text-slate-900">{condo.name}</h3>
+                      <h3 className="font-bold text-text-main">{condo.name}</h3>
                       {condo.address && (
-                        <p className="text-sm text-slate-600">{condo.address}</p>
+                        <p className="text-sm text-text-dim">{condo.address}</p>
                       )}
                       {!condo.latitude || !condo.longitude ? (
                         <p className="text-xs text-amber-600 mt-1">⚠️ Sem coordenadas GPS</p>
@@ -386,11 +386,11 @@ export default function AdminAnalytics() {
                   <div className="flex items-center gap-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold text-green-600">{condo.total_visits_today}</div>
-                      <div className="text-xs text-slate-600">Visitas Hoje</div>
+                      <div className="text-xs text-text-dim">Visitas Hoje</div>
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-red-600">{condo.total_incidents_open}</div>
-                      <div className="text-xs text-slate-600">Incidentes Abertos</div>
+                      <div className="text-xs text-text-dim">Incidentes Abertos</div>
                     </div>
                   </div>
                 </div>

@@ -163,8 +163,8 @@ export default function AdminVisitTypes() {
     <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Tipos de Visita</h1>
-          <p className="text-slate-600">Configurar tipos de visita disponíveis no sistema</p>
+          <h1 className="text-3xl font-bold text-text-main mb-2">Tipos de Visita</h1>
+          <p className="text-text-dim">Configurar tipos de visita disponíveis no sistema</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
@@ -184,24 +184,24 @@ export default function AdminVisitTypes() {
             placeholder="Buscar por nome..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
 
       {/* Visit Types List */}
       {loading ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
-          <p className="text-slate-600">Carregando tipos de visita...</p>
+          <p className="text-text-dim">Carregando tipos de visita...</p>
         </div>
       ) : filteredVisitTypes.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+        <div className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Tag size={64} className="text-slate-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-slate-800 mb-2">
+          <h3 className="text-xl font-bold text-text-main mb-2">
             {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum tipo de visita configurado'}
           </h3>
-          <p className="text-slate-600">
+          <p className="text-text-dim">
             {searchTerm ? 'Tente buscar com outros termos' : 'Clique em "Novo Tipo" para adicionar um tipo de visita'}
           </p>
         </div>
@@ -210,7 +210,7 @@ export default function AdminVisitTypes() {
           {filteredVisitTypes.map((visitType) => (
             <div
               key={visitType.id}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-bg-surface rounded-xl shadow-sm border border-border-main p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
@@ -223,7 +223,7 @@ export default function AdminVisitTypes() {
                     );
                   })()}
                   <div className="flex-1">
-                    <h3 className="text-xl font-bold text-slate-900 mb-2">{visitType.name}</h3>
+                    <h3 className="text-xl font-bold text-text-main mb-2">{visitType.name}</h3>
                     <div className="flex flex-wrap gap-2 mb-2">
                       <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
                         Ícone: {visitType.icon_key}
@@ -236,7 +236,7 @@ export default function AdminVisitTypes() {
                         ) : (
                           <XIcon size={16} className="text-red-600" />
                         )}
-                        <span className={visitType.requires_service_type ? 'text-green-700' : 'text-slate-500'}>
+                        <span className={visitType.requires_service_type ? 'text-green-700' : 'text-text-dim'}>
                           Requer Tipo de Serviço
                         </span>
                       </div>
@@ -246,7 +246,7 @@ export default function AdminVisitTypes() {
                         ) : (
                           <XIcon size={16} className="text-red-600" />
                         )}
-                        <span className={visitType.requires_restaurant ? 'text-green-700' : 'text-slate-500'}>
+                        <span className={visitType.requires_restaurant ? 'text-green-700' : 'text-text-dim'}>
                           Requer Restaurante
                         </span>
                       </div>
@@ -256,7 +256,7 @@ export default function AdminVisitTypes() {
                         ) : (
                           <XIcon size={16} className="text-red-600" />
                         )}
-                        <span className={visitType.requires_sport ? 'text-green-700' : 'text-slate-500'}>
+                        <span className={visitType.requires_sport ? 'text-green-700' : 'text-text-dim'}>
                           Requer Desporto
                         </span>
                       </div>
@@ -288,41 +288,41 @@ export default function AdminVisitTypes() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
-            <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-slate-900">Novo Tipo de Visita</h2>
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+            <div className="p-6 border-b border-border-main flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-text-main">Novo Tipo de Visita</h2>
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   resetForm();
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Nome do Tipo de Visita *
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Ex: Visitante, Entrega, Serviço"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Ícone (chave)
                 </label>
                 <input
                   type="text"
                   value={formData.icon_key}
                   onChange={(e) => setFormData({ ...formData, icon_key: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Ex: user, package, truck"
                 />
               </div>
@@ -334,7 +334,7 @@ export default function AdminVisitTypes() {
                     onChange={(e) => setFormData({ ...formData, requires_service_type: e.target.checked })}
                     className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium text-slate-700">Requer Tipo de Serviço</span>
+                  <span className="text-sm font-medium text-text-main">Requer Tipo de Serviço</span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -343,7 +343,7 @@ export default function AdminVisitTypes() {
                     onChange={(e) => setFormData({ ...formData, requires_restaurant: e.target.checked })}
                     className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium text-slate-700">Requer Restaurante</span>
+                  <span className="text-sm font-medium text-text-main">Requer Restaurante</span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -352,17 +352,17 @@ export default function AdminVisitTypes() {
                     onChange={(e) => setFormData({ ...formData, requires_sport: e.target.checked })}
                     className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium text-slate-700">Requer Desporto</span>
+                  <span className="text-sm font-medium text-text-main">Requer Desporto</span>
                 </label>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   resetForm();
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main text-text-main rounded-lg hover:bg-bg-root transition-colors"
               >
                 Cancelar
               </button>
@@ -380,7 +380,7 @@ export default function AdminVisitTypes() {
       {/* Edit Modal */}
       {showEditModal && selectedVisitType && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
             <div className="p-6 border-b border-slate-200 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-slate-900">Editar Tipo de Visita</h2>
               <button
@@ -389,33 +389,33 @@ export default function AdminVisitTypes() {
                   setSelectedVisitType(null);
                   resetForm();
                 }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Nome do Tipo de Visita *
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Ex: Visitante, Entrega, Serviço"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-text-main mb-2">
                   Ícone (chave)
                 </label>
                 <input
                   type="text"
                   value={formData.icon_key}
                   onChange={(e) => setFormData({ ...formData, icon_key: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Ex: user, package, truck"
                 />
               </div>
@@ -427,7 +427,7 @@ export default function AdminVisitTypes() {
                     onChange={(e) => setFormData({ ...formData, requires_service_type: e.target.checked })}
                     className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium text-slate-700">Requer Tipo de Serviço</span>
+                  <span className="text-sm font-medium text-text-main">Requer Tipo de Serviço</span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -436,7 +436,7 @@ export default function AdminVisitTypes() {
                     onChange={(e) => setFormData({ ...formData, requires_restaurant: e.target.checked })}
                     className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium text-slate-700">Requer Restaurante</span>
+                  <span className="text-sm font-medium text-text-main">Requer Restaurante</span>
                 </label>
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -445,18 +445,18 @@ export default function AdminVisitTypes() {
                     onChange={(e) => setFormData({ ...formData, requires_sport: e.target.checked })}
                     className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-2 focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium text-slate-700">Requer Desporto</span>
+                  <span className="text-sm font-medium text-text-main">Requer Desporto</span>
                 </label>
               </div>
             </div>
-            <div className="p-6 border-t border-slate-200 flex justify-end gap-3">
+            <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowEditModal(false);
                   setSelectedVisitType(null);
                   resetForm();
                 }}
-                className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                className="px-6 py-2 border border-border-main text-text-main rounded-lg hover:bg-bg-root transition-colors"
               >
                 Cancelar
               </button>
