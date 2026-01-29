@@ -138,19 +138,23 @@ export const SupabaseService = {
 
   // --- Auth Segura ---
   async verifyStaffLogin(firstName: string, lastName: string, pin: string): Promise<Staff | null> {
-    if (!supabase) {
-      throw new Error('Supabase client not initialized');
+    if (!supabase) return null;
+
+    try {
+      // Chama a RPC function que compara o PIN com o Hash na BD
+      const { data, error } = await supabase.rpc('verify_staff_login', {
+        p_first_name: firstName,
+        p_last_name: lastName,
+        p_pin: pin
+      });
+
+      if (error) throw error;
+      return data as Staff | null;
+
+    } catch (err: any) {
+      console.error('Supabase Login RPC Error:', err.message || JSON.stringify(err));
+      return null;
     }
-
-    // Chama a RPC function que compara o PIN com o Hash na BD
-    const { data, error } = await supabase.rpc('verify_staff_login', {
-      p_first_name: firstName,
-      p_last_name: lastName,
-      p_pin: pin
-    });
-
-    if (error) throw error;
-    return data as Staff | null;
   },
 
   // --- Configurações ---
