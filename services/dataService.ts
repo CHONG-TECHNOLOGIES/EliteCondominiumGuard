@@ -2034,7 +2034,7 @@ class DataService {
           SupabaseService.adminGetAllDevices(scopedCondoId),
           SupabaseService.adminGetAllStaff(scopedCondoId),
           SupabaseService.adminGetAllUnits(scopedCondoId),
-          SupabaseService.adminGetAllResidents(scopedCondoId),
+          SupabaseService.adminGetAllResidents(scopedCondoId, null, null, null, null),
           SupabaseService.adminGetAllIncidents(scopedCondoId),
           SupabaseService.adminGetAllVisits(
             startOfDay.toISOString(),
@@ -2348,11 +2348,23 @@ class DataService {
   /**
    * Admin: Get all residents (cross-condominium)
    */
-  async adminGetAllResidents(condominiumId?: number): Promise<any[]> {
+  async adminGetAllResidents(
+    condominiumId?: number,
+    limit?: number | null,
+    search?: string | null,
+    afterName?: string | null,
+    afterId?: number | null
+  ): Promise<any[]> {
     try {
       const scopedCondoId = this.getAdminScopeCondoId();
       const effectiveCondoId = scopedCondoId ?? condominiumId;
-      return await SupabaseService.adminGetAllResidents(effectiveCondoId);
+      return await SupabaseService.adminGetAllResidents(
+        effectiveCondoId,
+        limit ?? null,
+        search ?? null,
+        afterName ?? null,
+        afterId ?? null
+      );
     } catch (e) {
       console.error('[Admin] Failed to fetch residents (online required):', e);
       return [];

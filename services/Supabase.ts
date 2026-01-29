@@ -1495,36 +1495,24 @@ export const SupabaseService = {
   /**
    * Admin: Get all residents (cross-condominium)
    */
-  async adminGetAllResidents(condominiumId?: number): Promise<any[]> {
+  async adminGetAllResidents(
+    condominiumId?: number,
+    limit?: number | null,
+    search?: string | null,
+    afterName?: string | null,
+    afterId?: number | null
+  ): Promise<any[]> {
     if (!supabase) return [];
 
     try {
-      if (condominiumId == null) {
-        const { data: condos, error: condoError } = await supabase
-          .rpc('get_condominiums');
-
-        if (condoError) throw condoError;
-
-        const condoList = (condos as Condominium[]) || [];
-        if (condoList.length === 0) return [];
-
-        const results = await Promise.all(
-          condoList.map((condo) =>
-            supabase.rpc('admin_get_residents', { p_condominium_id: condo.id })
-          )
-        );
-
-        const combined: any[] = [];
-        for (const result of results) {
-          if (result.error) throw result.error;
-          combined.push(...(result.data || []));
-        }
-
-        return combined;
-      }
-
       const { data, error } = await supabase
-        .rpc('admin_get_residents', { p_condominium_id: condominiumId });
+        .rpc('admin_get_residents', {
+          p_condominium_id: condominiumId ?? null,
+          p_limit: limit ?? null,
+          p_search: search ?? null,
+          p_after_name: afterName ?? null,
+          p_after_id: afterId ?? null
+        });
 
       if (error) throw error;
       return data || [];

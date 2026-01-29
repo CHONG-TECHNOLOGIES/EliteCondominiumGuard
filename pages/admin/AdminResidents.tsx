@@ -135,12 +135,16 @@ function SearchableSelect({
 
 export default function AdminResidents() {
   const { showToast, showConfirm } = useToast();
+  const PAGE_SIZE = 100;
   const [residents, setResidents] = useState<Resident[]>([]);
   const [condominiums, setCondominiums] = useState<Condominium[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterCondoId, setFilterCondoId] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
@@ -156,8 +160,19 @@ export default function AdminResidents() {
   });
 
   useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setSearchQuery(searchTerm.trim());
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    loadCondominiums();
+  }, []);
+
+  useEffect(() => {
     loadData();
-  }, [filterCondoId]);
+  }, [filterCondoId, searchQuery]);
 
   useEffect(() => {
     // Load units when condominium is selected
@@ -171,16 +186,26 @@ export default function AdminResidents() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [residentsData, condosData] = await Promise.all([
-        api.adminGetAllResidents(filterCondoId || undefined),
-        api.adminGetAllCondominiums()
-      ]);
+      const residentsData = await api.adminGetAllResidents(
+        filterCondoId || undefined,
+        PAGE_SIZE,
+        searchQuery || undefined
+      );
       setResidents(residentsData);
-      setCondominiums(condosData);
+      setHasMore(residentsData.length === PAGE_SIZE);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCondominiums = async () => {
+    try {
+      const condosData = await api.adminGetAllCondominiums();
+      setCondominiums(condosData);
+    } catch (error) {
+      console.error('Error loading condominiums:', error);
     }
   };
 
@@ -190,6 +215,30 @@ export default function AdminResidents() {
       setUnits(unitsData);
     } catch (error) {
       console.error('Error loading units:', error);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    if (residents.length === 0) return;
+    const lastResident = residents[residents.length - 1];
+    if (!lastResident) return;
+    setLoadingMore(true);
+    try {
+      const moreResidents = await api.adminGetAllResidents(
+        filterCondoId || undefined,
+        PAGE_SIZE,
+        searchQuery || undefined,
+        lastResident.name,
+        lastResident.id
+      );
+      setResidents(prev => [...prev, ...moreResidents]);
+      setHasMore(moreResidents.length === PAGE_SIZE);
+    } catch (error) {
+      console.error('Error loading more residents:', error);
+      showToast('error', 'Erro ao carregar mais residentes');
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -312,12 +361,6 @@ export default function AdminResidents() {
     return 'Desconhecida';
   };
 
-  const filteredResidents = residents.filter(resident =>
-    resident.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    resident.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    resident.phone?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
     <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
@@ -325,9 +368,9 @@ export default function AdminResidents() {
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold text-text-main">Gestão de Residentes</h1>
             <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">
-              {filteredResidents.length === residents.length
-                ? `${residents.length} total`
-                : `${filteredResidents.length} de ${residents.length}`
+              {searchQuery
+                ? `${residents.length} encontrados`
+                : `${residents.length} carregados`
               }
             </span>
           </div>
@@ -377,21 +420,21 @@ export default function AdminResidents() {
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
           <p className="text-text-dim">Carregando residentes...</p>
         </div>
-      ) : filteredResidents.length === 0 ? (
+      ) : residents.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Users size={64} className="text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
-            {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhum residente cadastrado'}
+            {searchQuery ? 'Nenhum resultado encontrado' : 'Nenhum residente cadastrado'}
           </h3>
           <p className="text-text-dim">
-            {searchTerm
+            {searchQuery
               ? 'Tente buscar com outros termos'
               : 'Clique em "Novo Residente" para começar'}
           </p>
         </div>
       ) : (
         <div className="grid gap-3">
-          {filteredResidents.map((resident) => (
+          {residents.map((resident) => (
             <div
               key={resident.id}
               className="bg-white rounded-xl shadow-sm border border-border-main p-4 hover:shadow-md transition-shadow"
@@ -453,6 +496,19 @@ export default function AdminResidents() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {!loading && residents.length > 0 && hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {loadingMore && <Loader2 size={18} className="animate-spin" />}
+            {loadingMore ? 'Carregando...' : 'Mostrar mais'}
+          </button>
         </div>
       )}
 

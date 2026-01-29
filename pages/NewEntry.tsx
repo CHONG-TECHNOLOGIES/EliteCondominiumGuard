@@ -746,8 +746,20 @@ export default function NewEntry() {
   return (
     <div className="flex flex-col h-full relative bg-slate-50">
       <div className="px-4 pt-4 md:px-6 md:pt-6 flex items-center">
-        {step > 1 && (
-          <button onClick={() => setStep(step - 1 as any)} className="p-2 bg-white border border-slate-200 text-slate-600 rounded-full shadow-sm hover:bg-slate-100 mr-4">
+        {step === 1 ? (
+          <button
+            onClick={() => navigate('/')}
+            className="p-2 bg-white border border-slate-200 text-slate-600 rounded-full shadow-sm hover:bg-slate-100 mr-4"
+            aria-label="Voltar ao menu"
+          >
+            <ArrowLeft size={20} />
+          </button>
+        ) : (
+          <button
+            onClick={() => setStep(step - 1 as any)}
+            className="p-2 bg-white border border-slate-200 text-slate-600 rounded-full shadow-sm hover:bg-slate-100 mr-4"
+            aria-label="Voltar ao passo anterior"
+          >
             <ArrowLeft size={20} />
           </button>
         )}

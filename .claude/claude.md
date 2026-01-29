@@ -430,7 +430,7 @@ get_visit_types(condominium_id)
 get_service_types()
 ```
 
-**Database Migrations**: Located in `database/*.sql` (apply manually to Supabase)
+**Mcp**: Located in `docs/MCP.md`
 
 **Storage Buckets** (Supabase Storage):
 ```
@@ -658,6 +658,7 @@ HashRouter (# based URLs for compatibility)
 - Avoid adding console.log statements to any files
 - Existing console logs in dataService.ts are for debugging only
 - Use proper error handling instead of console logging
+- Always run `pnpm lint` and `pnpm test` before committing.
 
 ### When Adding Features
 
@@ -759,15 +760,6 @@ SQL migration files in `database/` must be applied manually to Supabase:
 2. Copy contents of migration file
 3. Execute SQL
 4. Verify in Table Editor
-
-**Migration Files**:
-- `add_audit_logging.sql` - Audit trail for all actions
-- `add_otp_system.sql` - OTP verification for residents
-- `add_pin_reset_rpcs.sql` - PIN reset functionality
-- `add_resident_app_tracking.sql` - Resident app installation tracking
-- `create_audit_log.sql` - RPC function for creating audit logs
-- `setup_storage_buckets.sql` - Storage buckets configuration (staff-photos, condo-logos)
-- `add_visit_events.sql` - Visit events table for status tracking history
 
 ---
 
