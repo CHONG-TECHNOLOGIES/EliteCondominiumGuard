@@ -343,6 +343,8 @@ Each tablet must be configured before use:
 - Admin can configure device manually without internet using `configureDeviceOffline()`
 - Requires admin PIN verification (123456)
 
+> **Detailed Documentation**: For comprehensive coverage of all 8 configuration scenarios, storage layer priorities, sync validation rules, and troubleshooting guide, see [docs/DEVICE_CONFIGURATION_SYNC_STRATEGY.md](../docs/DEVICE_CONFIGURATION_SYNC_STRATEGY.md).
+
 ### 4. Authentication & Security
 
 **PIN Authentication**:

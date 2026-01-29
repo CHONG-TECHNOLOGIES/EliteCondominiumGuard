@@ -702,6 +702,91 @@ class DataService {
     }
   }
 
+  /**
+   * DEVICE RECOVERY
+   * Recovers device configuration when localStorage/IndexedDB is cleared
+   * but the device still exists in the central database.
+   * Requires admin authentication for security.
+   */
+  async recoverDeviceConfiguration(
+    deviceIdentifier: string,
+    adminFirstName: string,
+    adminLastName: string,
+    adminPin: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isBackendHealthy) {
+      return { success: false, error: "Sem conexão com o servidor. Recuperação requer internet." };
+    }
+
+    try {
+      // Step 1: Verify admin credentials
+      const adminAuth = await SupabaseService.verifyStaffLogin(adminFirstName, adminLastName, adminPin);
+      if (!adminAuth) {
+        return { success: false, error: "Credenciais de administrador inválidas." };
+      }
+
+      if (adminAuth.role !== UserRole.ADMIN && adminAuth.role !== UserRole.SUPER_ADMIN) {
+        return { success: false, error: "Apenas administradores podem recuperar dispositivos." };
+      }
+
+      // Step 2: Fetch device details from central database
+      const device = await SupabaseService.getDeviceByIdentifier(deviceIdentifier);
+      if (!device) {
+        return { success: false, error: "Dispositivo não encontrado no banco central." };
+      }
+
+      if (device.status !== 'ACTIVE') {
+        return { success: false, error: `Dispositivo está ${device.status}. Apenas dispositivos ATIVOS podem ser recuperados.` };
+      }
+
+      if (!device.condominium_id) {
+        return { success: false, error: "Dispositivo não está associado a nenhum condomínio." };
+      }
+
+      // Step 3: Fetch condominium details
+      const condo = await SupabaseService.getCondominium(device.condominium_id);
+      if (!condo) {
+        return { success: false, error: "Condomínio associado não encontrado." };
+      }
+
+      // Step 4: Update all storage layers with recovered data
+      // Update IndexedDB
+      await db.settings.put({ key: 'device_condo_details', value: condo });
+      await db.settings.put({ key: 'device_id', value: deviceIdentifier });
+
+      // Update localStorage
+      localStorage.setItem('condo_guard_device_id', deviceIdentifier);
+      localStorage.setItem('device_condo_backup', JSON.stringify(condo));
+
+      // Update service state
+      this.currentCondoDetails = condo;
+      this.currentCondoId = condo.id;
+
+      console.log('[DataService] ✓ Device configuration recovered:', {
+        deviceId: deviceIdentifier,
+        condo: condo.name
+      });
+
+      // Step 5: Trigger initial data sync
+      await this.bootstrapSyncIfEmpty();
+
+      return { success: true };
+    } catch (error) {
+      console.error('[DataService] Device recovery failed:', error);
+      return { success: false, error: "Falha ao recuperar configuração do dispositivo." };
+    }
+  }
+
+  /**
+   * Get all active devices with condominium info (for recovery UI)
+   */
+  async getAllActiveDevicesForRecovery(): Promise<(Device & { condominium_name?: string })[]> {
+    if (!this.isBackendHealthy) {
+      return [];
+    }
+    return SupabaseService.getAllActiveDevicesWithCondoInfo();
+  }
+
   async resetDevice() {
     await db.clearAllData();
     this.currentCondoId = null;

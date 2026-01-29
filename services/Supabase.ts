@@ -898,6 +898,45 @@ export const SupabaseService = {
     }
   },
 
+  /**
+   * Get all active devices with condominium names (for device recovery)
+   * Returns devices with status='ACTIVE' enriched with condominium info
+   */
+  async getAllActiveDevicesWithCondoInfo(): Promise<(Device & { condominium_name?: string })[]> {
+    if (!supabase) return [];
+
+    try {
+      // Fetch all devices using existing RPC
+      const { data: devicesData, error: devicesError } = await supabase
+        .rpc('admin_get_all_devices');
+
+      if (devicesError) throw devicesError;
+
+      const allDevices = (devicesData as Device[]) || [];
+      const activeDevices = allDevices.filter(d => d.status === 'ACTIVE');
+
+      if (activeDevices.length === 0) return [];
+
+      // Fetch all condominiums to enrich device data
+      const { data: condosData, error: condosError } = await supabase
+        .rpc('get_condominiums');
+
+      if (condosError) throw condosError;
+
+      const condos = (condosData as Condominium[]) || [];
+      const condoMap = new Map(condos.map(c => [c.id, c.name]));
+
+      // Enrich devices with condominium names
+      return activeDevices.map(device => ({
+        ...device,
+        condominium_name: device.condominium_id ? condoMap.get(device.condominium_id) : undefined
+      }));
+    } catch (err: any) {
+      console.error("Get all active devices error:", err.message || JSON.stringify(err));
+      return [];
+    }
+  },
+
   // --- ADMIN METHODS (Cross-Condominium Access) ---
 
   /**

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/dataService';
-import { ShieldCheck, AlertCircle, Loader2, Search, Building, RefreshCw, KeyRound } from 'lucide-react';
-import { Condominium } from '../types';
+import { ShieldCheck, AlertCircle, Loader2, Search, Building, RefreshCw, KeyRound, RotateCcw, Tablet, Clock } from 'lucide-react';
+import { Condominium, Device } from '../types';
 
 export default function Setup() {
   const navigate = useNavigate();
@@ -21,8 +21,29 @@ export default function Setup() {
   const [replaceError, setReplaceError] = useState('');
   const [logoErrors, setLogoErrors] = useState<Record<number, boolean>>({});
 
+  // Recovery state
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [activeDevices, setActiveDevices] = useState<(Device & { condominium_name?: string })[]>([]);
+  const [selectedRecoveryDevice, setSelectedRecoveryDevice] = useState<Device | null>(null);
+  const [recoveryAdminName, setRecoveryAdminName] = useState('');
+  const [recoveryAdminPin, setRecoveryAdminPin] = useState('');
+  const [recoveryError, setRecoveryError] = useState('');
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [loadingDevices, setLoadingDevices] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
   useEffect(() => {
     loadCondos();
+
+    // Online/offline listener
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   const loadCondos = async () => {
@@ -97,6 +118,81 @@ export default function Setup() {
     } finally {
       setIsConfiguring(false);
     }
+  };
+
+  const handleShowRecovery = async () => {
+    setShowRecoveryModal(true);
+    setLoadingDevices(true);
+    setRecoveryError('');
+
+    try {
+      const devices = await api.getAllActiveDevicesForRecovery();
+      setActiveDevices(devices);
+      if (devices.length === 0) {
+        setRecoveryError('Nenhum dispositivo ativo encontrado no sistema.');
+      }
+    } catch (err) {
+      setRecoveryError('Erro ao carregar dispositivos.');
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  const handleRecoverDevice = async () => {
+    if (!selectedRecoveryDevice || !recoveryAdminName || !recoveryAdminPin) {
+      setRecoveryError('Selecione um dispositivo e preencha as credenciais.');
+      return;
+    }
+
+    setIsRecovering(true);
+    setRecoveryError('');
+
+    try {
+      const nameParts = recoveryAdminName.trim().split(' ');
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const result = await api.recoverDeviceConfiguration(
+        selectedRecoveryDevice.device_identifier,
+        firstName,
+        lastName,
+        recoveryAdminPin
+      );
+
+      if (result.success) {
+        navigate('/login');
+      } else {
+        setRecoveryError(result.error || 'Erro ao recuperar dispositivo.');
+      }
+    } catch (err: any) {
+      setRecoveryError(err.message || 'Erro ao recuperar dispositivo.');
+    } finally {
+      setIsRecovering(false);
+    }
+  };
+
+  const closeRecoveryModal = () => {
+    setShowRecoveryModal(false);
+    setSelectedRecoveryDevice(null);
+    setRecoveryAdminName('');
+    setRecoveryAdminPin('');
+    setRecoveryError('');
+    setActiveDevices([]);
+  };
+
+  const formatLastSeen = (dateStr?: string) => {
+    if (!dateStr) return 'Nunca';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 5) return 'Agora';
+    if (diffMins < 60) return `${diffMins} min`;
+    if (diffHours < 24) return `${diffHours}h`;
+    return `${diffDays}d`;
   };
 
   const filteredCondos = condos.filter(c =>
@@ -200,6 +296,22 @@ export default function Setup() {
           >
             {isConfiguring ? <Loader2 className="animate-spin" /> : 'CONFIRMAR E ATIVAR'}
           </button>
+
+          {/* Recovery option - only show when online */}
+          {isOnline && (
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <p className="text-slate-400 text-xs text-center mb-2">
+                Este tablet já foi configurado antes?
+              </p>
+              <button
+                onClick={handleShowRecovery}
+                className="w-full py-2.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg font-medium text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                <RotateCcw size={16} />
+                Recuperar Dispositivo Existente
+              </button>
+            </div>
+          )}
         </div>
       </div>
       {showConfirmModal && selectedCondo && (
@@ -308,6 +420,133 @@ export default function Setup() {
                 className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 hover:bg-red-700 transition-all active:scale-95 flex justify-center items-center gap-2 disabled:opacity-50 disabled:shadow-none"
               >
                 {isConfiguring ? <Loader2 className="animate-spin" size={20} /> : 'Confirmar Troca'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Device Recovery Modal */}
+      {showRecoveryModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-6 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
+                  <RotateCcw size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800">Recuperar Dispositivo</h3>
+                  <p className="text-slate-500 text-sm">
+                    Selecione o dispositivo para restaurar a configuração
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Device List */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {loadingDevices ? (
+                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                  <Loader2 className="animate-spin mb-2" size={32} />
+                  <p>A carregar dispositivos...</p>
+                </div>
+              ) : activeDevices.length === 0 ? (
+                <div className="text-center py-10 text-slate-400">
+                  <Tablet size={40} className="mx-auto mb-2 opacity-50" />
+                  <p>Nenhum dispositivo ativo encontrado.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {activeDevices.map(device => (
+                    <button
+                      key={device.device_identifier}
+                      onClick={() => setSelectedRecoveryDevice(device)}
+                      className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                        selectedRecoveryDevice?.device_identifier === device.device_identifier
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-slate-100 bg-white hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-lg ${
+                          selectedRecoveryDevice?.device_identifier === device.device_identifier
+                            ? 'bg-blue-200 text-blue-700'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          <Tablet size={20} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-slate-800 truncate">
+                            {device.device_name || 'Dispositivo sem nome'}
+                          </p>
+                          <p className="text-sm text-blue-600 font-medium">
+                            {device.condominium_name || 'Sem condomínio'}
+                          </p>
+                          <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
+                            <Clock size={12} />
+                            <span>Visto: {formatLastSeen(device.last_seen_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Admin Credentials */}
+            {selectedRecoveryDevice && (
+              <div className="p-4 border-t border-slate-100 bg-slate-50">
+                <p className="text-xs font-bold text-slate-500 uppercase mb-3">
+                  Credenciais de Administrador
+                </p>
+                <div className="space-y-3">
+                  <input
+                    value={recoveryAdminName}
+                    onChange={e => setRecoveryAdminName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none"
+                    placeholder="Nome do Administrador"
+                  />
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      type="password"
+                      value={recoveryAdminPin}
+                      onChange={e => setRecoveryAdminPin(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none font-mono text-lg tracking-widest"
+                      placeholder="PIN"
+                      maxLength={6}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {recoveryError && (
+              <div className="px-4 pb-2">
+                <p className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">
+                  {recoveryError}
+                </p>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 flex gap-3">
+              <button
+                onClick={closeRecoveryModal}
+                className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleRecoverDevice}
+                disabled={isRecovering || !selectedRecoveryDevice || !recoveryAdminName || !recoveryAdminPin}
+                className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-all active:scale-95 flex justify-center items-center gap-2 disabled:opacity-50 disabled:shadow-none"
+              >
+                {isRecovering ? <Loader2 className="animate-spin" size={20} /> : 'Recuperar'}
               </button>
             </div>
           </div>
