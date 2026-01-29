@@ -8,39 +8,16 @@ Este documento serve como um roteiro para validar todas as funcionalidades do Pa
 - [ ] **Links Rápidos**: Testar se os cards de estatísticas e botões de "Ações Rápidas" redirecionam para as páginas corretas.
 - [ ] **Estado de Carregamento**: Verificar se o spinner de loading aparece enquanto os dados são buscados.
 
-## Gestão de Condomínios (`AdminCondominiums`)
-### Ações (CRUD)
-
-- [x] **Inserir,Editar Condomínio**:
-    - [x] carregar logo.
-
-### ⚠️ Issues Identificadas
-- **ISSUE 2**: O ícone (logo) não está a aparecer para todos os condomínios na listagem.
-
-
 
 ## Gestão de Dispositivos (`AdminDevices`)
-### Listagem e Filtros
-- [x] **Listagem**: Verificar se os dispositivos (tablets) aparecem.
-- [x] **Status**: Verificar badges (ATIVO, INATIVO, DESATIVADO).
-- [x] **Último Contacto**: Verificar se o tempo "atrás" (ex: 5m atrás) está coerente.
 
 ### Ações
 - [ ] **Editar Dispositivo**:
-    - [ ] Renomear dispositivo.
     - [ ] Associar/Desassociar de um condomínio.
 - [ ] **Desativar (Decommission)**:
     - [ ] Testar a desativação de um dispositivo.
     - [ ] Verificar se o status muda para DESATIVADO.
 
-### ⚠️ Issues Identificadas
-
-#### **ISSUE #5: Falta botão para ativar/desativar tablet**
-**Severidade:** 🟡 Média (Funcionalidade em falta)  
-**Status:** Aberta  
-
-**Descrição:**  
-Não existe botão na interface para ativar ou desativar um dispositivo (tablet). A funcionalidade de "Decommission" existe no backend (`adminDecommissionDevice` e `adminUpdateDevice` em `Supabase.ts`), mas não está acessível através do UI.
 
 **Funcionalidades Backend Disponíveis:**
 - `adminUpdateDevice()` - Pode alterar status do dispositivo
@@ -75,8 +52,6 @@ Adicionar botões de ação na listagem de dispositivos:
 - [ ] **Exportar CSV**:
     - [ ] Testar o botão de exportação e verificar se o arquivo é baixado corretamente.
 
-## Outros Módulos (Testes Rápidos)
-- [ ] **Staff (`AdminStaff`)**: Testar criação e listagem de guardas/admins.testar adicao de fotos
 
 
 ## Gestão de Residentes 
