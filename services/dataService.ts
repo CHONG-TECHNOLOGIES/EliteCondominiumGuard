@@ -885,8 +885,11 @@ class DataService {
     if (!deviceCondoId) throw new Error("Dispositivo não configurado");
 
     let onlineError: string | null = null;
+    let onlineAttempted = false;
+    let onlineReturnedNull = false;
 
     if (this.isBackendHealthy) {
+      onlineAttempted = true;
       try {
         const staff = await SupabaseService.verifyStaffLogin(firstName, lastName, pin);
         if (staff) {
@@ -899,6 +902,7 @@ class DataService {
           await this.refreshConfigs(deviceCondoId);
           return staff;
         }
+        onlineReturnedNull = true;
       } catch (e) {
         onlineError = e instanceof Error ? e.message : JSON.stringify(e);
         console.error("Login online falhou, tentando offline:", e);
@@ -919,8 +923,15 @@ class DataService {
     if (onlineError) {
       throw new Error(`Login online falhou: ${onlineError}`);
     }
+    if (onlineAttempted && onlineReturnedNull) {
+      throw new Error("Login online retornou vazio (sem correspondência). Verifique nome/PIN no banco.");
+    }
+    if (!onlineAttempted) {
+      throw new Error("Backend indisponível - login online não foi tentado.");
+    }
 
-    throw new Error("Credenciais inválidas ou sem acesso offline.");
+    const debugSuffix = ` [onlineAttempted=${onlineAttempted}, onlineReturnedNull=${onlineReturnedNull}, onlineError=${onlineError ?? 'null'}]`;
+    throw new Error(`Credenciais inválidas ou sem acesso offline.${debugSuffix}`);
   }
 
   // --- Configurações (Cache-then-Network) ---
