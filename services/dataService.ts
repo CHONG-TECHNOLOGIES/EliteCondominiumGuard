@@ -884,6 +884,8 @@ class DataService {
     const deviceCondoId = (await this.getDeviceCondoDetails())?.id;
     if (!deviceCondoId) throw new Error("Dispositivo não configurado");
 
+    let onlineError: string | null = null;
+
     if (this.isBackendHealthy) {
       try {
         const staff = await SupabaseService.verifyStaffLogin(firstName, lastName, pin);
@@ -898,6 +900,7 @@ class DataService {
           return staff;
         }
       } catch (e) {
+        onlineError = e instanceof Error ? e.message : JSON.stringify(e);
         console.error("Login online falhou, tentando offline:", e);
         this.backendHealthScore--;
       }
@@ -911,6 +914,10 @@ class DataService {
         console.warn("Login OFFLINE bem-sucedido.");
         return localStaff;
       }
+    }
+
+    if (onlineError) {
+      throw new Error(`Login online falhou: ${onlineError}`);
     }
 
     throw new Error("Credenciais inválidas ou sem acesso offline.");
