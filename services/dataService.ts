@@ -881,6 +881,11 @@ class DataService {
   }
 
   async login(firstName: string, lastName: string, pin: string): Promise<Staff | null> {
+    const normalizeName = (value: string) => value.normalize('NFKC').replace(/\s+/g, ' ').trim();
+    const normalizedFirst = normalizeName(firstName);
+    const normalizedLast = normalizeName(lastName);
+    const normalizedPin = pin.trim();
+
     const deviceCondoId = (await this.getDeviceCondoDetails())?.id;
     if (!deviceCondoId) throw new Error("Dispositivo não configurado");
 
@@ -891,7 +896,7 @@ class DataService {
     if (this.isBackendHealthy) {
       onlineAttempted = true;
       try {
-        const staff = await SupabaseService.verifyStaffLogin(firstName, lastName, pin);
+        const staff = await SupabaseService.verifyStaffLogin(normalizedFirst, normalizedLast, normalizedPin);
         if (staff) {
           if (staff.role !== UserRole.SUPER_ADMIN) {
             if (String(staff.condominium_id) !== String(deviceCondoId)) {
@@ -911,9 +916,9 @@ class DataService {
     }
 
     // --- OFFLINE FALLBACK ---
-    const localStaff = await db.staff.where({ first_name: firstName, last_name: lastName }).first();
+    const localStaff = await db.staff.where({ first_name: normalizedFirst, last_name: normalizedLast }).first();
     if (localStaff?.pin_hash) {
-      const isValid = await bcrypt.compare(pin, localStaff.pin_hash);
+      const isValid = await bcrypt.compare(normalizedPin, localStaff.pin_hash);
       if (isValid) {
         console.warn("Login OFFLINE bem-sucedido.");
         return localStaff;
