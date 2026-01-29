@@ -113,9 +113,13 @@ export function initiatePhoneCall(phoneNumber: string): void {
 
   // Clean phone number (remove spaces, dashes, etc.)
   const cleanNumber = phoneNumber.replace(/[^0-9+]/g, '');
+  const telUrl = `tel:${cleanNumber}`;
 
-  // Use tel: protocol to open dialer
-  window.location.href = `tel:${cleanNumber}`;
+  // Use tel: protocol to open dialer (try window.open first, then fallback)
+  const opened = window.open(telUrl, '_self');
+  if (!opened) {
+    window.location.href = telUrl;
+  }
 }
 
 /**
