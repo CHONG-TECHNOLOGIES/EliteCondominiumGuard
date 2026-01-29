@@ -881,62 +881,46 @@ class DataService {
   }
 
   async login(firstName: string, lastName: string, pin: string): Promise<Staff | null> {
-    const normalizeName = (value: string) => value.normalize('NFKC').replace(/\s+/g, ' ').trim();
-    const normalizedFirst = normalizeName(firstName);
-    const normalizedLast = normalizeName(lastName);
-    const normalizedPin = pin.trim();
-
-    const deviceCondoId = (await this.getDeviceCondoDetails())?.id;
+    const deviceCondoDetails = await this.getDeviceCondoDetails();
+    const deviceCondoId = deviceCondoDetails?.id;
     if (!deviceCondoId) throw new Error("Dispositivo não configurado");
 
-    let onlineError: string | null = null;
-    let onlineAttempted = false;
-    let onlineReturnedNull = false;
-
     if (this.isBackendHealthy) {
-      onlineAttempted = true;
       try {
-        const staff = await SupabaseService.verifyStaffLogin(normalizedFirst, normalizedLast, normalizedPin);
+        const staff = await SupabaseService.verifyStaffLogin(firstName, lastName, pin);
         if (staff) {
           if (staff.role !== UserRole.SUPER_ADMIN) {
             if (String(staff.condominium_id) !== String(deviceCondoId)) {
-              throw new Error(`Acesso Negado: Utilizador pertence ao condomínio ${staff.condominium_id}, mas o tablet está no ${deviceCondoId}.`);
+              const staffCondoName = staff.condominium?.name
+                || (await db.condominiums.get(staff.condominium_id))?.name;
+              const deviceCondoName = deviceCondoDetails?.name
+                || (deviceCondoId ? (await db.condominiums.get(deviceCondoId))?.name : undefined);
+              const staffCondoLabel = staffCondoName || 'Desconhecido';
+              const deviceCondoLabel = deviceCondoName || 'Desconhecido';
+
+              throw new Error(`Acesso Negado: Utilizador pertence ao condomínio ${staffCondoLabel}, mas o tablet está no ${deviceCondoLabel}.`);
             }
           }
           await this.syncStaff(deviceCondoId); // Sync all staff after a successful login
           await this.refreshConfigs(deviceCondoId);
           return staff;
         }
-        onlineReturnedNull = true;
       } catch (e) {
-        onlineError = e instanceof Error ? e.message : JSON.stringify(e);
         console.error("Login online falhou, tentando offline:", e);
         this.backendHealthScore--;
       }
     }
 
     // --- OFFLINE FALLBACK ---
-    const localStaff = await db.staff.where({ first_name: normalizedFirst, last_name: normalizedLast }).first();
+    const localStaff = await db.staff.where({ first_name: firstName, last_name: lastName }).first();
     if (localStaff?.pin_hash) {
-      const isValid = await bcrypt.compare(normalizedPin, localStaff.pin_hash);
+      const isValid = await bcrypt.compare(pin, localStaff.pin_hash);
       if (isValid) {
         console.warn("Login OFFLINE bem-sucedido.");
         return localStaff;
       }
     }
-
-    if (onlineError) {
-      throw new Error(`Login online falhou: ${onlineError}`);
-    }
-    if (onlineAttempted && onlineReturnedNull) {
-      throw new Error("Login online retornou vazio (sem correspondência). Verifique nome/PIN no banco.");
-    }
-    if (!onlineAttempted) {
-      throw new Error("Backend indisponível - login online não foi tentado.");
-    }
-
-    const debugSuffix = ` [onlineAttempted=${onlineAttempted}, onlineReturnedNull=${onlineReturnedNull}, onlineError=${onlineError ?? 'null'}]`;
-    throw new Error(`Credenciais inválidas ou sem acesso offline.${debugSuffix}`);
+    throw new Error("Credenciais inválidas ou sem acesso offline.");
   }
 
   // --- Configurações (Cache-then-Network) ---
