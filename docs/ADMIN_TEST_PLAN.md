@@ -3,12 +3,6 @@
 Este documento serve como um roteiro para validar todas as funcionalidades do Painel Administrativo do Elite Condo Guard. Utilize as caixas de seleção para marcar o progresso dos testes.
 
 
-## Dashboard (`AdminDashboard`)
-- [ ] **Carregamento de Estatísticas**: Verificar se os números (Condomínios, Dispositivos, Pessoal, etc.) carregam corretamente.
-- [ ] **Links Rápidos**: Testar se os cards de estatísticas e botões de "Ações Rápidas" redirecionam para as páginas corretas.
-- [ ] **Estado de Carregamento**: Verificar se o spinner de loading aparece enquanto os dados são buscados.
-
-
 ## Gestão de Dispositivos (`AdminDevices`)
 
 ### Ações
@@ -53,7 +47,3 @@ Adicionar botões de ação na listagem de dispositivos:
     - [ ] Testar o botão de exportação e verificar se o arquivo é baixado corretamente.
 
 
-
-## Gestão de Residentes 
-### Listagem e Filtros
-- por paginacao

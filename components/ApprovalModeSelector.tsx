@@ -8,6 +8,7 @@ import {
   getResidentPhones,
   unitHasAppInstalled
 } from '../utils/approvalModes';
+import { useToast } from './Toast';
 import {
   Smartphone,
   Phone,
@@ -77,6 +78,7 @@ export default function ApprovalModeSelector({
   visitorPhone
 }: ApprovalModeSelectorProps) {
   const [calling, setCalling] = useState(false);
+  const { showToast, showConfirm } = useToast();
   const availableModes = getAvailableApprovalModes(isOnline, unit); // Pass unit for contextual logic
   const residentPhones = unit ? getResidentPhones(unit) : [];
   const hasAppInstalled = unit ? unitHasAppInstalled(unit) : false;
@@ -102,31 +104,31 @@ export default function ApprovalModeSelector({
     }
   }, [isOnline, unit, availableModes, selectedMode, onModeSelect, hasAppInstalled]);
 
-  const handlePhoneCall = async () => {
+  const handlePhoneCall = () => {
     const phoneToCall = preferredPhone;
     if (!phoneToCall) {
-      alert('Nenhum n?mero de telefone dispon?vel para esta unidade.');
+      showToast('warning', 'Nenhum número de telefone disponível para esta unidade.');
       return;
     }
 
     const confirmMessage = unitLabel
       ? `Confirmar chamada para ${phoneToCall} (Unidade ${unitLabel})?`
       : `Confirmar chamada para ${phoneToCall}?`;
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
 
-    setCalling(true);
-    await api.logCallInitiated({
-      phone: phoneToCall,
-      source: preferredPhoneSource,
-      unitId: unit?.id,
-      unitLabel: unitLabel || undefined,
-      approvalMode: ApprovalMode.PHONE,
-      context: 'approval_mode_selector'
+    showConfirm(confirmMessage, () => {
+      setCalling(true);
+      // Fire the dialer immediately while the user-gesture is active.
+      initiatePhoneCall(phoneToCall);
+      void api.logCallInitiated({
+        phone: phoneToCall,
+        source: preferredPhoneSource,
+        unitId: unit?.id,
+        unitLabel: unitLabel || undefined,
+        approvalMode: ApprovalMode.PHONE,
+        context: 'approval_mode_selector'
+      });
+      setTimeout(() => setCalling(false), 2000);
     });
-    initiatePhoneCall(phoneToCall);
-    setTimeout(() => setCalling(false), 2000);
   };
 
   const handleIntercomCall = () => {

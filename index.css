@@ -27,11 +27,26 @@
     }
   }
 
+  @keyframes blink-strong {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0;
+    }
+  }
+
   .animate-slide-in {
     animation: slide-in 0.3s ease-out;
   }
 
   .animate-scale-in {
     animation: scale-in 0.2s ease-out;
+  }
+
+  .animate-blink-strong {
+    animation: blink-strong 0.9s steps(1, end) infinite;
   }
 }

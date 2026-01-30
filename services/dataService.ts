@@ -403,6 +403,18 @@ class DataService {
     return null;
   }
 
+  private getOnlineDeviceCount(devices: Device[]): number {
+    const now = Date.now();
+    return devices.reduce((count, device) => {
+      if (device.status === 'DECOMMISSIONED') return count;
+      if (!device.last_seen_at) return count;
+      const lastSeen = new Date(device.last_seen_at).getTime();
+      if (Number.isNaN(lastSeen)) return count;
+      const diffMins = Math.floor((now - lastSeen) / 60000);
+      return diffMins < 7 ? count + 1 : count;
+    }, 0);
+  }
+
   // --- Device Configuration (Setup) ---
 
   async isDeviceConfigured(): Promise<boolean> {
@@ -910,7 +922,8 @@ class DataService {
   }
 
   async login(firstName: string, lastName: string, pin: string): Promise<Staff | null> {
-    const deviceCondoId = (await this.getDeviceCondoDetails())?.id;
+    const deviceCondoDetails = await this.getDeviceCondoDetails();
+    const deviceCondoId = deviceCondoDetails?.id;
     if (!deviceCondoId) throw new Error("Dispositivo não configurado");
 
     if (this.isBackendHealthy) {
@@ -919,7 +932,14 @@ class DataService {
         if (staff) {
           if (staff.role !== UserRole.SUPER_ADMIN) {
             if (String(staff.condominium_id) !== String(deviceCondoId)) {
-              throw new Error(`Acesso Negado: Utilizador pertence ao condomínio ${staff.condominium_id}, mas o tablet está no ${deviceCondoId}.`);
+              const staffCondoName = staff.condominium?.name
+                || (await db.condominiums.get(staff.condominium_id))?.name;
+              const deviceCondoName = deviceCondoDetails?.name
+                || (deviceCondoId ? (await db.condominiums.get(deviceCondoId))?.name : undefined);
+              const staffCondoLabel = staffCondoName || 'Desconhecido';
+              const deviceCondoLabel = deviceCondoName || 'Desconhecido';
+
+              throw new Error(`Acesso Negado: Utilizador pertence ao condomínio ${staffCondoLabel}, mas o tablet está no ${deviceCondoLabel}.`);
             }
           }
           await this.syncStaff(deviceCondoId); // Sync all staff after a successful login
@@ -2160,12 +2180,13 @@ class DataService {
         const insideVisits = visits.filter(visit => visit.status === VisitStatus.INSIDE).length;
         const activeIncidents = incidents.filter(incident => incident.status?.toUpperCase() !== 'RESOLVED').length;
         const resolvedIncidents = incidents.filter(incident => incident.status?.toUpperCase() === 'RESOLVED').length;
+        const onlineDevices = this.getOnlineDeviceCount(devices);
 
         return {
           totalCondominiums: condo ? 1 : 0,
           activeCondominiums: condo?.status === 'ACTIVE' ? 1 : 0,
           totalDevices: devices.length,
-          activeDevices: devices.filter(device => device.status === 'ACTIVE').length,
+          activeDevices: onlineDevices,
           totalStaff: staff.length,
           totalUnits: units.length,
           totalResidents: residents.length,
@@ -2179,11 +2200,52 @@ class DataService {
       }
 
       const stats = await SupabaseService.adminGetDashboardStats();
-      return stats ?? null;
+      if (!stats) return null;
+
+      const devices = await SupabaseService.adminGetAllDevices();
+      const onlineDevices = this.getOnlineDeviceCount(devices);
+
+      return {
+        ...stats,
+        totalDevices: devices.length,
+        activeDevices: onlineDevices
+      };
     } catch (error) {
       console.error('[Admin] Error fetching dashboard stats (online required):', error);
       return null;
     }
+  }
+
+  /**
+   * Admin: Subscribe to device status changes for realtime dashboard counts
+   * @param onChange - Callback triggered on status-relevant changes
+   * @returns Unsubscribe function
+   */
+  subscribeToDeviceStatusChanges(onChange: () => void): () => void {
+    const user = this.getStoredUser();
+    if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.SUPER_ADMIN)) {
+      return () => {};
+    }
+
+    const scopedCondoId = this.getAdminScopeCondoId();
+    let debounceId: ReturnType<typeof setTimeout> | null = null;
+
+    const handleChange = () => {
+      if (debounceId) return;
+      debounceId = setTimeout(() => {
+        debounceId = null;
+        onChange();
+      }, 800);
+    };
+
+    const unsubscribe = SupabaseService.subscribeToDeviceChanges(scopedCondoId, handleChange);
+    return () => {
+      if (debounceId) {
+        clearTimeout(debounceId);
+        debounceId = null;
+      }
+      unsubscribe();
+    };
   }
 
   // --- ADMIN CRUD OPERATIONS ---
