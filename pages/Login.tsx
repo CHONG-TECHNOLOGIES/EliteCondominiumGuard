@@ -134,8 +134,6 @@ export default function Login() {
       <div className="flex-1 w-full md:w-1/2 lg:w-1/3 bg-slate-50 flex flex-col h-[70vh] md:h-full">
         <div className="flex-1 overflow-y-auto p-4 md:p-12 flex flex-col justify-center">
           <div className="mb-4 md:mb-8 text-center md:text-left">
-            <h2 className="text-xl md:text-3xl font-bold text-slate-800">Login de Staff</h2>
-            <p className="text-sm md:text-base text-slate-500">Insira as credenciais para iniciar.</p>
           </div>
           <form onSubmit={handleLogin} className="flex flex-col gap-3 md:gap-5 h-full md:h-auto">
             {error && (

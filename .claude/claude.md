@@ -27,9 +27,13 @@ npm run preview
 
 Required in `.env.local`:
 ```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_GEMINI_API_KEY=your-gemini-api-key
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VITE_SENTRY_ORG=chongtechnologies
+VITE_SENTRY_PROJECT=eliteaccesscontrol
+VITE_SENTRY_DSN=
+NODE_ENV=development
+VITE_APP_VERSION=1.0.0
 ```
 
 ---
@@ -390,7 +394,59 @@ devices         // Device registry (cached)
 - `staff`: `id, condominium_id, [first_name+last_name]` (compound index for login)
 - `units`: `id, condominium_id, code_block, number`
 
-### 6. Type System (types.ts)
+### 6. PostgreSQL Database Schema (Supabase)
+
+**Source**: Supabase REST API (OpenAPI spec) — queried live from the project.
+
+#### Core Tables
+
+| Table | Columns | Description |
+|-------|---------|-------------|
+| `condominiums` | id, created_at, name, address, logo_url, latitude, longitude, gps_radius_meters, status, phone_number | Condominium/building registry |
+| `units` | id, condominium_id, code_block, number, floor, building_name, created_at | Apartment/unit registry |
+| `residents` | id, condominium_id, unit_id, name, phone, email, created_at, pin_hash, has_app_installed, device_token, app_first_login_at, app_last_seen_at, avatar_url, push_token, type | Resident directory |
+| `staff` | id, created_at, first_name, last_name, pin_hash, condominium_id, role, photo_url | Guard/admin staff |
+| `devices` | id (UUID), created_at, device_identifier, device_name, condominium_id, configured_at, last_seen_at, status, metadata | Registered tablet devices |
+| `visits` | id, created_at, condominium_id, visitor_name, visitor_doc, visitor_phone, visit_type_id, service_type_id, unit_id, reason, photo_url, qr_token, qr_expires_at, check_in_at, check_out_at, status, approval_mode, guard_id, sync_status, restaurant_id, sport_id, approved_at, denied_at, device_id, vehicle_license_plate | Visit/delivery records |
+| `visit_events` | id, created_at, visit_id, status, event_at, actor_id, device_id | Visit status change audit trail |
+| `incidents` | id, reported_at, resident_id, description, type, status, photo_path, acknowledged_at, acknowledged_by, guard_notes, resolved_at | Security incident reports |
+| `audit_logs` | id, created_at, condominium_id, actor_id, action, target_table, target_id, details, ip_address, user_agent | Audit trail for all actions |
+
+#### Reference/Config Tables
+
+| Table | Columns | Description |
+|-------|---------|-------------|
+| `visit_types` | id, name, icon_key, requires_service_type, requires_restaurant, requires_sport | Visit type configuration |
+| `service_types` | id, name | Service type lookup |
+| `incident_types` | code, label, sort_order | Incident type lookup |
+| `incident_statuses` | code, label, sort_order | Incident status lookup |
+| `restaurants` | id, created_at, condominium_id, name, description, status | Restaurant directory |
+| `sports` | id, created_at, condominium_id, name, description, status | Sports facility directory |
+| `streets` | id, condominium_id, name, created_at | Street/location management |
+| `news_categories` | id, name, label, created_at | News category lookup |
+
+#### Resident App Tables
+
+| Table | Columns | Description |
+|-------|---------|-------------|
+| `resident_devices` | id, resident_id, push_token, device_name, platform, last_active, created_at | Resident mobile devices for push notifications |
+| `resident_qr_codes` | id, resident_id, condominium_id, unit_id, purpose, visitor_name, visitor_phone, notes, qr_code, is_recurring, recurrence_pattern, recurrence_days, start_date, end_date, expires_at, status, created_at, updated_at | Visitor QR code invitations |
+| `notifications` | id, resident_id, condominium_id, unit_id, title, body, type, data, read, created_at, updated_at | Push notifications for residents |
+| `condominium_news` | id, condominium_id, title, description, content, image_url, category_id, created_at, updated_at | News articles per condominium |
+
+#### Error Tracking
+
+| Table | Columns | Description |
+|-------|---------|-------------|
+| `device_registration_errors` | id, created_at, device_identifier, error_message, payload | Device registration error log |
+
+#### Views
+
+| View | Columns | Description |
+|------|---------|-------------|
+| `v_app_adoption_stats` | condominium_id, condominium_name, total_units, total_residents, residents_with_app, units_with_app, resident_adoption_percent, unit_coverage_percent | Resident app adoption metrics per condominium |
+
+### 7. Type System (types.ts)
 
 **All types use numeric IDs** (Supabase SERIAL/INT4), not UUIDs:
 - `Condominium.id: number`
@@ -415,30 +471,174 @@ ApprovalMode: APP | PHONE | INTERCOM | GUARD_MANUAL | QR_SCAN
 
 ### 7. Backend Integration (Supabase)
 
-**RPC Functions** (services/Supabase.ts - 2,146 lines):
-```typescript
-// Authentication
-verify_staff_login(first_name, last_name, pin_cleartext)
+**RPC Functions** (services/Supabase.ts - 2,316 lines) — 94 functions total, grouped by domain:
 
-// Device Management
-register_device(device_identifier, device_name, condominium_id, metadata)
-update_device_heartbeat(device_identifier)
+**Authentication (3)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `verify_staff_login` | p_first_name, p_last_name, p_pin (TEXT) | Guard/admin PIN login |
+| `verify_resident_login` | p_phone, p_pin_cleartext, p_device_token (TEXT) | Resident app login |
+| `register_resident_pin` | p_phone, p_pin_cleartext, p_device_token (TEXT) | Register resident PIN |
 
-// Data Sync
-get_staff_for_sync(condominium_id)
-get_visit_types(condominium_id)
-get_service_types()
-```
+**Device Management (7)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `register_device` | p_data (JSONB) | Register new tablet device |
+| `get_device` | p_identifier (TEXT) | Get device by fingerprint |
+| `update_device_heartbeat` | p_identifier (TEXT) | Update last_seen_at |
+| `update_device_status` | p_id (INT), p_status (TEXT) | Change device status |
+| `deactivate_condo_devices` | p_condominium_id (INT) | Deactivate all devices for a condo |
+| `get_devices_by_condominium` | p_condominium_id (INT) | List devices per condo |
+| `admin_get_all_devices` | (none) | List all devices |
 
-**Mcp**: Located in `docs/MCP.md`
+**Visits (8)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `create_visit` | p_data (JSONB) | Create new visit record |
+| `update_visit_status` | p_id (INT), p_status (TEXT) | Update visit status |
+| `checkout_visit` | p_id (INT) | Check out visitor |
+| `create_visit_event` | p_data (JSONB) | Log visit status change |
+| `get_visit_events` | p_visit_id (INT) | Get visit event history |
+| `admin_get_all_visits` | p_condominium_id (INT), p_start_date, p_end_date (DATE) | List visits (date range) |
+| `admin_get_all_visits_filtered` | p_condominium_id, p_start_date, p_end_date, p_status, p_visit_type, p_service_type | Filtered visit query |
+| `admin_update_visit` | p_id (INT), p_data (JSONB) | Update visit record |
+
+**Condominiums (7)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `get_condominiums` | (none) | List all condominiums |
+| `get_condominium` | p_id (INT) | Get single condominium |
+| `get_available_condominiums_for_setup` | (none) | Active condos for device setup |
+| `admin_create_condominium` | p_data (JSONB) | Create condominium |
+| `admin_update_condominium` | p_id (INT), p_data (JSONB) | Update condominium |
+| `admin_delete_condominium` | p_id (INT) | Delete condominium |
+| `admin_get_condominiums_with_stats` | (none) | Condos with visit/incident stats |
+
+**Staff (6)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `get_staff_by_condominium` | p_condominium_id (INT) | Staff list per condo |
+| `admin_get_all_staff` | p_condominium_id (INT) | All staff for admin |
+| `admin_create_staff_with_pin` | p_first_name, p_last_name (TEXT), p_condominium_id (INT), p_role, p_pin_cleartext, p_photo_url (TEXT) | Create staff with PIN |
+| `admin_update_staff` | p_id (INT), p_data (JSONB) | Update staff |
+| `admin_delete_staff` | p_id (INT) | Delete staff |
+| `admin_update_staff_pin` | p_staff_id (INT), p_pin_cleartext (TEXT) | Reset staff PIN |
+
+**Units (4)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `get_units` | p_condominium_id (INT) | Units per condo |
+| `admin_get_all_units` | p_condominium_id (INT) | All units for admin |
+| `admin_create_unit` | p_data (JSONB) | Create unit |
+| `admin_delete_unit` | p_id (INT) | Delete unit |
+
+**Residents (4)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `get_resident` | p_id (INT) | Get single resident |
+| `admin_get_residents` | p_condominium_id, p_search, p_limit, p_after_id, p_after_name | Paginated resident search |
+| `admin_create_resident` | p_data (JSONB) | Create resident |
+| `admin_update_resident` | p_id (INT), p_data (JSONB) | Update resident |
+
+**Incidents (7)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `create_incident` | p_resident_id (INT), p_description, p_type, p_photo_path (TEXT) | Create incident |
+| `get_incidents` | p_condominium_id (INT) | Incidents per condo |
+| `get_resident_incidents` | p_resident_id (INT) | Incidents per resident |
+| `acknowledge_incident` | p_id (INT), p_guard_id (INT) | Guard acknowledges incident |
+| `admin_get_all_incidents` | p_condominium_id (INT) | All incidents for admin |
+| `admin_update_incident` | p_id (INT), p_data (JSONB) | Update incident |
+| `admin_delete_incident` | p_id (INT) | Delete incident |
+
+**Configuration (11)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `get_visit_types` | p_condominium_id (INT) | Visit types per condo |
+| `get_service_types` | (none) | All service types |
+| `get_incident_types` | (none) | Incident type lookup |
+| `get_incident_statuses` | (none) | Incident status lookup |
+| `admin_get_visit_types` | (none) | All visit types for admin |
+| `admin_get_service_types` | (none) | All service types for admin |
+| `admin_create_visit_type` | p_data (JSONB) | Create visit type |
+| `admin_delete_visit_type` | p_id (INT) | Delete visit type |
+| `admin_create_service_type` | p_data (JSONB) | Create service type |
+| `admin_update_service_type` | p_id (INT), p_data (JSONB) | Update service type |
+| `admin_delete_service_type` | p_id (INT) | Delete service type |
+
+**Restaurants & Sports (10)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `get_restaurants` | p_condominium_id (INT) | Restaurants per condo |
+| `get_sports` | p_condominium_id (INT) | Sports per condo |
+| `admin_get_restaurants` | (none) | All restaurants |
+| `admin_get_sports` | (none) | All sports |
+| `admin_create_restaurant` | p_data (JSONB) | Create restaurant |
+| `admin_update_restaurant` | p_id (INT), p_data (JSONB) | Update restaurant |
+| `admin_delete_restaurant` | p_id (INT) | Delete restaurant |
+| `admin_create_sport` | p_data (JSONB) | Create sport |
+| `admin_update_sport` | p_id (INT), p_data (JSONB) | Update sport |
+| `admin_delete_sport` | p_id (INT) | Delete sport |
+
+**QR Codes (5)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `create_visitor_qr_code` | p_resident_id, p_condominium_id, p_unit_id (INT), p_purpose, p_visitor_name, p_visitor_phone (TEXT), p_expires_at (TIMESTAMP), p_notes (TEXT) | Create visitor QR invitation |
+| `validate_qr_code` | p_qr_code (TEXT) | Validate QR at gate |
+| `revoke_qr_code` | p_qr_code_id (UUID) | Revoke QR code |
+| `get_active_qr_codes` | p_resident_id (INT) | Active QR codes per resident |
+| `expire_qr_codes` | (none) | Expire outdated QR codes |
+
+**Notifications (6)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `create_notification` | p_resident_id, p_condominium_id, p_unit_id (INT), p_title, p_body, p_type (TEXT), p_data (JSONB) | Create push notification |
+| `get_notifications` | p_resident_id (INT) | All notifications |
+| `get_resident_notifications` | p_resident_id, p_offset, p_limit (INT), p_unread_only (BOOL) | Paginated notifications |
+| `get_unread_notification_count` | p_resident_id (INT) | Unread count |
+| `mark_notification_read` | p_notification_id, p_resident_id (INT) | Mark one as read |
+| `mark_all_notifications_read` | p_resident_id (INT) | Mark all as read |
+
+**OTP / PIN Reset (3)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `request_pin_reset_otp` | p_phone (TEXT) | Send OTP via SMS |
+| `check_otp_validity` | p_phone (TEXT) | Check if OTP is still valid |
+| `reset_pin_with_otp` | p_phone, p_otp_code, p_new_pin (TEXT) | Reset PIN using OTP |
+
+**Streets (3)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `create_street` | p_data (JSONB) | Create street |
+| `get_streets` | p_condominium_id (INT) | Streets per condo |
+| `delete_street` | p_id (INT) | Delete street |
+
+**Audit (3)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `create_audit_log` | p_data (JSONB) | Create audit log entry |
+| `log_audit` | p_condominium_id, p_actor_id (INT), p_action, p_target_table (TEXT), p_target_id (INT), p_details (JSONB) | Log audit with params |
+| `admin_get_audit_logs` | p_condominium_id, p_actor_id (INT), p_action, p_target_table (TEXT), p_start_date, p_end_date (TIMESTAMP), p_offset, p_limit (INT) | Filtered audit query |
+
+**Dashboard & App Tracking (3)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `admin_get_dashboard_stats` | (none) | Admin dashboard statistics |
+| `update_resident_app_activity` | p_resident_id (INT) | Update resident last seen |
+| `check_unit_has_app` | p_unit_id (INT) | Check if unit has app installed |
+
+**MCP Documentation**: See `docs/MCP.md` for MCP server configuration.
+
+**Database Migrations**: Located in `database/*.sql` (apply manually to Supabase)
 
 **Storage Buckets** (Supabase Storage):
 ```
-staff-photos    // Staff profile photos (5MB max, jpeg/png/webp)
-condo-logos     // Condominium logos (2MB max, jpeg/png/webp/svg)
+visitor-photos     // Visitor photos taken during check-in
+staff-photos       // Staff profile photos
+logo_condominio    // Condominium logos
 ```
 
-Both buckets are public for read access. Setup via `setup_storage_buckets.sql`.
+All buckets are public for read access. Setup via `setup_storage_buckets.sql`.
 
 ### 8. PWA Configuration (vite.config.ts)
 
@@ -668,6 +868,7 @@ HashRouter (# based URLs for compatibility)
 4. **Type safety** - Update types.ts before implementing new features
 5. **Device context** - Include `device_id` when creating records that need device tracking
 6. **Audio alerts** - Use AudioService for incident-related notifications
+7. **Database object** - Read supabase mcp to update the objects in this document
 
 ### When Debugging Sync Issues
 
@@ -849,6 +1050,9 @@ interface Visit {
   approval_mode?: ApprovalMode;
   guard_id: number;
   device_id?: string;          // Tracks which device registered
+  vehicle_license_plate?: string; // Vehicle plate number
+  approved_at?: string;        // When visit was approved
+  denied_at?: string;          // When visit was denied
   sync_status: SyncStatus;
 }
 ```
@@ -878,7 +1082,9 @@ interface Resident {
   type?: 'OWNER' | 'TENANT';
   pin_hash?: string;           // bcrypt hash for app login
   has_app_installed?: boolean;
-  device_token?: string;       // Push notification token
+  device_token?: string;       // Push notification token (legacy)
+  push_token?: string;         // Push notification token
+  avatar_url?: string;         // Resident avatar URL
   app_first_login_at?: string;
   app_last_seen_at?: string;
 }
