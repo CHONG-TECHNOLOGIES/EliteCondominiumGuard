@@ -39,7 +39,7 @@ interface DashboardStats {
 interface StatCardProps {
   title: string;
   value: string | number;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   icon: React.ReactNode;
   color: 'blue' | 'green' | 'orange' | 'red' | 'purple' | 'slate';
   onClick?: () => void;
@@ -102,13 +102,11 @@ export default function AdminDashboard() {
     resolvedIncidents: 0
   });
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (showLoader = false) => {
     try {
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
 
       // Use admin-specific methods that fetch data across ALL condominiums
       const [dashboardStats, pendingCount] = await Promise.all([
@@ -116,24 +114,62 @@ export default function AdminDashboard() {
         api.getPendingSyncCount()
       ]);
 
-      setStats(dashboardStats);
+      if (dashboardStats) {
+        setStats(dashboardStats);
+      }
       setPendingSyncCount(pendingCount);
     } catch (error) {
       // Error handling without console.log
     } finally {
-      setLoading(false);
+      if (showLoader) {
+        setLoading(false);
+      }
     }
   };
+
+  useEffect(() => {
+    void loadDashboardData(true);
+    const unsubscribe = api.subscribeToDeviceStatusChanges(() => {
+      void loadDashboardData(false);
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const handleSync = async () => {
     setSyncing(true);
     try {
       await api.syncPendingItems();
-      await loadDashboardData();
+      await loadDashboardData(false);
     } finally {
       setSyncing(false);
     }
   };
+
+  const offlineDevices = Math.max(stats.totalDevices - stats.activeDevices, 0);
+  const onlinePercent = stats.totalDevices > 0
+    ? Math.round((stats.activeDevices / stats.totalDevices) * 100)
+    : 0;
+  const devicesSubtitle = stats.totalDevices > 0 ? (
+    <span className="inline-flex items-center flex-wrap gap-2">
+      <span>{onlinePercent}% online</span>
+      <span className="text-text-dim">|</span>
+      {offlineDevices > 0 ? (
+        <span className="inline-flex items-center gap-2 rounded-full bg-red-100 text-red-700 px-2 py-0.5 font-semibold">
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-600"></span>
+          </span>
+          {offlineDevices} offline
+        </span>
+      ) : (
+        <span>{offlineDevices} offline</span>
+      )}
+    </span>
+  ) : (
+    'Nenhum dispositivo'
+  );
 
   if (loading) {
     return (
@@ -195,7 +231,7 @@ export default function AdminDashboard() {
           <StatCard
             title="Dispositivos Ativos"
             value={`${stats.activeDevices}/${stats.totalDevices}`}
-            subtitle={stats.totalDevices > 0 ? `${Math.round((stats.activeDevices / stats.totalDevices) * 100)}% online` : 'Nenhum dispositivo'}
+            subtitle={devicesSubtitle}
             icon={<Tablet />}
             color="green"
             onClick={() => navigate('/admin/devices')}

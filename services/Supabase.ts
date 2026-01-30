@@ -937,6 +937,49 @@ export const SupabaseService = {
     }
   },
 
+  /**
+   * Subscribe to device changes for realtime dashboards.
+   * @param condominiumId - Optional condominium filter for scoped admins
+   * @param onChange - Callback fired when device status changes
+   * @returns Unsubscribe function
+   */
+  subscribeToDeviceChanges(condominiumId: number | null, onChange: () => void): () => void {
+    if (!supabase) return () => {};
+
+    const filter = condominiumId ? `condominium_id=eq.${condominiumId}` : undefined;
+    const channel = supabase
+      .channel(`devices-changes-${condominiumId ?? 'all'}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'devices',
+          ...(filter ? { filter } : {})
+        },
+        (payload: any) => {
+          if (payload?.eventType === 'UPDATE') {
+            const previousStatus = (payload.old as any)?.status;
+            const nextStatus = (payload.new as any)?.status;
+            const previousSeen = (payload.old as any)?.last_seen_at;
+            const nextSeen = (payload.new as any)?.last_seen_at;
+            if (
+              previousStatus === nextStatus &&
+              previousSeen === nextSeen
+            ) {
+              return;
+            }
+          }
+          onChange();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void channel.unsubscribe();
+    };
+  },
+
   // --- ADMIN METHODS (Cross-Condominium Access) ---
 
   /**
