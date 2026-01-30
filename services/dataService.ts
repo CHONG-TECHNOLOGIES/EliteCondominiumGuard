@@ -2630,7 +2630,10 @@ class DataService {
   /**
    * Admin: Delete a staff member
    */
-  async adminDeleteStaff(id: number, photoUrl?: string): Promise<boolean> {
+  async adminDeleteStaff(
+    id: number,
+    photoUrl?: string
+  ): Promise<{ success: boolean; error?: { message?: string; code?: string; details?: string; hint?: string } }> {
     try {
       if (photoUrl) {
         const photoDeleted = await SupabaseService.deleteStaffPhotoByUrl(photoUrl);
@@ -2638,8 +2641,8 @@ class DataService {
           console.error('[Admin] Failed to delete staff photo from storage');
         }
       }
-      const success = await SupabaseService.adminDeleteStaff(id);
-      if (success) {
+      const result = await SupabaseService.adminDeleteStaff(id);
+      if (result.success) {
         await this.logAudit({
           action: 'DELETE',
           target_table: 'staff',
@@ -2650,10 +2653,10 @@ class DataService {
           }
         });
       }
-      return success;
+      return result;
     } catch (e) {
       console.error('[Admin] Failed to delete staff (online required):', e);
-      return false;
+      return { success: false, error: { message: 'Failed to delete staff' } };
     }
   }
 

@@ -357,17 +357,34 @@ export default function AdminStaff() {
     });
   };
 
+  const isStaffDeleteBlockedByVisits = (error?: {
+    message?: string;
+    details?: string;
+    hint?: string;
+  }) => {
+    const text = [error?.message, error?.details, error?.hint].filter(Boolean).join(' ').toLowerCase();
+    return text.includes('visits_guard_id_fkey') || text.includes('foreign key');
+  };
+
   const handleDelete = async (staffMember: Staff) => {
     showConfirm(
       `Deseja realmente remover ${staffMember.first_name} ${staffMember.last_name}?`,
       async () => {
         try {
           const result = await api.adminDeleteStaff(staffMember.id, staffMember.photo_url);
-          if (result) {
+          if (result.success) {
             await loadData();
             showToast('success', 'Staff removido com sucesso!');
           } else {
-            showToast('error', 'Erro ao remover staff');
+            const blockedByVisits = isStaffDeleteBlockedByVisits(result.error);
+            if (blockedByVisits) {
+              showToast(
+                'error',
+                'Nao e possivel remover este funcionario porque existem visitas registradas por ele.'
+              );
+            } else {
+              showToast('error', 'Erro ao remover staff');
+            }
           }
         } catch (error) {
           console.error('Error deleting staff:', error);

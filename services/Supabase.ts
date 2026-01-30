@@ -47,6 +47,18 @@ const getStoragePathFromPublicUrl = (publicUrl: string, bucket: string): string 
  * Responsável apenas pela comunicação direta com o Backend.
  * Não gere estado offline ou local storage.
  */
+type AdminDeleteStaffResult =
+  | { success: true }
+  | {
+      success: false;
+      error?: {
+        message?: string;
+        code?: string;
+        details?: string;
+        hint?: string;
+      };
+    };
+
 export const SupabaseService = {
 
   // --- Setup / Condomínio ---
@@ -1454,18 +1466,33 @@ export const SupabaseService = {
   /**
    * Admin: Delete a staff member
    */
-  async adminDeleteStaff(id: number): Promise<boolean> {
-    if (!supabase) return false;
+  async adminDeleteStaff(id: number): Promise<AdminDeleteStaffResult> {
+    if (!supabase) return { success: false, error: { message: 'Supabase client not initialized' } };
 
     try {
       const { error } = await supabase
         .rpc('admin_delete_staff', { p_id: id });
 
-      if (error) throw error;
-      return true;
+      if (error) {
+        return {
+          success: false,
+          error: {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+          }
+        };
+      }
+      return { success: true };
     } catch (err: any) {
       console.error("[Admin] Error deleting staff:", err.message || JSON.stringify(err));
-      return false;
+      return {
+        success: false,
+        error: {
+          message: err?.message ?? 'Unknown error'
+        }
+      };
     }
   },
 

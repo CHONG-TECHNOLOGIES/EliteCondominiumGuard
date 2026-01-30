@@ -333,7 +333,7 @@ Each tablet must be configured before use:
 1. Setup.tsx → configureDevice(condoId)
    - Generates unique device fingerprint (deviceUtils.ts)
    - Registers device in Supabase
-   - Saves config to IndexedDB
+   - Saves config to IndexedDB + localStorage
 
 2. ConfigGuard checks if device configured
    - Redirects to /setup if not configured
@@ -343,11 +343,61 @@ Each tablet must be configured before use:
    - Guards can only login to their assigned condominium's devices
 ```
 
+**Storage Layer Priorities**:
+- **Online**: Central DB (source of truth) → IndexedDB → localStorage
+- **Offline**: IndexedDB (primary cache) → localStorage (backup/fast access)
+- Persistent Storage API (`navigator.storage.persist()`) requested on init to prevent browser auto-deletion on kiosk tablets
+
+**localStorage Keys**:
+- `condo_guard_device_id` — device_identifier UUID
+- `device_condo_backup` — JSON stringified Condominium object
+- `auth_user` — auth state persistence across PWA updates
+
+**IndexedDB Settings Keys**:
+- `device_condo_details` — Condominium object
+- `device_id` — device_identifier string
+
+**Configuration Check Priority (isDeviceConfigured)**:
+1. **Online**: Query Central DB by `device_identifier` → if not found, fallback query by `condominium_id` from IndexedDB → sync all layers
+2. **Offline**: Check IndexedDB `device_condo_details` → restore localStorage if missing
+3. **Last resort**: Parse `device_condo_backup` from localStorage → restore to IndexedDB
+4. **All empty + online**: Navigate to `/setup`
+5. **All empty + offline**: Offline emergency configuration
+
+**Scenario Matrix** (localStorage × IndexedDB × Online):
+
+| localStorage | IndexedDB | Online | Action |
+|---|---|---|---|
+| Valid | Valid | Online | Sync from Central DB → update all layers |
+| Valid | Valid | Offline | Use IndexedDB, restore localStorage if needed |
+| Valid | Empty | Online | Query Central DB → populate IndexedDB |
+| Valid | Empty | Offline | Restore IndexedDB from localStorage |
+| Empty | Valid | Online | Sync from Central DB → restore localStorage |
+| Empty | Valid | Offline | Restore localStorage from IndexedDB |
+| Empty | Empty | Online | Navigate to /setup |
+| Empty | Empty | Offline | **Offline emergency configuration** |
+
+**Sync Validation Rules**:
+- Central DB always wins when online (overwrites local data)
+- IndexedDB has priority over localStorage when offline
+- All writes must sync bidirectionally (IndexedDB ↔ localStorage)
+- Never clear localStorage without also clearing IndexedDB
+
 **Offline Emergency Configuration**:
 - Admin can configure device manually without internet using `configureDeviceOffline()`
 - Requires admin PIN verification (123456)
+- Guard provides `device_identifier` to admin (copy button on screen)
+- Admin checks Central DB: if device exists, provides condo ID/name; if new, creates record first
+- Guard enters condo ID + name in manual config form
+- Saves to IndexedDB (settings, devices, condominiums tables) + localStorage
+- Will sync with Central DB when internet is restored
 
-> **Detailed Documentation**: For comprehensive coverage of all 8 configuration scenarios, storage layer priorities, sync validation rules, and troubleshooting guide, see [docs/DEVICE_CONFIGURATION_SYNC_STRATEGY.md](../docs/DEVICE_CONFIGURATION_SYNC_STRATEGY.md).
+**Troubleshooting Device Config**:
+- **Setup screen reappears**: localStorage cleared → app recovers from IndexedDB or Central DB
+- **"Condominium already assigned"**: Another active device exists → admin deactivates old device
+- **Offline config doesn't sync**: Device record missing in Central DB → admin creates it manually
+- **device_identifier changed after reinstall**: Browser data cleared, new UUID generated → admin updates Central DB or reconfigures
+- **IndexedDB cleared unexpectedly**: Persistent storage not granted → check `navigator.storage.persisted()`, recover from localStorage backup
 
 ### 4. Authentication & Security
 
@@ -667,7 +717,36 @@ All buckets are public for read access. Setup via `setup_storage_buckets.sql`.
 - Runtime caching for Supabase API (NetworkFirst, 5min TTL)
 - Image caching (CacheFirst, 7 days)
 
+**Caching Strategies**:
+- **App Shell**: Cached on install (HTML, CSS, JS)
+- **CDN Resources**: CacheFirst (Tailwind, fonts, AI Studio CDN)
+- **Supabase API**: NetworkFirst with 10s timeout (5min cache)
+- **Images**: CacheFirst (7 days cache)
+
 **HTTPS Required**: `@vitejs/plugin-basic-ssl` enables camera access on tablets
+
+**PWA Update Flow**:
+- Update check interval: 60s (dev), recommended 5min for production
+- `PWAUpdateNotification.tsx` shows update prompt with `[PWA Update]` log prefix
+- Auth state persists across updates via `localStorage` (`auth_user` key)
+- Known config conflict: `skipWaiting: true` + `registerType: 'prompt'` — consider setting `skipWaiting: false` for controlled updates
+
+**Tablet-Specific Optimizations**:
+- Viewport fit for notched devices
+- Prevents accidental zoom/pull-to-refresh
+- Kiosk mode styles (no text selection on UI)
+- Standalone display mode
+
+**Debugging PWA Updates**:
+1. DevTools → Application → Service Workers (check status: Activated/Waiting/Installing)
+2. Console logs with `[PWA Update]` prefix for all update events
+3. Force update: DevTools → Application → Service Workers → "Update" or "Unregister" + refresh
+4. Network tab: filter by "sw.js", verify 200 response (not 304)
+
+**Installing on Tablets**:
+- **Android**: Chrome/Edge → Menu → "Install app" or "Add to Home Screen"
+- **iOS/iPadOS**: Safari → Share button → "Add to Home Screen"
+- Recommended tablet settings: disable screen auto-lock, enable "stay awake while charging", set portrait orientation
 
 ### 10. Path Aliases
 
