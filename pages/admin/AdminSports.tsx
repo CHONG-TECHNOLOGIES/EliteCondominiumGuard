@@ -3,6 +3,7 @@ import { Dumbbell, Plus, Edit2, Trash2, Loader2, Search, X, Building2 } from 'lu
 import { api } from '../../services/dataService';
 import { Sport, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
+import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 
 export default function AdminSports() {
   const { showToast, showConfirm } = useToast();
@@ -77,7 +78,9 @@ export default function AdminSports() {
     }
 
     try {
-      const result = await api.adminUpdateSport(String(selectedSport.id), formData);
+      const changes = buildAuditChanges(selectedSport, formData, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
+      const result = await api.adminUpdateSport(String(selectedSport.id), formData, auditDetails);
       if (result) {
         await loadData();
         setShowEditModal(false);

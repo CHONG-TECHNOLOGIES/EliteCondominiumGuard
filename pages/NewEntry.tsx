@@ -233,7 +233,25 @@ export default function NewEntry() {
       guard_id: user!.id
     };
 
-    await api.createVisit(visitData);
+    const createdVisit = await api.createVisit(visitData);
+    await api.logAudit({
+      condominium_id: user!.condominium_id,
+      actor_id: user!.id,
+      action: 'CREATE',
+      target_table: 'visits',
+      target_id: createdVisit.id > 0 ? createdVisit.id : null,
+      details: {
+        source: 'NewEntry',
+        visit_type_id: selectedType,
+        unit_id: unitId || null,
+        service_type_id: serviceTypeId || null,
+        restaurant_id: restaurantId || null,
+        sport_id: sportId || null,
+        approval_mode: isFreeEntry ? 'ENTRADA_LIVRE' : approvalMode,
+        status: isFreeEntry ? VisitStatus.APPROVED : VisitStatus.PENDING,
+        temp_id: createdVisit.id < 0 ? createdVisit.id : null
+      }
+    });
     navigate('/day-list');
   };
 

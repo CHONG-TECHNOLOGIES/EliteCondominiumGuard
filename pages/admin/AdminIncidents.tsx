@@ -5,6 +5,7 @@ import { Incident, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
 import { AuthContext } from '../../App';
 import { exportIncidentsToCSV } from '../../utils/csvExport';
+import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 
 export default function AdminIncidents() {
   const { showToast } = useToast();
@@ -46,7 +47,10 @@ export default function AdminIncidents() {
     }
 
     try {
-      const result = await api.adminAcknowledgeIncident(incident.id, user.id);
+      const updates = { status: 'ACKNOWLEDGED' };
+      const changes = buildAuditChanges(incident, updates, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
+      const result = await api.adminAcknowledgeIncident(incident.id, user.id, undefined, auditDetails);
       if (result) {
         await loadData();
         showToast('success', 'Incidente reconhecido com sucesso!');
@@ -73,7 +77,10 @@ export default function AdminIncidents() {
     }
 
     try {
-      const result = await api.adminResolveIncident(incident.id, user.id);
+      const updates = { status: 'RESOLVED' };
+      const changes = buildAuditChanges(incident, updates, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
+      const result = await api.adminResolveIncident(incident.id, user.id, undefined, auditDetails);
       if (result) {
         await loadData();
         showToast('success', 'Incidente resolvido com sucesso!');
@@ -90,7 +97,10 @@ export default function AdminIncidents() {
     if (!selectedIncident || !user?.id) return;
 
     try {
-      const result = await api.adminResolveIncident(selectedIncident.id, user.id, notes);
+      const updates = { status: 'RESOLVED', guard_notes: notes };
+      const changes = buildAuditChanges(selectedIncident, updates, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
+      const result = await api.adminResolveIncident(selectedIncident.id, user.id, notes, auditDetails);
       if (result) {
         await loadData();
         setShowNotesModal(false);
@@ -146,6 +156,22 @@ export default function AdminIncidents() {
       return;
     }
     exportIncidentsToCSV(filteredIncidents);
+    void api.logAudit({
+      condominium_id: user?.condominium_id ?? null,
+      actor_id: user?.id ?? null,
+      action: 'EXPORT',
+      target_table: 'incidents',
+      target_id: null,
+      details: {
+        format: 'CSV',
+        count: filteredIncidents.length,
+        filters: {
+          search: searchTerm || null,
+          condominium_id: filterCondoId ?? null,
+          status: filterStatus || null
+        }
+      }
+    });
     showToast('success', `${filteredIncidents.length} incidentes exportados para CSV`);
   };
 

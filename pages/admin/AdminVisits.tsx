@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { UserCheck, Loader2, Search, Download, X, FileText, RotateCcw, History } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { Visit, VisitEvent, Condominium, VisitStatus, VisitTypeConfig, ServiceTypeConfig } from '../../types';
 import { useToast } from '../../components/Toast';
 import { exportVisitsToCSV, exportVisitsToPDF } from '../../utils/csvExport';
+import { AuthContext } from '../../App';
 
 // Calculate months difference between two dates
 const getMonthsDifference = (start: string, end: string): number => {
@@ -15,6 +16,7 @@ const getMonthsDifference = (start: string, end: string): number => {
 
 export default function AdminVisits() {
   const { showToast } = useToast();
+  const { user } = useContext(AuthContext);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [condominiums, setCondominiums] = useState<Condominium[]>([]);
   const [visitTypes, setVisitTypes] = useState<VisitTypeConfig[]>([]);
@@ -256,6 +258,27 @@ export default function AdminVisits() {
       return;
     }
     exportVisitsToCSV(filteredVisits);
+    void api.logAudit({
+      condominium_id: user?.condominium_id ?? null,
+      actor_id: user?.id ?? null,
+      action: 'EXPORT',
+      target_table: 'visits',
+      target_id: null,
+      details: {
+        format: 'CSV',
+        count: filteredVisits.length,
+        filters: {
+          search: searchTerm || null,
+          condominium_id: filterCondoId ?? null,
+          status: filterStatus || null,
+          visit_type: filterVisitType || null,
+          service_type: filterServiceType || null,
+          start_date: startDate || null,
+          end_date: endDate || null,
+          backend_filtering: usesBackendFiltering
+        }
+      }
+    });
     showToast('success', `${filteredVisits.length} visitas exportadas para CSV`);
   };
 
@@ -265,6 +288,27 @@ export default function AdminVisits() {
       return;
     }
     exportVisitsToPDF(filteredVisits);
+    void api.logAudit({
+      condominium_id: user?.condominium_id ?? null,
+      actor_id: user?.id ?? null,
+      action: 'EXPORT',
+      target_table: 'visits',
+      target_id: null,
+      details: {
+        format: 'PDF',
+        count: filteredVisits.length,
+        filters: {
+          search: searchTerm || null,
+          condominium_id: filterCondoId ?? null,
+          status: filterStatus || null,
+          visit_type: filterVisitType || null,
+          service_type: filterServiceType || null,
+          start_date: startDate || null,
+          end_date: endDate || null,
+          backend_filtering: usesBackendFiltering
+        }
+      }
+    });
     showToast('success', `${filteredVisits.length} visitas exportadas para PDF`);
   };
 

@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast';
 import CameraCapture from '../../components/CameraCapture';
 import { SupabaseService } from '../../services/Supabase';
 import { AuthContext } from '../../App';
+import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -295,13 +296,16 @@ export default function AdminStaff() {
         }
       }
 
-      const result = await api.adminUpdateStaff(selectedStaff.id, {
+      const updates = {
         first_name: formData.first_name,
         last_name: formData.last_name,
         condominium_id: formData.condominium_id,
         role: formData.role,
         ...(photoUrl && { photo_url: photoUrl })
-      });
+      };
+      const changes = buildAuditChanges(selectedStaff, updates, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
+      const result = await api.adminUpdateStaff(selectedStaff.id, updates, auditDetails);
 
       if (result) {
         await loadData();
@@ -331,22 +335,26 @@ export default function AdminStaff() {
       return;
     }
 
-    try {
-      // Use server-side PIN hashing - send plain PIN to RPC
-      const result = await api.adminUpdateStaffPin(selectedStaff.id, pinData.newPin);
+    const pinToSet = pinData.newPin;
 
-      if (result) {
-        setShowPinModal(false);
-        setSelectedStaff(null);
-        setPinData({ newPin: '', confirmPin: '' });
-        showToast('success', 'PIN alterado com sucesso!');
-      } else {
+    showConfirm(`O Novo pin é ${pinToSet}. por memorize-o`, async () => {
+      try {
+        // Use server-side PIN hashing - send plain PIN to RPC
+        const result = await api.adminUpdateStaffPin(selectedStaff.id, pinToSet);
+
+        if (result) {
+          setShowPinModal(false);
+          setSelectedStaff(null);
+          setPinData({ newPin: '', confirmPin: '' });
+          showToast('success', 'PIN alterado com sucesso!');
+        } else {
+          showToast('error', 'Erro ao alterar PIN');
+        }
+      } catch (error) {
+        console.error('Error changing PIN:', error);
         showToast('error', 'Erro ao alterar PIN');
       }
-    } catch (error) {
-      console.error('Error changing PIN:', error);
-      showToast('error', 'Erro ao alterar PIN');
-    }
+    });
   };
 
   const handleDelete = async (staffMember: Staff) => {

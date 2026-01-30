@@ -403,6 +403,18 @@ export default function App() {
   };
 
   const logout = () => {
+    if (user) {
+      void api.logAudit({
+        condominium_id: user.condominium_id,
+        actor_id: user.id,
+        action: 'LOGOUT',
+        target_table: 'staff',
+        target_id: user.id,
+        details: {
+          device_identifier: getDeviceIdentifier()
+        }
+      });
+    }
     setUser(null);
     // Clear persisted auth state
     sessionStorage.removeItem('auth_user');

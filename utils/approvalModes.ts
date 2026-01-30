@@ -114,8 +114,14 @@ export function initiatePhoneCall(phoneNumber: string): void {
   // Clean phone number (remove spaces, dashes, etc.)
   const cleanNumber = phoneNumber.replace(/[^0-9+]/g, '');
 
-  // Use tel: protocol to open dialer
-  window.location.href = `tel:${cleanNumber}`;
+  // Use a temporary <a> element — most reliable way to trigger
+  // tel: protocol on Android tablets and PWAs
+  const link = document.createElement('a');
+  link.href = `tel:${cleanNumber}`;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 /**

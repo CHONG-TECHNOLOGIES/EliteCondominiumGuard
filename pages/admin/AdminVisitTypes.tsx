@@ -8,6 +8,7 @@ import {
 import { api } from '../../services/dataService';
 import { VisitTypeConfig } from '../../types';
 import { useToast } from '../../components/Toast';
+import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 
 // Map icon_key to Lucide icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -107,7 +108,9 @@ export default function AdminVisitTypes() {
     }
 
     try {
-      const result = await api.adminUpdateVisitType(selectedVisitType.id, formData);
+      const changes = buildAuditChanges(selectedVisitType, formData, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
+      const result = await api.adminUpdateVisitType(selectedVisitType.id, formData, auditDetails);
       if (result) {
         await loadData();
         setShowEditModal(false);

@@ -6,6 +6,7 @@ import {
 import { api } from '../../services/dataService';
 import { ServiceTypeConfig } from '../../types';
 import { useToast } from '../../components/Toast';
+import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 
 // Map service name to icon based on keywords (same logic as NewEntry.tsx)
 const getServiceIcon = (name: string, size: number = 32) => {
@@ -83,7 +84,9 @@ export default function AdminServiceTypes() {
     }
 
     try {
-      const result = await api.adminUpdateServiceType(selectedServiceType.id, formData);
+      const changes = buildAuditChanges(selectedServiceType, formData, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
+      const result = await api.adminUpdateServiceType(selectedServiceType.id, formData, auditDetails);
       if (result) {
         await loadData();
         setShowEditModal(false);

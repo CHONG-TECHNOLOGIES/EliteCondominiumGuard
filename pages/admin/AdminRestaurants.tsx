@@ -3,6 +3,7 @@ import { Utensils, Plus, Edit2, Trash2, Loader2, Search, X, Building2 } from 'lu
 import { api } from '../../services/dataService';
 import { Restaurant, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
+import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 
 export default function AdminRestaurants() {
   const { showToast, showConfirm } = useToast();
@@ -77,7 +78,9 @@ export default function AdminRestaurants() {
     }
 
     try {
-      const result = await api.adminUpdateRestaurant(String(selectedRestaurant.id), formData);
+      const changes = buildAuditChanges(selectedRestaurant, formData, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
+      const result = await api.adminUpdateRestaurant(String(selectedRestaurant.id), formData, auditDetails);
       if (result) {
         await loadData();
         setShowEditModal(false);

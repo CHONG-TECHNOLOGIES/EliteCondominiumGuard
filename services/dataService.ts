@@ -318,6 +318,35 @@ class DataService {
     await this.setPendingAuditLogs([]);
   }
 
+  async logAudit(entry: {
+    condominium_id?: number | null;
+    actor_id?: number | null;
+    action: string;
+    target_table: string;
+    target_id?: number | string | null;
+    details?: any;
+  }): Promise<void> {
+    const payload = {
+      condominium_id: entry.condominium_id ?? this.currentCondoId ?? 0,
+      actor_id: entry.actor_id ?? this.getStoredUser()?.id ?? null,
+      action: entry.action,
+      target_table: entry.target_table,
+      target_id: entry.target_id ?? null,
+      details: entry.details ?? null
+    };
+
+    if (!payload.condominium_id || !payload.action || !payload.target_table) {
+      return;
+    }
+
+    if (this.isBackendHealthy) {
+      SupabaseService.logAudit(payload);
+      return;
+    }
+
+    await this.enqueueAuditLog(payload);
+  }
+
   async logCallInitiated(payload: {
     phone: string;
     source: 'resident' | 'visitor';
@@ -895,6 +924,18 @@ class DataService {
           }
           await this.syncStaff(deviceCondoId); // Sync all staff after a successful login
           await this.refreshConfigs(deviceCondoId);
+          await this.logAudit({
+            condominium_id: staff.condominium_id ?? deviceCondoId,
+            actor_id: staff.id,
+            action: 'LOGIN',
+            target_table: 'staff',
+            target_id: staff.id,
+            details: {
+              method: 'pin',
+              offline: false,
+              device_identifier: getDeviceIdentifier()
+            }
+          });
           return staff;
         }
       } catch (e) {
@@ -909,10 +950,35 @@ class DataService {
       const isValid = await bcrypt.compare(pin, localStaff.pin_hash);
       if (isValid) {
         console.warn("Login OFFLINE bem-sucedido.");
+        await this.logAudit({
+          condominium_id: localStaff.condominium_id ?? deviceCondoId,
+          actor_id: localStaff.id,
+          action: 'LOGIN',
+          target_table: 'staff',
+          target_id: localStaff.id,
+          details: {
+            method: 'pin',
+            offline: true,
+            device_identifier: getDeviceIdentifier()
+          }
+        });
         return localStaff;
       }
     }
 
+    await this.logAudit({
+      condominium_id: deviceCondoId,
+      actor_id: null,
+      action: 'LOGIN_FAILED',
+      target_table: 'staff',
+      target_id: null,
+      details: {
+        first_name: firstName,
+        last_name: lastName,
+        offline: !this.isBackendHealthy,
+        device_identifier: getDeviceIdentifier()
+      }
+    });
     throw new Error("Credenciais inválidas ou sem acesso offline.");
   }
 
@@ -1388,6 +1454,11 @@ class DataService {
     const visit = await db.visits.get(visitId);
     if (!visit) throw new Error("Visit not found");
 
+    const previousStatus = visit.status;
+    if (previousStatus === status) {
+      return;
+    }
+
     visit.status = status;
 
     // Set check_out time when status changes to LEFT
@@ -1405,6 +1476,17 @@ class DataService {
     // Update locally
     await db.visits.put(visit);
     await this.createVisitEvent(visitId, status, eventAt);
+    await this.logAudit({
+      action: 'UPDATE',
+      target_table: 'visits',
+      target_id: visitId > 0 ? visitId : null,
+      details: {
+        field: 'status',
+        old_value: previousStatus,
+        new_value: status,
+        temp_id: visitId < 0 ? visitId : null
+      }
+    });
 
     // Try to sync if online
     if (this.isBackendHealthy) {
@@ -1715,6 +1797,9 @@ class DataService {
     const incident = await db.incidents.get(id);
     if (!incident) throw new Error("Incident not found");
 
+    const previousStatus = incident.status;
+    const previousNotes = incident.guard_notes ?? null;
+
     // Update incident status to "acknowledged"
     incident.status = 'acknowledged';
     incident.acknowledged_by = staffId;
@@ -1723,6 +1808,18 @@ class DataService {
 
     // Update locally
     await db.incidents.put(incident);
+    await this.logAudit({
+      action: 'UPDATE',
+      target_table: 'incidents',
+      target_id: id,
+      actor_id: staffId,
+      details: {
+        changes: {
+          status: { from: previousStatus ?? null, to: incident.status },
+          guard_notes: { from: previousNotes, to: incident.guard_notes ?? null }
+        }
+      }
+    });
 
     // Try to sync if online
     if (this.isBackendHealthy) {
@@ -1742,6 +1839,9 @@ class DataService {
   async reportIncidentAction(id: number, guardNotes: string, newStatus: string): Promise<void> {
     const incident = await db.incidents.get(id);
     if (!incident) throw new Error("Incident not found");
+
+    const previousStatus = incident.status;
+    const previousNotes = incident.guard_notes ?? null;
 
     // Concatenate new notes with existing notes to preserve history
     const timestamp = new Date().toLocaleString('pt-PT', {
@@ -1771,6 +1871,19 @@ class DataService {
 
     // Update locally
     await db.incidents.put(incident);
+    await this.logAudit({
+      action: 'UPDATE',
+      target_table: 'incidents',
+      target_id: id,
+      actor_id: incident.acknowledged_by ?? this.getStoredUser()?.id ?? null,
+      details: {
+        changes: {
+          status: { from: previousStatus ?? null, to: newStatus },
+          guard_notes: { from: previousNotes, to: incident.guard_notes ?? null },
+          resolved_at: { from: null, to: incident.resolved_at ?? null }
+        }
+      }
+    });
 
     // Try to sync if online
     if (this.isBackendHealthy) {
@@ -2080,7 +2193,20 @@ class DataService {
    */
   async adminCreateCondominium(condo: Partial<Condominium>): Promise<Condominium | null> {
     try {
-      return await SupabaseService.adminCreateCondominium(condo);
+      const created = await SupabaseService.adminCreateCondominium(condo);
+      if (created) {
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'condominiums',
+          target_id: created.id,
+          condominium_id: created.id,
+          details: {
+            name: created.name ?? condo.name ?? null,
+            status: created.status ?? condo.status ?? null
+          }
+        });
+      }
+      return created;
     } catch (e) {
       console.error('[Admin] Failed to create condominium (online required):', e);
       return null;
@@ -2090,9 +2216,23 @@ class DataService {
   /**
    * Admin: Update an existing condominium
    */
-  async adminUpdateCondominium(id: number, updates: Partial<Condominium>): Promise<Condominium | null> {
+  async adminUpdateCondominium(
+    id: number,
+    updates: Partial<Condominium>,
+    auditDetails?: any
+  ): Promise<Condominium | null> {
     try {
-      return await SupabaseService.adminUpdateCondominium(id, updates);
+      const updated = await SupabaseService.adminUpdateCondominium(id, updates);
+      if (updated) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'condominiums',
+          target_id: id,
+          condominium_id: updated.id ?? id,
+          details: auditDetails ?? { updates }
+        });
+      }
+      return updated;
     } catch (e) {
       console.error('[Admin] Failed to update condominium (online required):', e);
       return null;
@@ -2102,9 +2242,27 @@ class DataService {
   /**
    * Admin: Toggle condominium status (ACTIVE/INACTIVE)
    */
-  async adminToggleCondominiumStatus(id: number, status: 'ACTIVE' | 'INACTIVE'): Promise<boolean> {
+  async adminToggleCondominiumStatus(
+    id: number,
+    status: 'ACTIVE' | 'INACTIVE',
+    previousStatus?: 'ACTIVE' | 'INACTIVE'
+  ): Promise<boolean> {
     try {
-      return await SupabaseService.adminToggleCondominiumStatus(id, status);
+      const success = await SupabaseService.adminToggleCondominiumStatus(id, status);
+      if (success) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'condominiums',
+          target_id: id,
+          condominium_id: id,
+          details: {
+            field: 'status',
+            new_value: status,
+            old_value: previousStatus ?? null
+          }
+        });
+      }
+      return success;
     } catch (e) {
       console.error('[Admin] Failed to toggle condominium status (online required):', e);
       return false;
@@ -2118,6 +2276,11 @@ class DataService {
     try {
       const devices = await SupabaseService.adminGetAllDevices(condoId);
       if (devices.length === 0) return true;
+      const statusCounts = devices.reduce((acc: Record<string, number>, device) => {
+        const key = device.status || 'UNKNOWN';
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {});
 
       for (const device of devices) {
         if (!device.id) {
@@ -2132,6 +2295,18 @@ class DataService {
         if (!updated) return false;
       }
 
+      await this.logAudit({
+        action: 'UPDATE',
+        target_table: 'devices',
+        target_id: null,
+        condominium_id: condoId,
+        details: {
+          field: 'status',
+          new_value: 'INACTIVE',
+          device_count: devices.length,
+          old_statuses: statusCounts
+        }
+      });
       return true;
     } catch (e) {
       console.error('[Admin] Failed to deactivate condominium devices (online required):', e);
@@ -2156,7 +2331,19 @@ class DataService {
    */
   async adminAddStreet(condoId: number, name: string): Promise<any | null> {
     try {
-      return await SupabaseService.addStreet(condoId, name);
+      const created = await SupabaseService.addStreet(condoId, name);
+      if (created) {
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'streets',
+          target_id: created.id ?? null,
+          condominium_id: condoId,
+          details: {
+            name
+          }
+        });
+      }
+      return created;
     } catch (e) {
       console.error('[Admin] Failed to add street (online required):', e);
       return null;
@@ -2168,7 +2355,17 @@ class DataService {
    */
   async adminRemoveStreet(streetId: number): Promise<boolean> {
     try {
-      return await SupabaseService.removeStreet(streetId);
+      const success = await SupabaseService.removeStreet(streetId);
+      if (success) {
+        await this.logAudit({
+          action: 'DELETE',
+          target_table: 'streets',
+          target_id: streetId,
+          condominium_id: this.getAdminScopeCondoId() ?? this.currentCondoId ?? null,
+          details: {}
+        });
+      }
+      return success;
     } catch (e) {
       console.error('[Admin] Failed to remove street (online required):', e);
       return false;
@@ -2204,9 +2401,22 @@ class DataService {
   /**
    * Admin: Update a device
    */
-  async adminUpdateDevice(id: string, updates: Partial<Device>): Promise<Device | null> {
+  async adminUpdateDevice(id: string, updates: Partial<Device>, auditDetails?: any): Promise<Device | null> {
     try {
-      return await SupabaseService.adminUpdateDevice(id, updates);
+      const updated = await SupabaseService.adminUpdateDevice(id, updates);
+      if (updated) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'devices',
+          target_id: null,
+          condominium_id: updated.condominium_id ?? null,
+          details: auditDetails ?? {
+            device_id: id,
+            updates
+          }
+        });
+      }
+      return updated;
     } catch (e) {
       console.error('[Admin] Failed to update device (online required):', e);
       return null;
@@ -2216,9 +2426,24 @@ class DataService {
   /**
    * Admin: Decommission a device
    */
-  async adminDecommissionDevice(id: string): Promise<boolean> {
+  async adminDecommissionDevice(id: string, previousStatus?: string | null): Promise<boolean> {
     try {
-      return await SupabaseService.adminDecommissionDevice(id);
+      const success = await SupabaseService.adminDecommissionDevice(id);
+      if (success) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'devices',
+          target_id: null,
+          condominium_id: this.getAdminScopeCondoId() ?? this.currentCondoId ?? null,
+          details: {
+            device_id: id,
+            field: 'status',
+            new_value: 'DECOMMISSIONED',
+            old_value: previousStatus ?? null
+          }
+        });
+      }
+      return success;
     } catch (e) {
       console.error('[Admin] Failed to decommission device (online required):', e);
       return false;
@@ -2230,7 +2455,21 @@ class DataService {
    */
   async adminCreateStaff(staff: Partial<Staff>): Promise<Staff | null> {
     try {
-      return await SupabaseService.adminCreateStaff(staff);
+      const created = await SupabaseService.adminCreateStaff(staff);
+      if (created) {
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'staff',
+          target_id: created.id,
+          condominium_id: created.condominium_id ?? null,
+          details: {
+            first_name: created.first_name ?? staff.first_name ?? null,
+            last_name: created.last_name ?? staff.last_name ?? null,
+            role: created.role ?? staff.role ?? null
+          }
+        });
+      }
+      return created;
     } catch (e) {
       console.error('[Admin] Failed to create staff (online required):', e);
       return null;
@@ -2249,7 +2488,7 @@ class DataService {
     photo_url?: string
   ): Promise<Staff | null> {
     try {
-      return await SupabaseService.adminCreateStaffWithPin(
+      const created = await SupabaseService.adminCreateStaffWithPin(
         first_name,
         last_name,
         condominium_id,
@@ -2257,6 +2496,21 @@ class DataService {
         plainPin,
         photo_url
       );
+      if (created) {
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'staff',
+          target_id: created.id,
+          condominium_id: created.condominium_id ?? condominium_id ?? null,
+          details: {
+            first_name,
+            last_name,
+            role,
+            photo_url: photo_url ?? null
+          }
+        });
+      }
+      return created;
     } catch (e) {
       console.error('[Admin] Failed to create staff (online required):', e);
       return null;
@@ -2268,7 +2522,20 @@ class DataService {
    */
   async adminUpdateStaffPin(staffId: number, plainPin: string): Promise<Staff | null> {
     try {
-      return await SupabaseService.adminUpdateStaffPin(staffId, plainPin);
+      const updated = await SupabaseService.adminUpdateStaffPin(staffId, plainPin);
+      if (updated) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'staff',
+          target_id: staffId,
+          condominium_id: updated.condominium_id ?? null,
+          details: {
+            field: 'pin',
+            reset: true
+          }
+        });
+      }
+      return updated;
     } catch (e) {
       console.error('[Admin] Failed to update staff PIN (online required):', e);
       return null;
@@ -2278,9 +2545,20 @@ class DataService {
   /**
    * Admin: Update an existing staff member
    */
-  async adminUpdateStaff(id: number, updates: Partial<Staff>): Promise<Staff | null> {
+  async adminUpdateStaff(id: number, updates: Partial<Staff>, auditDetails?: any): Promise<Staff | null> {
     try {
-      return await SupabaseService.adminUpdateStaff(id, updates);
+      const updated = await SupabaseService.adminUpdateStaff(id, updates);
+      if (updated) {
+        const { pin_hash, ...safeUpdates } = updates as Partial<Staff> & { pin_hash?: unknown };
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'staff',
+          target_id: id,
+          condominium_id: updated.condominium_id ?? null,
+          details: auditDetails ?? { updates: safeUpdates }
+        });
+      }
+      return updated;
     } catch (e) {
       console.error('[Admin] Failed to update staff (online required):', e);
       return null;
@@ -2298,7 +2576,19 @@ class DataService {
           console.error('[Admin] Failed to delete staff photo from storage');
         }
       }
-      return await SupabaseService.adminDeleteStaff(id);
+      const success = await SupabaseService.adminDeleteStaff(id);
+      if (success) {
+        await this.logAudit({
+          action: 'DELETE',
+          target_table: 'staff',
+          target_id: id,
+          condominium_id: this.getAdminScopeCondoId() ?? this.currentCondoId ?? null,
+          details: {
+            photo_deleted: !!photoUrl
+          }
+        });
+      }
+      return success;
     } catch (e) {
       console.error('[Admin] Failed to delete staff (online required):', e);
       return false;
@@ -2312,7 +2602,20 @@ class DataService {
    */
   async adminCreateUnit(unit: Partial<Unit>): Promise<Unit | null> {
     try {
-      return await SupabaseService.adminCreateUnit(unit);
+      const created = await SupabaseService.adminCreateUnit(unit);
+      if (created) {
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'units',
+          target_id: created.id as number,
+          condominium_id: (created as any).condominium_id ?? (unit as any).condominium_id ?? null,
+          details: {
+            code_block: (created as any).code_block ?? (unit as any).code_block ?? null,
+            number: (created as any).number ?? (unit as any).number ?? null
+          }
+        });
+      }
+      return created;
     } catch (e) {
       console.error('[Admin] Failed to create unit (online required):', e);
       return null;
@@ -2322,9 +2625,19 @@ class DataService {
   /**
    * Admin: Update an existing unit
    */
-  async adminUpdateUnit(id: string, updates: Partial<Unit>): Promise<Unit | null> {
+  async adminUpdateUnit(id: string, updates: Partial<Unit>, auditDetails?: any): Promise<Unit | null> {
     try {
-      return await SupabaseService.adminUpdateUnit(id, updates);
+      const updated = await SupabaseService.adminUpdateUnit(id, updates);
+      if (updated) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'units',
+          target_id: Number.isFinite(Number(id)) ? Number(id) : null,
+          condominium_id: (updated as any).condominium_id ?? null,
+          details: auditDetails ?? { updates }
+        });
+      }
+      return updated;
     } catch (e) {
       console.error('[Admin] Failed to update unit (online required):', e);
       return null;
@@ -2336,7 +2649,17 @@ class DataService {
    */
   async adminDeleteUnit(id: string): Promise<boolean> {
     try {
-      return await SupabaseService.adminDeleteUnit(id);
+      const success = await SupabaseService.adminDeleteUnit(id);
+      if (success) {
+        await this.logAudit({
+          action: 'DELETE',
+          target_table: 'units',
+          target_id: Number.isFinite(Number(id)) ? Number(id) : null,
+          condominium_id: this.getAdminScopeCondoId() ?? this.currentCondoId ?? null,
+          details: {}
+        });
+      }
+      return success;
     } catch (e) {
       console.error('[Admin] Failed to delete unit (online required):', e);
       return false;
@@ -2376,7 +2699,22 @@ class DataService {
    */
   async adminCreateResident(resident: any): Promise<any | null> {
     try {
-      return await SupabaseService.adminCreateResident(resident);
+      const created = await SupabaseService.adminCreateResident(resident);
+      if (created) {
+        const { pin_hash, pin, plainPin, ...safeResident } = resident ?? {};
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'residents',
+          target_id: created.id,
+          condominium_id: created.condominium_id ?? resident?.condominium_id ?? null,
+          details: {
+            name: created.name ?? resident?.name ?? null,
+            unit_id: created.unit_id ?? resident?.unit_id ?? null,
+            data: safeResident
+          }
+        });
+      }
+      return created;
     } catch (e) {
       console.error('[Admin] Failed to create resident (online required):', e);
       return null;
@@ -2386,9 +2724,20 @@ class DataService {
   /**
    * Admin: Update an existing resident
    */
-  async adminUpdateResident(id: string, updates: any): Promise<any | null> {
+  async adminUpdateResident(id: string, updates: any, auditDetails?: any): Promise<any | null> {
     try {
-      return await SupabaseService.adminUpdateResident(id, updates);
+      const updated = await SupabaseService.adminUpdateResident(id, updates);
+      if (updated) {
+        const { pin_hash, pin, plainPin, ...safeUpdates } = updates ?? {};
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'residents',
+          target_id: Number.isFinite(Number(id)) ? Number(id) : null,
+          condominium_id: updated.condominium_id ?? null,
+          details: auditDetails ?? { updates: safeUpdates }
+        });
+      }
+      return updated;
     } catch (e) {
       console.error('[Admin] Failed to update resident (online required):', e);
       return null;
@@ -2400,7 +2749,17 @@ class DataService {
    */
   async adminDeleteResident(id: string): Promise<boolean> {
     try {
-      return await SupabaseService.adminDeleteResident(id);
+      const success = await SupabaseService.adminDeleteResident(id);
+      if (success) {
+        await this.logAudit({
+          action: 'DELETE',
+          target_table: 'residents',
+          target_id: Number.isFinite(Number(id)) ? Number(id) : null,
+          condominium_id: this.getAdminScopeCondoId() ?? this.currentCondoId ?? null,
+          details: {}
+        });
+      }
+      return success;
     } catch (e) {
       console.error('[Admin] Failed to delete resident (online required):', e);
       return false;
@@ -2428,7 +2787,20 @@ class DataService {
    */
   async adminCreateRestaurant(restaurant: Partial<Restaurant>): Promise<Restaurant | null> {
     try {
-      return await SupabaseService.adminCreateRestaurant(restaurant);
+      const created = await SupabaseService.adminCreateRestaurant(restaurant);
+      if (created) {
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'restaurants',
+          target_id: created.id ?? null,
+          condominium_id: created.condominium_id ?? restaurant.condominium_id ?? null,
+          details: {
+            name: created.name ?? restaurant.name ?? null,
+            status: created.status ?? restaurant.status ?? null
+          }
+        });
+      }
+      return created;
     } catch (e) {
       console.error('[Admin] Failed to create restaurant (online required):', e);
       return null;
@@ -2438,9 +2810,19 @@ class DataService {
   /**
    * Admin: Update an existing restaurant
    */
-  async adminUpdateRestaurant(id: string, updates: Partial<Restaurant>): Promise<Restaurant | null> {
+  async adminUpdateRestaurant(id: string, updates: Partial<Restaurant>, auditDetails?: any): Promise<Restaurant | null> {
     try {
-      return await SupabaseService.adminUpdateRestaurant(id, updates);
+      const updated = await SupabaseService.adminUpdateRestaurant(id, updates);
+      if (updated) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'restaurants',
+          target_id: id ?? null,
+          condominium_id: updated.condominium_id ?? null,
+          details: auditDetails ?? { updates }
+        });
+      }
+      return updated;
     } catch (e) {
       console.error('[Admin] Failed to update restaurant (online required):', e);
       return null;
@@ -2452,7 +2834,17 @@ class DataService {
    */
   async adminDeleteRestaurant(id: string): Promise<boolean> {
     try {
-      return await SupabaseService.adminDeleteRestaurant(id);
+      const success = await SupabaseService.adminDeleteRestaurant(id);
+      if (success) {
+        await this.logAudit({
+          action: 'DELETE',
+          target_table: 'restaurants',
+          target_id: id ?? null,
+          condominium_id: this.getAdminScopeCondoId() ?? this.currentCondoId ?? null,
+          details: {}
+        });
+      }
+      return success;
     } catch (e) {
       console.error('[Admin] Failed to delete restaurant (online required):', e);
       return false;
@@ -2480,7 +2872,20 @@ class DataService {
    */
   async adminCreateSport(sport: Partial<Sport>): Promise<Sport | null> {
     try {
-      return await SupabaseService.adminCreateSport(sport);
+      const created = await SupabaseService.adminCreateSport(sport);
+      if (created) {
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'sports',
+          target_id: created.id ?? null,
+          condominium_id: created.condominium_id ?? sport.condominium_id ?? null,
+          details: {
+            name: created.name ?? sport.name ?? null,
+            status: created.status ?? sport.status ?? null
+          }
+        });
+      }
+      return created;
     } catch (e) {
       console.error('[Admin] Failed to create sport (online required):', e);
       return null;
@@ -2490,9 +2895,19 @@ class DataService {
   /**
    * Admin: Update an existing sport facility
    */
-  async adminUpdateSport(id: string, updates: Partial<Sport>): Promise<Sport | null> {
+  async adminUpdateSport(id: string, updates: Partial<Sport>, auditDetails?: any): Promise<Sport | null> {
     try {
-      return await SupabaseService.adminUpdateSport(id, updates);
+      const updated = await SupabaseService.adminUpdateSport(id, updates);
+      if (updated) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'sports',
+          target_id: id ?? null,
+          condominium_id: updated.condominium_id ?? null,
+          details: auditDetails ?? { updates }
+        });
+      }
+      return updated;
     } catch (e) {
       console.error('[Admin] Failed to update sport (online required):', e);
       return null;
@@ -2504,7 +2919,17 @@ class DataService {
    */
   async adminDeleteSport(id: string): Promise<boolean> {
     try {
-      return await SupabaseService.adminDeleteSport(id);
+      const success = await SupabaseService.adminDeleteSport(id);
+      if (success) {
+        await this.logAudit({
+          action: 'DELETE',
+          target_table: 'sports',
+          target_id: id ?? null,
+          condominium_id: this.getAdminScopeCondoId() ?? this.currentCondoId ?? null,
+          details: {}
+        });
+      }
+      return success;
     } catch (e) {
       console.error('[Admin] Failed to delete sport (online required):', e);
       return false;
@@ -2518,12 +2943,24 @@ class DataService {
    */
   async adminUpdateVisitStatus(id: number, status: VisitStatus): Promise<Visit | null> {
     try {
+      const existing = await db.visits.get(id);
       const visit = await SupabaseService.adminUpdateVisitStatus(id, status);
       if (visit) {
         const eventAt = status === VisitStatus.LEFT && visit.check_out_at
           ? visit.check_out_at
           : new Date().toISOString();
         await this.createVisitEvent(visit.id, status, eventAt);
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'visits',
+          target_id: id,
+          details: {
+            field: 'status',
+            old_value: existing?.status ?? null,
+            new_value: status,
+            source: 'AdminVisits'
+          }
+        });
       }
       return visit;
     } catch (e) {
@@ -2537,9 +2974,29 @@ class DataService {
   /**
    * Admin: Acknowledge an incident
    */
-  async adminAcknowledgeIncident(id: number, guardId: number, notes?: string): Promise<Incident | null> {
+  async adminAcknowledgeIncident(
+    id: number,
+    guardId: number,
+    notes?: string,
+    auditDetails?: any
+  ): Promise<Incident | null> {
     try {
-      return await SupabaseService.adminAcknowledgeIncident(id, guardId, notes);
+      const incident = await SupabaseService.adminAcknowledgeIncident(id, guardId, notes);
+      if (incident) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'incidents',
+          target_id: id,
+          actor_id: guardId,
+          details: auditDetails ?? {
+            field: 'status',
+            new_value: incident.status,
+            note: notes || null,
+            source: 'AdminIncidents'
+          }
+        });
+      }
+      return incident;
     } catch (e) {
       console.error('[Admin] Failed to acknowledge incident (online required):', e);
       return null;
@@ -2549,9 +3006,29 @@ class DataService {
   /**
    * Admin: Resolve an incident
    */
-  async adminResolveIncident(id: number, guardId: number, notes?: string): Promise<Incident | null> {
+  async adminResolveIncident(
+    id: number,
+    guardId: number,
+    notes?: string,
+    auditDetails?: any
+  ): Promise<Incident | null> {
     try {
-      return await SupabaseService.adminResolveIncident(id, guardId, notes);
+      const incident = await SupabaseService.adminResolveIncident(id, guardId, notes);
+      if (incident) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'incidents',
+          target_id: id,
+          actor_id: guardId,
+          details: auditDetails ?? {
+            field: 'status',
+            new_value: incident.status,
+            note: notes || null,
+            source: 'AdminIncidents'
+          }
+        });
+      }
+      return incident;
     } catch (e) {
       console.error('[Admin] Failed to resolve incident (online required):', e);
       return null;
@@ -2561,9 +3038,23 @@ class DataService {
   /**
    * Admin: Update incident notes
    */
-  async adminUpdateIncidentNotes(id: number, notes: string): Promise<Incident | null> {
+  async adminUpdateIncidentNotes(id: number, notes: string, auditDetails?: any): Promise<Incident | null> {
     try {
-      return await SupabaseService.adminUpdateIncidentNotes(id, notes);
+      const incident = await SupabaseService.adminUpdateIncidentNotes(id, notes);
+      if (incident) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'incidents',
+          target_id: id,
+          actor_id: this.getStoredUser()?.id ?? null,
+          details: auditDetails ?? {
+            field: 'guard_notes',
+            new_value: notes,
+            source: 'AdminIncidents'
+          }
+        });
+      }
+      return incident;
     } catch (e) {
       console.error('[Admin] Failed to update incident notes (online required):', e);
       return null;
@@ -2589,7 +3080,19 @@ class DataService {
    */
   async adminCreateVisitType(visitType: Partial<VisitTypeConfig>): Promise<VisitTypeConfig | null> {
     try {
-      return await SupabaseService.adminCreateVisitType(visitType);
+      const created = await SupabaseService.adminCreateVisitType(visitType);
+      if (created) {
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'visit_types',
+          target_id: created.id,
+          details: {
+            name: created.name ?? visitType.name ?? null,
+            icon_key: created.icon_key ?? visitType.icon_key ?? null
+          }
+        });
+      }
+      return created;
     } catch (e) {
       console.error('[Admin] Failed to create visit type (online required):', e);
       return null;
@@ -2599,9 +3102,22 @@ class DataService {
   /**
    * Admin: Update an existing visit type
    */
-  async adminUpdateVisitType(id: number, updates: Partial<VisitTypeConfig>): Promise<VisitTypeConfig | null> {
+  async adminUpdateVisitType(
+    id: number,
+    updates: Partial<VisitTypeConfig>,
+    auditDetails?: any
+  ): Promise<VisitTypeConfig | null> {
     try {
-      return await SupabaseService.adminUpdateVisitType(id, updates);
+      const updated = await SupabaseService.adminUpdateVisitType(id, updates);
+      if (updated) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'visit_types',
+          target_id: id,
+          details: auditDetails ?? { updates }
+        });
+      }
+      return updated;
     } catch (e) {
       console.error('[Admin] Failed to update visit type (online required):', e);
       return null;
@@ -2613,7 +3129,17 @@ class DataService {
    */
   async adminDeleteVisitType(id: number): Promise<boolean> {
     try {
-      return await SupabaseService.adminDeleteVisitType(id);
+      const success = await SupabaseService.adminDeleteVisitType(id);
+      if (success) {
+        await this.logAudit({
+          action: 'DELETE',
+          target_table: 'visit_types',
+          target_id: id,
+          condominium_id: this.getAdminScopeCondoId() ?? this.currentCondoId ?? null,
+          details: {}
+        });
+      }
+      return success;
     } catch (e) {
       console.error('[Admin] Failed to delete visit type (online required):', e);
       return false;
@@ -2639,7 +3165,18 @@ class DataService {
    */
   async adminCreateServiceType(serviceType: Partial<ServiceTypeConfig>): Promise<ServiceTypeConfig | null> {
     try {
-      return await SupabaseService.adminCreateServiceType(serviceType);
+      const created = await SupabaseService.adminCreateServiceType(serviceType);
+      if (created) {
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'service_types',
+          target_id: created.id,
+          details: {
+            name: created.name ?? serviceType.name ?? null
+          }
+        });
+      }
+      return created;
     } catch (e) {
       console.error('[Admin] Failed to create service type (online required):', e);
       return null;
@@ -2649,9 +3186,22 @@ class DataService {
   /**
    * Admin: Update an existing service type
    */
-  async adminUpdateServiceType(id: number, updates: Partial<ServiceTypeConfig>): Promise<ServiceTypeConfig | null> {
+  async adminUpdateServiceType(
+    id: number,
+    updates: Partial<ServiceTypeConfig>,
+    auditDetails?: any
+  ): Promise<ServiceTypeConfig | null> {
     try {
-      return await SupabaseService.adminUpdateServiceType(id, updates);
+      const updated = await SupabaseService.adminUpdateServiceType(id, updates);
+      if (updated) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'service_types',
+          target_id: id,
+          details: auditDetails ?? { updates }
+        });
+      }
+      return updated;
     } catch (e) {
       console.error('[Admin] Failed to update service type (online required):', e);
       return null;
@@ -2663,7 +3213,17 @@ class DataService {
    */
   async adminDeleteServiceType(id: number): Promise<boolean> {
     try {
-      return await SupabaseService.adminDeleteServiceType(id);
+      const success = await SupabaseService.adminDeleteServiceType(id);
+      if (success) {
+        await this.logAudit({
+          action: 'DELETE',
+          target_table: 'service_types',
+          target_id: id,
+          condominium_id: this.getAdminScopeCondoId() ?? this.currentCondoId ?? null,
+          details: {}
+        });
+      }
+      return success;
     } catch (e) {
       console.error('[Admin] Failed to delete service type (online required):', e);
       return false;

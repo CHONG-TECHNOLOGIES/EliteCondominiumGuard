@@ -3,6 +3,7 @@ import { Tablet, Edit2, Power, Loader2, Search, X, Clock, Building2, Info, Datab
 import { api } from '../../services/dataService';
 import { Device, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
+import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 
 interface DeviceStorageInfo {
   used: number;
@@ -52,10 +53,13 @@ export default function AdminDevices() {
     if (!selectedDevice) return;
 
     try {
-      const result = await api.adminUpdateDevice(selectedDevice.id!, {
+      const updates = {
         device_name: formData.device_name,
         condominium_id: formData.condominium_id
-      });
+      };
+      const changes = buildAuditChanges(selectedDevice, updates, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes, device_id: selectedDevice.id } : { device_id: selectedDevice.id };
+      const result = await api.adminUpdateDevice(selectedDevice.id!, updates, auditDetails);
       if (result) {
         await loadData();
         setShowEditModal(false);
@@ -77,7 +81,7 @@ export default function AdminDevices() {
       `Deseja realmente desativar o dispositivo "${device.device_name || device.device_identifier}"?`,
       async () => {
         try {
-          const result = await api.adminDecommissionDevice(String(device.id));
+          const result = await api.adminDecommissionDevice(String(device.id), device.status || null);
           if (result) {
             await loadData();
             showToast('success', 'Dispositivo desativado com sucesso!');

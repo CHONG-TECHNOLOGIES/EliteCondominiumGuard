@@ -4,6 +4,7 @@ import { api } from '../../services/dataService';
 import { Condominium, Street } from '../../types';
 import { useToast } from '../../components/Toast';
 import { Trash2 } from 'lucide-react';
+import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 
 export default function AdminCondominiums() {
   const { showToast, showConfirm } = useToast();
@@ -101,7 +102,9 @@ export default function AdminCondominiums() {
     }
 
     try {
-      const result = await api.adminUpdateCondominium(selectedCondo.id, formData);
+      const changes = buildAuditChanges(selectedCondo, formData, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
+      const result = await api.adminUpdateCondominium(selectedCondo.id, formData, auditDetails);
       if (result) {
         await loadCondominiums();
         setShowEditModal(false);
@@ -136,7 +139,7 @@ export default function AdminCondominiums() {
               return;
             }
           }
-          const result = await api.adminToggleCondominiumStatus(condo.id, newStatus);
+          const result = await api.adminToggleCondominiumStatus(condo.id, newStatus, condo.status);
           if (result) {
             await loadCondominiums();
             showToast('success', `Condominio ${action === 'ativar' ? 'ativado' : 'desativado'} com sucesso!`);

@@ -3,6 +3,7 @@ import { Users, Plus, Edit2, Trash2, Loader2, Search, X, Building2, Home, Chevro
 import { api } from '../../services/dataService';
 import { Resident, Condominium, Unit } from '../../types';
 import { useToast } from '../../components/Toast';
+import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -280,7 +281,9 @@ export default function AdminResidents() {
     }
 
     try {
-      const result = await api.adminUpdateResident(String(selectedResident.id), formData);
+      const changes = buildAuditChanges(selectedResident, formData, { exclude: ['pin', 'pin_hash'] });
+      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
+      const result = await api.adminUpdateResident(String(selectedResident.id), formData, auditDetails);
       if (result) {
         await loadData();
         setShowEditModal(false);

@@ -3,7 +3,7 @@
  * Provides functions to export data to CSV and PDF formats
  */
 
-import { Visit, Incident } from '../types';
+import { Visit, Incident, AuditLog } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -148,6 +148,37 @@ export function exportIncidentsToCSV(incidents: Incident[], filename?: string): 
 
   const csvContent = convertToCSV(incidents, headers, accessor);
   const defaultFilename = `incidentes_${new Date().toISOString().split('T')[0]}.csv`;
+  downloadCSV(csvContent, filename || defaultFilename);
+}
+
+/**
+ * Export audit logs to CSV
+ */
+export function exportAuditLogsToCSV(logs: AuditLog[], filename?: string): void {
+  const headers = [
+    'ID',
+    'Data/Hora',
+    'Ação',
+    'Tabela',
+    'ID Alvo',
+    'Utilizador',
+    'Condomínio',
+    'Detalhes'
+  ];
+
+  const accessor = (log: AuditLog) => [
+    log.id || '',
+    formatDateTime(log.created_at),
+    log.action || '',
+    log.target_table || '',
+    log.target_id ?? '',
+    log.actor ? `${log.actor.first_name} ${log.actor.last_name}` : '',
+    log.condominium?.name || '',
+    log.details ? JSON.stringify(log.details) : ''
+  ];
+
+  const csvContent = convertToCSV(logs, headers, accessor);
+  const defaultFilename = `audit_logs_${new Date().toISOString().split('T')[0]}.csv`;
   downloadCSV(csvContent, filename || defaultFilename);
 }
 

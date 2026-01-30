@@ -390,7 +390,59 @@ devices         // Device registry (cached)
 - `staff`: `id, condominium_id, [first_name+last_name]` (compound index for login)
 - `units`: `id, condominium_id, code_block, number`
 
-### 6. Type System (types.ts)
+### 6. PostgreSQL Database Schema (Supabase)
+
+**Source**: Supabase REST API (OpenAPI spec) — queried live from the project.
+
+#### Core Tables
+
+| Table | Columns | Description |
+|-------|---------|-------------|
+| `condominiums` | id, created_at, name, address, logo_url, latitude, longitude, gps_radius_meters, status, phone_number | Condominium/building registry |
+| `units` | id, condominium_id, code_block, number, floor, building_name, created_at | Apartment/unit registry |
+| `residents` | id, condominium_id, unit_id, name, phone, email, created_at, pin_hash, has_app_installed, device_token, app_first_login_at, app_last_seen_at, avatar_url, push_token, type | Resident directory |
+| `staff` | id, created_at, first_name, last_name, pin_hash, condominium_id, role, photo_url | Guard/admin staff |
+| `devices` | id (UUID), created_at, device_identifier, device_name, condominium_id, configured_at, last_seen_at, status, metadata | Registered tablet devices |
+| `visits` | id, created_at, condominium_id, visitor_name, visitor_doc, visitor_phone, visit_type_id, service_type_id, unit_id, reason, photo_url, qr_token, qr_expires_at, check_in_at, check_out_at, status, approval_mode, guard_id, sync_status, restaurant_id, sport_id, approved_at, denied_at, device_id, vehicle_license_plate | Visit/delivery records |
+| `visit_events` | id, created_at, visit_id, status, event_at, actor_id, device_id | Visit status change audit trail |
+| `incidents` | id, reported_at, resident_id, description, type, status, photo_path, acknowledged_at, acknowledged_by, guard_notes, resolved_at | Security incident reports |
+| `audit_logs` | id, created_at, condominium_id, actor_id, action, target_table, target_id, details, ip_address, user_agent | Audit trail for all actions |
+
+#### Reference/Config Tables
+
+| Table | Columns | Description |
+|-------|---------|-------------|
+| `visit_types` | id, name, icon_key, requires_service_type, requires_restaurant, requires_sport | Visit type configuration |
+| `service_types` | id, name | Service type lookup |
+| `incident_types` | code, label, sort_order | Incident type lookup |
+| `incident_statuses` | code, label, sort_order | Incident status lookup |
+| `restaurants` | id, created_at, condominium_id, name, description, status | Restaurant directory |
+| `sports` | id, created_at, condominium_id, name, description, status | Sports facility directory |
+| `streets` | id, condominium_id, name, created_at | Street/location management |
+| `news_categories` | id, name, label, created_at | News category lookup |
+
+#### Resident App Tables
+
+| Table | Columns | Description |
+|-------|---------|-------------|
+| `resident_devices` | id, resident_id, push_token, device_name, platform, last_active, created_at | Resident mobile devices for push notifications |
+| `resident_qr_codes` | id, resident_id, condominium_id, unit_id, purpose, visitor_name, visitor_phone, notes, qr_code, is_recurring, recurrence_pattern, recurrence_days, start_date, end_date, expires_at, status, created_at, updated_at | Visitor QR code invitations |
+| `notifications` | id, resident_id, condominium_id, unit_id, title, body, type, data, read, created_at, updated_at | Push notifications for residents |
+| `condominium_news` | id, condominium_id, title, description, content, image_url, category_id, created_at, updated_at | News articles per condominium |
+
+#### Error Tracking
+
+| Table | Columns | Description |
+|-------|---------|-------------|
+| `device_registration_errors` | id, created_at, device_identifier, error_message, payload | Device registration error log |
+
+#### Views
+
+| View | Columns | Description |
+|------|---------|-------------|
+| `v_app_adoption_stats` | condominium_id, condominium_name, total_units, total_residents, residents_with_app, units_with_app, resident_adoption_percent, unit_coverage_percent | Resident app adoption metrics per condominium |
+
+### 7. Type System (types.ts)
 
 **All types use numeric IDs** (Supabase SERIAL/INT4), not UUIDs:
 - `Condominium.id: number`
@@ -413,34 +465,72 @@ ApprovalMode: APP | PHONE | INTERCOM | GUARD_MANUAL | QR_SCAN
 - `CondominiumStats` - Statistics data
 - `ApprovalModeConfig` - Approval mode metadata
 
-### 7. Backend Integration (Supabase)
+### 7.1 Audit Logging (App + Supabase)
 
-**RPC Functions** (services/Supabase.ts - 2,146 lines):
-```typescript
-// Authentication
-verify_staff_login(first_name, last_name, pin_cleartext)
+**Client logging**:
+- Visit creation logs on `NewEntry` (CREATE visits).
+- Visit status changes log on guard updates and admin updates.
+- Incident acknowledge/resolve/notes log for guard + admin flows.
+- Admin CRUD for condominiums, devices, staff, units, residents, restaurants, sports, visit types, service types logs CREATE/UPDATE/DELETE.
+- Login/Logout and login failures log with device identifier.
+- CSV/PDF exports log (visits/incidents/audit logs).
 
-// Device Management
-register_device(device_identifier, device_name, condominium_id, metadata)
-update_device_heartbeat(device_identifier)
+**Backend**:
+- RPCs `create_audit_log` and `admin_get_audit_logs` are expected to be deployed.
+- Optional SQL scripts:
+  - `database/audit_log_policies.sql` (retention + RLS)
+  - `database/audit_log_hardening.sql` (revoke UPDATE/DELETE/TRUNCATE on `audit_logs`)
 
-// Data Sync
-get_staff_for_sync(condominium_id)
-get_visit_types(condominium_id)
-get_service_types()
-```
+### 8. Backend Integration (Supabase)
 
-**Mcp**: Located in `docs/MCP.md`
+**RPC Functions** (services/Supabase.ts - 2,316 lines) — 94 functions total, grouped by domain:
+
+**Authentication (3)**: `verify_staff_login`, `verify_resident_login`, `register_resident_pin`
+
+**Device Management (7)**: `register_device`, `get_device`, `update_device_heartbeat`, `update_device_status`, `deactivate_condo_devices`, `get_devices_by_condominium`, `admin_get_all_devices`
+
+**Visits (8)**: `create_visit`, `update_visit_status`, `checkout_visit`, `create_visit_event`, `get_visit_events`, `admin_get_all_visits`, `admin_get_all_visits_filtered`, `admin_update_visit`
+
+**Condominiums (7)**: `get_condominiums`, `get_condominium`, `get_available_condominiums_for_setup`, `admin_create_condominium`, `admin_update_condominium`, `admin_delete_condominium`, `admin_get_condominiums_with_stats`
+
+**Staff (6)**: `get_staff_by_condominium`, `admin_get_all_staff`, `admin_create_staff_with_pin`, `admin_update_staff`, `admin_delete_staff`, `admin_update_staff_pin`
+
+**Units (4)**: `get_units`, `admin_get_all_units`, `admin_create_unit`, `admin_delete_unit`
+
+**Residents (4)**: `get_resident`, `admin_get_residents`, `admin_create_resident`, `admin_update_resident`
+
+**Incidents (7)**: `create_incident`, `get_incidents`, `get_resident_incidents`, `acknowledge_incident`, `admin_get_all_incidents`, `admin_update_incident`, `admin_delete_incident`
+
+**Configuration (11)**: `get_visit_types`, `get_service_types`, `get_incident_types`, `get_incident_statuses`, `admin_get_visit_types`, `admin_get_service_types`, `admin_create_visit_type`, `admin_delete_visit_type`, `admin_create_service_type`, `admin_update_service_type`, `admin_delete_service_type`
+
+**Restaurants & Sports (10)**: `get_restaurants`, `get_sports`, `admin_get_restaurants`, `admin_get_sports`, `admin_create_restaurant`, `admin_update_restaurant`, `admin_delete_restaurant`, `admin_create_sport`, `admin_update_sport`, `admin_delete_sport`
+
+**QR Codes (5)**: `create_visitor_qr_code`, `validate_qr_code`, `revoke_qr_code`, `get_active_qr_codes`, `expire_qr_codes`
+
+**Notifications (6)**: `create_notification`, `get_notifications`, `get_resident_notifications`, `get_unread_notification_count`, `mark_notification_read`, `mark_all_notifications_read`
+
+**OTP / PIN Reset (3)**: `request_pin_reset_otp`, `check_otp_validity`, `reset_pin_with_otp`
+
+**Streets (3)**: `create_street`, `get_streets`, `delete_street`
+
+**Audit (3)**: `create_audit_log`, `log_audit`, `admin_get_audit_logs`
+
+**Dashboard & App Tracking (3)**: `admin_get_dashboard_stats`, `update_resident_app_activity`, `check_unit_has_app`
+
+**MCP Documentation**: See `docs/MCP.md` for MCP server configuration.
+
+**Database Migrations**: Located in `database/*.sql` (apply manually to Supabase)
 
 **Storage Buckets** (Supabase Storage):
 ```
-staff-photos    // Staff profile photos (5MB max, jpeg/png/webp)
-condo-logos     // Condominium logos (2MB max, jpeg/png/webp/svg)
+visitor-photos     // Visitor photos taken during check-in
+staff-photos       // Staff profile photos
+logo_condominio    // Condominium logos
 ```
 
-Both buckets are public for read access. Setup via `setup_storage_buckets.sql`.
+All buckets are public for read access. Setup via `setup_storage_buckets.sql`.
 
-### 8. PWA Configuration (vite.config.ts)
+### 9. PWA Configuration (vite.config.ts)
 
 **Service Worker** (VitePWA):
 - Prompt-based registration (user controls updates)
@@ -450,7 +540,7 @@ Both buckets are public for read access. Setup via `setup_storage_buckets.sql`.
 
 **HTTPS Required**: `@vitejs/plugin-basic-ssl` enables camera access on tablets
 
-### 9. Path Aliases
+### 10. Path Aliases
 
 Use `@/` for imports:
 ```typescript
@@ -927,6 +1017,8 @@ interface AuditLog {
   target_table: string;
   target_id: number;
   details: any;  // JSON
+  ip_address?: string;
+  user_agent?: string;
 }
 ```
 
@@ -970,6 +1062,85 @@ interface VisitEvent {
 ```
 
 **Purpose**: Tracks visit status changes over time for audit trail and history display.
+
+#### ResidentDevice
+```typescript
+interface ResidentDevice {
+  id: number;
+  resident_id: number;
+  push_token: string;
+  device_name?: string;
+  platform?: string;           // 'ios' | 'android' | 'web'
+  last_active?: string;
+  created_at?: string;
+}
+```
+
+#### ResidentQrCode
+```typescript
+interface ResidentQrCode {
+  id: string;                  // UUID
+  resident_id: number;
+  condominium_id: number;
+  unit_id: number;
+  purpose?: string;
+  visitor_name?: string;
+  visitor_phone?: string;
+  notes?: string;
+  qr_code: string;             // Unique QR code string
+  is_recurring?: boolean;
+  recurrence_pattern?: string;
+  recurrence_days?: string[];
+  start_date?: string;
+  end_date?: string;
+  expires_at?: string;
+  status?: string;             // 'ACTIVE' | 'EXPIRED' | 'REVOKED'
+  created_at?: string;
+  updated_at?: string;
+}
+```
+
+#### Notification
+```typescript
+interface Notification {
+  id: number;
+  resident_id: number;
+  condominium_id: number;
+  unit_id?: number;
+  title: string;
+  body: string;
+  type?: string;               // 'VISIT_APPROVAL' | 'INCIDENT' | 'NEWS' etc.
+  data?: any;                  // JSON payload
+  read?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+```
+
+#### CondominiumNews
+```typescript
+interface CondominiumNews {
+  id: number;
+  condominium_id: number;
+  title: string;
+  description?: string;
+  content?: string;
+  image_url?: string;
+  category_id?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+```
+
+#### NewsCategory
+```typescript
+interface NewsCategory {
+  id: number;
+  name: string;
+  label?: string;
+  created_at?: string;
+}
+```
 
 ---
 

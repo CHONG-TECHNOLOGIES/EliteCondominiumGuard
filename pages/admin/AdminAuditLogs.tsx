@@ -1,16 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Loader2, Search, ChevronLeft, ChevronRight, Shield, Calendar } from 'lucide-react';
+import React, { useState, useEffect, useContext } from 'react';
+import { FileText, Loader2, Search, Shield, Calendar, Download } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { AuditLog, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
+import { exportAuditLogsToCSV } from '../../utils/csvExport';
+import { AuthContext } from '../../App';
 
 export default function AdminAuditLogs() {
   const { showToast } = useToast();
+  const { user } = useContext(AuthContext);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [condominiums, setCondominiums] = useState<Condominium[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [total, setTotal] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const pageSize = 50;
 
   // Filters
@@ -27,7 +31,7 @@ export default function AdminAuditLogs() {
 
   useEffect(() => {
     loadData();
-  }, [currentPage, filterCondoId, filterAction, filterTable, startDate, endDate]);
+  }, [filterCondoId, filterAction, filterTable, startDate, endDate]);
 
   const loadCondominiums = async () => {
     try {
@@ -49,11 +53,11 @@ export default function AdminAuditLogs() {
       if (startDate) filters.startDate = `${startDate}T00:00:00`;
       if (endDate) filters.endDate = `${endDate}T23:59:59`;
 
-      const offset = (currentPage - 1) * pageSize;
-      const result = await api.adminGetAuditLogs(filters, pageSize, offset);
+      const result = await api.adminGetAuditLogs(filters, pageSize, 0);
 
       setLogs(result.logs);
       setTotal(result.total);
+      setHasMore(result.logs.length < result.total);
     } catch (error) {
       console.error('Error loading audit logs:', error);
       showToast('error', 'Erro ao carregar logs de auditoria');
@@ -69,7 +73,33 @@ export default function AdminAuditLogs() {
     setStartDate('');
     setEndDate('');
     setSearchTerm('');
-    setCurrentPage(1);
+  };
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const filters: any = {};
+
+      if (filterCondoId) filters.condominiumId = filterCondoId;
+      if (filterAction) filters.action = filterAction;
+      if (filterTable) filters.targetTable = filterTable;
+      if (startDate) filters.startDate = `${startDate}T00:00:00`;
+      if (endDate) filters.endDate = `${endDate}T23:59:59`;
+
+      const result = await api.adminGetAuditLogs(filters, pageSize, logs.length);
+      setTotal(result.total);
+      setLogs(prev => {
+        const combined = [...prev, ...result.logs];
+        setHasMore(combined.length < result.total);
+        return combined;
+      });
+    } catch (error) {
+      console.error('Error loading more audit logs:', error);
+      showToast('error', 'Erro ao carregar mais logs');
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const getActionBadge = (action: string) => {
@@ -114,8 +144,6 @@ export default function AdminAuditLogs() {
     );
   });
 
-  const totalPages = Math.ceil(total / pageSize);
-
   return (
     <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
@@ -123,9 +151,45 @@ export default function AdminAuditLogs() {
           <h1 className="text-3xl font-bold text-text-main mb-2">Logs de Auditoria</h1>
           <p className="text-text-dim">Visualizar todas as ações administrativas no sistema</p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-text-dim">
-          <Shield size={20} />
-          <span className="font-medium">{total} registos</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-text-dim">
+            <Shield size={20} />
+            <span className="font-medium">{total} registos</span>
+          </div>
+          <button
+            onClick={() => {
+              if (filteredLogs.length === 0) {
+                showToast('warning', 'Nenhum log para exportar');
+                return;
+              }
+              exportAuditLogsToCSV(filteredLogs);
+              void api.logAudit({
+                condominium_id: user?.condominium_id ?? null,
+                actor_id: user?.id ?? null,
+                action: 'EXPORT',
+                target_table: 'audit_logs',
+                target_id: null,
+                details: {
+                  format: 'CSV',
+                  count: filteredLogs.length,
+                  filters: {
+                    search: searchTerm || null,
+                    condominium_id: filterCondoId ?? null,
+                    action: filterAction || null,
+                    target_table: filterTable || null,
+                    start_date: startDate || null,
+                    end_date: endDate || null
+                  }
+                }
+              });
+              showToast('success', `${filteredLogs.length} logs exportados para CSV`);
+            }}
+            disabled={loading || filteredLogs.length === 0}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <Download size={18} />
+            Exportar CSV
+          </button>
         </div>
       </div>
 
@@ -318,58 +382,16 @@ export default function AdminAuditLogs() {
             </div>
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between bg-bg-surface rounded-xl shadow-sm border border-border-main px-4 py-3">
-              <div className="text-sm text-text-dim">
-                Mostrando {((currentPage - 1) * pageSize) + 1} a {Math.min(currentPage * pageSize, total)} de {total} registos
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="p-2 text-text-dim hover:bg-bg-root rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                          currentPage === pageNum
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-600 hover:bg-slate-100'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-2 text-text-dim hover:bg-bg-root rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight size={20} />
-                </button>
-              </div>
+          {!loading && logs.length > 0 && hasMore && (
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {loadingMore && <Loader2 size={18} className="animate-spin" />}
+                {loadingMore ? 'Carregando...' : 'Mostrar mais'}
+              </button>
             </div>
           )}
         </>

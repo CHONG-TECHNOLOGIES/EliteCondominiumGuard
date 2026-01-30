@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/dataService';
 import { Visit, VisitEvent, VisitStatus, SyncStatus } from '../types';
+import { initiatePhoneCall } from '@/utils/approvalModes';
 import { CheckCircle, LogOut, Clock, AlertCircle, User, MapPin, ArrowLeft, Phone, History, X } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
@@ -65,7 +66,7 @@ export default function DailyList() {
         targetTable: 'visits',
         targetId: visit.id
       });
-      window.open(`tel:${visit.visitor_phone}`, '_self');
+      initiatePhoneCall(visit.visitor_phone!);
     });
   };
 
