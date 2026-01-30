@@ -15,6 +15,8 @@ import { SyncOverlay } from './components/SyncOverlay';
 import type { SyncEventDetail } from './services/dataService';
 import { ThemeProvider } from './context/ThemeContext';
 import { SpeedInsights } from '@vercel/speed-insights/react';
+import * as Sentry from '@sentry/react';
+import { logger } from './services/logger';
 
 const Login = React.lazy(() => import('./pages/Login'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -397,9 +399,21 @@ export default function App() {
 
   const login = (staff: Staff) => {
     setUser(staff);
-    // Use sessionStorage instead of localStorage so the session doesn't survive 
+    // Use sessionStorage instead of localStorage so the session doesn't survive
     // the app being fully closed or "reinstalled".
     sessionStorage.setItem('auth_user', JSON.stringify(staff));
+
+    // Set Sentry user context
+    Sentry.setUser({
+      id: String(staff.id),
+      username: `${staff.first_name} ${staff.last_name}`,
+    });
+    Sentry.setTag('role', staff.role);
+    Sentry.setTag('condominium_id', String(staff.condominium_id));
+    logger.setContext({
+      userId: staff.id,
+      condominiumId: staff.condominium_id,
+    });
   };
 
   const logout = () => {
@@ -418,6 +432,8 @@ export default function App() {
     setUser(null);
     // Clear persisted auth state
     sessionStorage.removeItem('auth_user');
+    Sentry.setUser(null);
+    logger.clearContext();
   };
 
   useEffect(() => {
@@ -427,9 +443,9 @@ export default function App() {
       try {
         const parsedUser = JSON.parse(storedUser) as Staff;
         setUser(parsedUser);
-        console.log('[App] ✅ Auth state restored from sessionStorage');
+        logger.info('Auth state restored from sessionStorage');
       } catch (e) {
-        console.error('[App] Failed to restore auth state:', e);
+        logger.warn('Failed to restore auth state', { error: String(e) });
         sessionStorage.removeItem('auth_user'); // Clean up corrupted data
       }
     }
@@ -440,13 +456,13 @@ export default function App() {
 
     // Log installation status
     const status = pwaLifecycleService.getInstallationStatus();
-    console.log('[App] PWA Installation Status:', status);
+    logger.debug('PWA Installation Status', status as unknown as Record<string, unknown>);
 
     // Initialize audio service on any user interaction
     const initAudio = () => {
       audioService.initialize().then(success => {
         if (success) {
-          console.log('[App] ✅ Audio service initialized successfully');
+          logger.debug('Audio service initialized successfully');
         }
       });
       // Remove listeners after first interaction

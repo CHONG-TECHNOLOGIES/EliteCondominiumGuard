@@ -111,18 +111,50 @@ export function initiatePhoneCall(phoneNumber: string): void {
     return;
   }
 
-  // Clean phone number (remove spaces, dashes, etc.)
   const cleanNumber = phoneNumber.replace(/[^0-9+]/g, '');
   const telUrl = `tel:${cleanNumber}`;
 
-  // Use a temporary <a> element — most reliable way to trigger
-  // tel: protocol on Android tablets and PWAs
-  const link = document.createElement('a');
-  link.href = telUrl;
-  link.style.display = 'none';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  // Try multiple methods to trigger the phone dialer
+  // Method 1: Temporary <a> element click
+  try {
+    const link = document.createElement('a');
+    link.href = telUrl;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (e1) {
+    // Method 2: window.open
+    try {
+      window.open(telUrl, '_self');
+    } catch (e2) {
+      // Method 3: window.location
+      try {
+        window.location.href = telUrl;
+      } catch (e3) {
+        alert(
+          `Não foi possível iniciar a chamada.\n\n` +
+          `Número: ${cleanNumber}\n\n` +
+          `Erro: ${e1 instanceof Error ? e1.message : String(e1)}\n` +
+          `Método 2: ${e2 instanceof Error ? e2.message : String(e2)}\n` +
+          `Método 3: ${e3 instanceof Error ? e3.message : String(e3)}`
+        );
+      }
+    }
+  }
+
+  // After a short delay, check if the page is still visible
+  // (if the dialer opened, the page would lose focus)
+  setTimeout(() => {
+    if (document.hasFocus()) {
+      alert(
+        `O discador não abriu. O tablet pode não suportar chamadas tel:.\n\n` +
+        `Número para ligar manualmente: ${cleanNumber}\n\n` +
+        `URL tentada: ${telUrl}\n` +
+        `UserAgent: ${navigator.userAgent}`
+      );
+    }
+  }, 2000);
 }
 
 /**

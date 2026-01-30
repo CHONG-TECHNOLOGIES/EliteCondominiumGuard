@@ -2,6 +2,9 @@
 
 import { supabase } from './supabaseClient';
 import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
+import { logger, ErrorCategory } from '@/services/logger';
+
+logger.setContext({ service: 'Supabase' });
 
 const getStoragePathFromPublicUrl = (publicUrl: string, bucket: string): string | null => {
   if (!publicUrl) return null;
@@ -73,7 +76,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Condominium;
     } catch (err: any) {
-      console.error("Error getting condo:", err.message || JSON.stringify(err));
+      logger.error('Error getting condo', err, ErrorCategory.NETWORK);
       return null;
     }
   },
@@ -96,7 +99,7 @@ export const SupabaseService = {
       return activeCondos;
 
     } catch (err: any) {
-      console.error("Error listing condos:", err.message || JSON.stringify(err));
+      logger.error('Error listing condos', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -111,7 +114,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data || [];
     } catch (err: any) {
-      console.error("Error getting streets:", err.message || JSON.stringify(err));
+      logger.error('Error getting streets', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -128,7 +131,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data;
     } catch (err: any) {
-      console.error("Error adding street:", err.message || JSON.stringify(err));
+      logger.error('Error adding street', err, ErrorCategory.NETWORK);
       return null;
     }
   },
@@ -143,7 +146,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("Error removing street:", err.message || JSON.stringify(err));
+      logger.error('Error removing street', err, ErrorCategory.NETWORK);
       return false;
     }
   },

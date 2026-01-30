@@ -108,6 +108,7 @@ export default function AdminAuditLogs() {
       'UPDATE': { bg: 'bg-blue-100', text: 'text-blue-800' },
       'DELETE': { bg: 'bg-red-100', text: 'text-red-800' },
       'LOGIN': { bg: 'bg-purple-100', text: 'text-purple-800' },
+      'LOGIN_FAILED': { bg: 'bg-orange-100', text: 'text-orange-800' },
       'LOGOUT': { bg: 'bg-gray-100', text: 'text-gray-800' }
     };
 
@@ -234,6 +235,7 @@ export default function AdminAuditLogs() {
             <option value="UPDATE">Atualizar</option>
             <option value="DELETE">Eliminar</option>
             <option value="LOGIN">Login</option>
+            <option value="LOGIN_FAILED">Login falhou</option>
             <option value="LOGOUT">Logout</option>
           </select>
 

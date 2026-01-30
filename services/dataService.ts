@@ -3,6 +3,7 @@ import { db } from './db';
 import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Sync event types for UI integration
 export type SyncEventType = 'sync:start' | 'sync:progress' | 'sync:complete' | 'sync:error';
@@ -926,6 +927,18 @@ class DataService {
     const deviceCondoId = deviceCondoDetails?.id;
     if (!deviceCondoId) throw new Error("Dispositivo não configurado");
 
+    let failureCode: string | null = null;
+    let failureReason: string | null = null;
+    let failureStage: 'online' | 'offline' | null = null;
+
+    const setFailure = (code: string, reason: string, stage: 'online' | 'offline') => {
+      if (!failureCode || failureCode === 'OFFLINE_MODE') {
+        failureCode = code;
+        failureReason = reason;
+        failureStage = stage;
+      }
+    };
+
     if (this.isBackendHealthy) {
       try {
         const staff = await SupabaseService.verifyStaffLogin(firstName, lastName, pin);
@@ -939,6 +952,11 @@ class DataService {
               const staffCondoLabel = staffCondoName || 'Desconhecido';
               const deviceCondoLabel = deviceCondoName || 'Desconhecido';
 
+              setFailure(
+                'CONDO_MISMATCH',
+                `Acesso negado: utilizador é de ${staffCondoLabel}, dispositivo está em ${deviceCondoLabel}.`,
+                'online'
+              );
               throw new Error(`Acesso Negado: Utilizador pertence ao condomínio ${staffCondoLabel}, mas o tablet está no ${deviceCondoLabel}.`);
             }
           }
@@ -958,10 +976,16 @@ class DataService {
           });
           return staff;
         }
+        setFailure('INVALID_CREDENTIALS', 'Credenciais inválidas.', 'online');
       } catch (e) {
         console.error("Login online falhou, tentando offline:", e);
+        if (!failureCode) {
+          setFailure('ONLINE_ERROR', 'Falha ao autenticar online.', 'online');
+        }
         this.backendHealthScore--;
       }
+    } else {
+      setFailure('OFFLINE_MODE', 'Sem ligação ao servidor.', 'offline');
     }
 
     // --- OFFLINE FALLBACK ---
@@ -984,6 +1008,9 @@ class DataService {
         });
         return localStaff;
       }
+      setFailure('OFFLINE_INVALID_PIN', 'PIN inválido (offline).', 'offline');
+    } else {
+      setFailure('OFFLINE_USER_NOT_FOUND', 'Utilizador não encontrado no cache offline.', 'offline');
     }
 
     await this.logAudit({
@@ -996,7 +1023,10 @@ class DataService {
         first_name: firstName,
         last_name: lastName,
         offline: !this.isBackendHealthy,
-        device_identifier: getDeviceIdentifier()
+        device_identifier: getDeviceIdentifier(),
+        failure_code: failureCode,
+        failure_reason: failureReason,
+        failure_stage: failureStage
       }
     });
     throw new Error("Credenciais inválidas ou sem acesso offline.");
