@@ -122,13 +122,13 @@ export default function Login() {
           >
             <ShieldCheck className="text-white w-8 h-8 md:w-12 md:h-12" />
           </div>
-          <h1 className="text-2xl md:text-5xl font-black text-white mb-2 md:mb-4 tracking-tight">Elite AccesControl</h1>
-          <p className="text-sm md:text-xl text-blue-100 font-light max-w-md hidden md:block">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-2 md:mb-4 tracking-tight">Elite AccesControl</h1>
+          <p className="text-sm sm:text-base md:text-xl text-blue-100 font-light max-w-md">
             Sistema Inteligente de Controlo de Acessos.
           </p>
           <div className="mt-2 md:mt-12 px-4 py-2 bg-white/10 backdrop-blur-md rounded-lg md:rounded-2xl border border-white/10">
-            <p className="text-[10px] md:text-xs uppercase tracking-widest text-blue-200 font-bold mb-0 md:mb-1">Condomínio</p>
-            <p className="text-sm md:text-2xl font-bold text-white">{condoName || '...'}</p>
+            <p className="text-xs sm:text-sm md:text-xs uppercase tracking-widest text-blue-200 font-bold mb-0 md:mb-1">Condomínio</p>
+            <p className="text-base sm:text-lg md:text-2xl font-bold text-white">{condoName || '...'}</p>
           </div>
         </div>
       </div>
@@ -144,7 +144,7 @@ export default function Login() {
             )}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Nome</label>
+                <label className="text-xs sm:text-sm md:text-sm font-bold text-slate-400 uppercase tracking-wider block mb-1">Nome</label>
                 <input
                   type="text"
                   value={firstName}
@@ -154,7 +154,7 @@ export default function Login() {
                 />
               </div>
               <div>
-                <label className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Apelido</label>
+                <label className="text-xs sm:text-sm md:text-sm font-bold text-slate-400 uppercase tracking-wider block mb-1">Apelido</label>
                 <input
                   type="text"
                   value={lastName}
