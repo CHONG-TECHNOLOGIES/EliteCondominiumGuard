@@ -140,6 +140,8 @@ export default function AdminResidents() {
   const [residents, setResidents] = useState<Resident[]>([]);
   const [condominiums, setCondominiums] = useState<Condominium[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [unitLookup, setUnitLookup] = useState<Record<number, Unit>>({});
+  const unitsByCondoRef = useRef<Record<number, Unit[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -194,6 +196,7 @@ export default function AdminResidents() {
       );
       setResidents(residentsData);
       setHasMore(residentsData.length === PAGE_SIZE);
+      await loadUnitsForResidentList(residentsData);
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -219,6 +222,36 @@ export default function AdminResidents() {
     }
   };
 
+  const loadUnitsForResidentList = async (residentList: Resident[]) => {
+    const condoIds = Array.from(
+      new Set(residentList.map(resident => resident.condominium_id).filter(Boolean))
+    );
+
+    if (condoIds.length === 0) {
+      setUnitLookup({});
+      return;
+    }
+
+    const missingCondoIds = condoIds.filter(condoId => !unitsByCondoRef.current[condoId]);
+    if (missingCondoIds.length > 0) {
+      const results = await Promise.all(
+        missingCondoIds.map(condoId => api.adminGetAllUnits(condoId))
+      );
+      missingCondoIds.forEach((condoId, index) => {
+        unitsByCondoRef.current[condoId] = results[index] || [];
+      });
+    }
+
+    const lookup: Record<number, Unit> = {};
+    condoIds.forEach(condoId => {
+      const unitsForCondo = unitsByCondoRef.current[condoId] || [];
+      unitsForCondo.forEach(unit => {
+        lookup[unit.id] = unit;
+      });
+    });
+    setUnitLookup(lookup);
+  };
+
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore) return;
     if (residents.length === 0) return;
@@ -233,8 +266,10 @@ export default function AdminResidents() {
         lastResident.name,
         lastResident.id
       );
-      setResidents(prev => [...prev, ...moreResidents]);
+      const updatedResidents = [...residents, ...moreResidents];
+      setResidents(updatedResidents);
       setHasMore(moreResidents.length === PAGE_SIZE);
+      await loadUnitsForResidentList(updatedResidents);
     } catch (error) {
       console.error('Error loading more residents:', error);
       showToast('error', 'Erro ao carregar mais residentes');
@@ -351,17 +386,27 @@ export default function AdminResidents() {
     return condo?.name || 'Desconhecido';
   };
 
+  const formatUnitLabel = (unit?: Unit | null, fallbackId?: number) => {
+    if (!unit) {
+      return fallbackId ? `Unidade ${fallbackId}` : 'Unidade';
+    }
+
+    const parts: string[] = [];
+    if (unit.building_name) parts.push(unit.building_name);
+    if (unit.code_block) parts.push(`Bloco ${unit.code_block}`);
+    if (unit.number) parts.push(`Unidade ${unit.number}`);
+    if (unit.floor) parts.push(`Andar ${unit.floor}`);
+
+    if (parts.length > 0) {
+      return parts.join(' • ');
+    }
+
+    return fallbackId ? `Unidade ${fallbackId}` : 'Unidade';
+  };
+
   const getUnitInfo = (unitId: number) => {
-    const unit = units.find(u => u.id === unitId);
-    if (unit) {
-      return `${unit.code_block} ${unit.number}`;
-    }
-    // If unit not found in current units list, try to find in resident's unit_id
-    const resident = residents.find(r => r.unit_id === unitId);
-    if (resident) {
-      return `Unidade ${unitId}`;
-    }
-    return 'Desconhecida';
+    const unit = unitLookup[unitId] || units.find(u => u.id === unitId);
+    return formatUnitLabel(unit, unitId);
   };
 
   return (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, X, AlertTriangle, Clock } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { logger, ErrorCategory } from '@/services/logger';
 
 const UPDATE_REMINDER_INTERVAL = 30 * 60 * 1000; // 30 minutes
 const UPDATE_CRITICAL_TIME = 24 * 60 * 60 * 1000; // 24 hours
@@ -19,26 +20,26 @@ export const PWAUpdateNotification: React.FC = () => {
     updateServiceWorker
   } = useRegisterSW({
     onRegistered(registration) {
-      console.log('[PWA Update] ✅ Service Worker registered:', registration);
+      logger.info('Service Worker registered', { registration: !!registration });
 
       // Check for updates every 5 minutes
       if (registration) {
-        console.log('[PWA Update] 🔄 Update checker initialized (checking every 5 minutes)');
+        logger.info('Update checker initialized (checking every 5 minutes)');
         setInterval(() => {
-          console.log('[PWA Update] 🔍 Checking for updates...');
+          logger.debug('Checking for updates');
           registration.update().then(() => {
-            console.log('[PWA Update] ✓ Update check completed');
+            logger.debug('Update check completed');
           }).catch((error) => {
-            console.error('[PWA Update] ❌ Update check failed:', error);
+            logger.error('Update check failed', error, ErrorCategory.PWA);
           });
         }, 5 * 60 * 1000); // 5 minutes
       }
     },
     onRegisterError(error) {
-      console.error('[PWA Update] ❌ Service Worker registration error:', error);
+      logger.error('Service Worker registration error', error, ErrorCategory.PWA);
     },
     onNeedRefresh() {
-      console.log('[PWA Update] 🎉 NEW VERSION AVAILABLE! Showing update prompt...');
+      logger.info('New version available, showing update prompt');
       const now = Date.now();
       setUpdateDetectedAt(now);
       setShowReload(true);
@@ -51,13 +52,13 @@ export const PWAUpdateNotification: React.FC = () => {
       setDismissCount(0);
     },
     onOfflineReady() {
-      console.log('[PWA Update] 📱 App ready to work offline');
+      logger.info('App ready to work offline');
     }
   });
 
   // Restore state from localStorage on mount
   useEffect(() => {
-    console.log('[PWA Update] Component mounted, needRefresh state:', needRefresh);
+    logger.debug('PWAUpdateNotification mounted', { needRefresh });
 
     // Restore update timestamp from localStorage
     const storedTimestamp = localStorage.getItem(STORAGE_KEY);
@@ -75,13 +76,13 @@ export const PWAUpdateNotification: React.FC = () => {
       // Check if update is now critical (>24h old)
       const age = Date.now() - timestamp;
       if (age > UPDATE_CRITICAL_TIME) {
-        console.log('[PWA Update] ⚠️ Update is CRITICAL (>24h old)');
+        logger.warn('Update is critical (>24h old)');
         setIsCritical(true);
       }
     }
 
     if (needRefresh) {
-      console.log('[PWA Update] ⚡ Setting showReload to true');
+      logger.debug('Setting showReload to true');
       setShowReload(true);
     }
   }, [needRefresh]);
@@ -112,21 +113,21 @@ export const PWAUpdateNotification: React.FC = () => {
   // Reminder system: show notification again after 30 minutes
   useEffect(() => {
     if (!showReload && updateDetectedAt && needRefresh) {
-      console.log('[PWA Update] ⏰ Setting up reminder (will show again in 30 minutes)');
+      logger.debug('Setting up reminder (will show again in 30 minutes)');
 
       const reminderTimeout = setTimeout(() => {
         const age = Date.now() - updateDetectedAt;
 
-        console.log('[PWA Update] ⏰ Reminder triggered - Update age:', Math.round(age / 1000 / 60), 'minutes');
+        logger.debug('Reminder triggered', { updateAgeMinutes: Math.round(age / 1000 / 60) });
 
         // Mark as critical after 24h
         if (age > UPDATE_CRITICAL_TIME && !isCritical) {
-          console.log('[PWA Update] ⚠️ Update is now CRITICAL');
+          logger.warn('Update is now critical');
           setIsCritical(true);
         }
 
         // Show reminder
-        console.log('[PWA Update] 🔔 Showing update reminder (dismissed', dismissCount, 'times)');
+        logger.info('Showing update reminder', { dismissCount });
         setShowReload(true);
 
       }, UPDATE_REMINDER_INTERVAL);
@@ -136,7 +137,7 @@ export const PWAUpdateNotification: React.FC = () => {
   }, [showReload, updateDetectedAt, needRefresh, isCritical, dismissCount]);
 
   const handleUpdate = () => {
-    console.log('[PWA Update] 🔄 User clicked "Atualizar Agora" - reloading app...');
+    logger.info('User clicked update now, reloading app');
     // Clear stored data
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(DISMISS_COUNT_KEY);
@@ -145,13 +146,13 @@ export const PWAUpdateNotification: React.FC = () => {
 
   const handleDismiss = () => {
     if (isCritical) {
-      console.log('[PWA Update] ⚠️ Update is CRITICAL - cannot fully dismiss, only hide temporarily');
+      logger.warn('Update is critical, cannot fully dismiss');
       // In critical mode, only allow hiding via X button, not "Mais Tarde"
       return;
     }
 
     const newDismissCount = dismissCount + 1;
-    console.log('[PWA Update] ⏭️ User dismissed update notification (count:', newDismissCount, ')');
+    logger.info('User dismissed update notification', { dismissCount: newDismissCount });
 
     setDismissCount(newDismissCount);
     localStorage.setItem(DISMISS_COUNT_KEY, newDismissCount.toString());
@@ -161,7 +162,7 @@ export const PWAUpdateNotification: React.FC = () => {
   };
 
   const handleClose = () => {
-    console.log('[PWA Update] ❌ User closed notification via X button');
+    logger.debug('User closed notification via X button');
     setShowReload(false);
     // Don't reset needRefresh - will show again based on reminder interval
   };

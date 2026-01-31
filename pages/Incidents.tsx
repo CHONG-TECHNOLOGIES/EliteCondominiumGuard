@@ -7,6 +7,7 @@ import { Incident } from '../types';
 import { CheckSquare, ArrowLeft, AlertTriangle, AlertCircle, Info, FileText, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { audioService } from '../services/audioService';
+import { logger, ErrorCategory } from '@/services/logger';
 
 export default function Incidents() {
   const { user } = useContext(AuthContext);
@@ -33,7 +34,7 @@ export default function Incidents() {
       const hasNewIncidents = newIncidentIds.some(id => !knownIncidentIdsRef.current.has(id));
 
       if (hasNewIncidents && knownIncidentIdsRef.current.size > 0) {
-        console.log('[Incidents] 🚨 NEW INCIDENT DETECTED!');
+        logger.info('New incident detected');
         playAlertSound();
         vibrateDevice();
         showNewIncidentBanner();
@@ -42,7 +43,7 @@ export default function Incidents() {
       // Update known incident IDs
       knownIncidentIdsRef.current = new Set(newIncidentIds);
     } catch (error) {
-      console.error('Error loading incidents:', error);
+      logger.error('Failed to load incidents', error, ErrorCategory.SYNC);
     } finally {
       setLoading(false);
     }
@@ -67,7 +68,7 @@ export default function Incidents() {
         alert('❌ Erro ao tocar som. Verifique as permissões do navegador.');
       }
     } catch (err) {
-      console.error('[Incidents] ❌ Error testing sound:', err);
+      logger.error('Error testing sound', err, ErrorCategory.DEVICE);
       alert('❌ Erro ao tocar som. Verifique as permissões do navegador.');
     }
   };
@@ -76,7 +77,7 @@ export default function Incidents() {
     // Vibrate on mobile devices (pattern: vibrate 200ms, pause 100ms, vibrate 200ms)
     if ('vibrate' in navigator) {
       navigator.vibrate([200, 100, 200]);
-      console.log('[Incidents] 📳 Device vibrated');
+      logger.debug('Device vibrated');
     }
   };
 
@@ -95,11 +96,11 @@ export default function Incidents() {
     if (supabase) {
       const condoId = user?.condominium_id;
       if (!condoId) {
-        console.warn('[Incidents] No condominium ID - subscription not created');
+        logger.warn('No condominium ID - subscription not created');
         return;
       }
 
-      console.log('[Incidents] 📡 Setting up realtime subscription for condo:', condoId);
+      logger.info('Setting up realtime subscription', { condoId });
 
       const subscription = supabase
         .channel('incidents-changes')
@@ -113,7 +114,7 @@ export default function Incidents() {
             // It's related through residents table. We'll filter client-side instead.
           },
           async (payload) => {
-            console.log('[Incidents] 🆕 New incident received via realtime:', payload);
+            logger.info('New incident received via realtime', { payload: payload.new });
 
             // Verify if incident belongs to this condominium
             // Get resident_id from payload and check condominium
@@ -129,7 +130,7 @@ export default function Incidents() {
                   .single();
 
                 if (resident?.condominium_id === condoId) {
-                  console.log('[Incidents] ✅ Incident belongs to this condominium - triggering alert');
+                  logger.info('Incident belongs to this condominium - triggering alert');
 
                   // Play alert IMMEDIATELY when new incident arrives
                   playAlertSound();
@@ -139,10 +140,10 @@ export default function Incidents() {
                   // Then reload incidents to update the list
                   loadIncidents();
                 } else {
-                  console.log('[Incidents] ⏭️ Incident from different condominium - ignoring');
+                  logger.debug('Incident from different condominium - ignoring');
                 }
               } catch (err) {
-                console.error('[Incidents] Error checking resident condominium:', err);
+                logger.error('Error checking resident condominium', err, ErrorCategory.NETWORK);
                 // If error, still show alert to be safe
                 playAlertSound();
                 vibrateDevice();
@@ -160,7 +161,7 @@ export default function Incidents() {
             table: 'incidents'
           },
           async (payload) => {
-            console.log('[Incidents] 🔄 Incident updated via realtime:', payload);
+            logger.info('Incident updated via realtime', { payload: payload.new });
 
             // Verify if incident belongs to this condominium
             const updatedIncident = payload.new as any;
@@ -178,7 +179,7 @@ export default function Incidents() {
                   loadIncidents();
                 }
               } catch (err) {
-                console.error('[Incidents] Error checking resident condominium on update:', err);
+                logger.error('Error checking resident condominium on update', err, ErrorCategory.NETWORK);
                 // If error, still reload to be safe
                 loadIncidents();
               }
@@ -186,20 +187,20 @@ export default function Incidents() {
           }
         )
         .subscribe((status) => {
-          console.log('[Incidents] Subscription status:', status);
+          logger.info('Subscription status changed', { status });
           if (status === 'SUBSCRIBED') {
-            console.log('[Incidents] ✅ Successfully subscribed to incident changes');
+            logger.info('Successfully subscribed to incident changes');
           } else if (status === 'CHANNEL_ERROR') {
-            console.error('[Incidents] ❌ Subscription error - realtime may not be enabled');
+            logger.error('Subscription error - realtime may not be enabled', undefined, ErrorCategory.NETWORK);
           }
         });
 
       return () => {
-        console.log('[Incidents] 🔌 Unsubscribing from incident changes');
+        logger.info('Unsubscribing from incident changes');
         subscription.unsubscribe();
       };
     } else {
-      console.warn('[Incidents] Supabase client not available - no realtime subscription');
+      logger.warn('Supabase client not available - no realtime subscription');
     }
   }, [user?.condominium_id]);
 
@@ -213,7 +214,7 @@ export default function Incidents() {
       await api.acknowledgeIncident(id, user.id);
       await loadIncidents();
     } catch (error) {
-      console.error('Error acknowledging incident:', error);
+      logger.error('Failed to acknowledge incident', error, ErrorCategory.SYNC);
       alert('Erro ao confirmar leitura do incidente');
     }
   };
@@ -243,7 +244,7 @@ export default function Incidents() {
       await loadIncidents();
       handleCloseActionModal();
     } catch (error) {
-      console.error('Error reporting action:', error);
+      logger.error('Failed to report incident action', error, ErrorCategory.SYNC);
       alert('Erro ao reportar ação');
     }
   };

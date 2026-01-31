@@ -4,6 +4,7 @@ import { api } from '../services/dataService';
 import { UninstallConfirmDialog } from '../components/UninstallConfirmDialog';
 import { getDeviceIdentifier } from '../services/deviceUtils';
 import { PhotoQuality } from '../types';
+import { logger, ErrorCategory } from '@/services/logger';
 
 const Settings: React.FC = () => {
   const [condoName, setCondoName] = useState('');

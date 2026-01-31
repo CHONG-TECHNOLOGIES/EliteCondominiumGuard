@@ -5,11 +5,16 @@
 
 import { getDeviceIdentifier } from './deviceUtils';
 import { SupabaseService } from './Supabase';
+import { logger, ErrorCategory } from '@/services/logger';
 
 import { db } from './db';
 
 class PWALifecycleService {
   private isInstalled: boolean = false;
+
+  constructor() {
+    logger.setContext({ service: 'PWALifecycle' });
+  }
 
   /**
    * Initialize PWA lifecycle tracking
@@ -32,10 +37,10 @@ class PWALifecycleService {
     this.isInstalled = isStandalone || isIOSStandalone;
 
     if (this.isInstalled) {
-      console.log('[PWA Lifecycle] App is running as installed PWA');
+      logger.info('App is running as installed PWA');
       this.markAsInstalled();
     } else {
-      console.log('[PWA Lifecycle] App is running in browser');
+      logger.info('App is running in browser');
     }
   }
 
@@ -45,7 +50,7 @@ class PWALifecycleService {
   private setupInstallListeners() {
     // Listen for app installation
     window.addEventListener('appinstalled', () => {
-      console.log('[PWA Lifecycle] App was installed');
+      logger.info('App was installed');
       this.isInstalled = true;
       this.markAsInstalled();
 
@@ -56,11 +61,11 @@ class PWALifecycleService {
     // Listen for display mode changes
     window.matchMedia('(display-mode: standalone)').addEventListener('change', (e) => {
       if (e.matches) {
-        console.log('[PWA Lifecycle] App entered standalone mode');
+        logger.info('App entered standalone mode');
         this.isInstalled = true;
         this.markAsInstalled();
       } else {
-        console.log('[PWA Lifecycle] App left standalone mode');
+        logger.info('App left standalone mode');
         // This could indicate uninstallation
         this.handlePotentialUninstall();
       }
@@ -94,7 +99,7 @@ class PWALifecycleService {
   private setupVisibilityTracking() {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && this.isInstalled) {
-        console.log('[PWA Lifecycle] App became visible');
+        logger.debug('App became visible');
         this.updateLastSeen();
       }
     });
@@ -117,7 +122,7 @@ class PWALifecycleService {
     localStorage.setItem('pwa_launch_count', (launchCount + 1).toString());
     localStorage.setItem('pwa_last_launch', new Date().toISOString());
 
-    console.log(`[PWA Lifecycle] App launched ${launchCount + 1} times`);
+    logger.debug('App launched', { launchCount: launchCount + 1 });
   }
 
   /**
@@ -127,9 +132,9 @@ class PWALifecycleService {
     try {
       const deviceId = getDeviceIdentifier();
       await SupabaseService.updateDeviceHeartbeat(deviceId);
-      console.log('[PWA Lifecycle] Updated last_seen in backend');
+      logger.debug('Updated last_seen in backend');
     } catch (err) {
-      console.error('[PWA Lifecycle] Failed to update last_seen:', err);
+      logger.error('Failed to update last_seen', err, ErrorCategory.NETWORK);
     }
   }
 
@@ -138,7 +143,7 @@ class PWALifecycleService {
    * This is called when we detect the app left standalone mode
    */
   private async handlePotentialUninstall() {
-    console.warn('[PWA Lifecycle] Potential uninstall detected!');
+    logger.warn('Potential uninstall detected');
 
     // Check if this is a real uninstall or just the user opening in browser
     const wasInstalled = localStorage.getItem('pwa_installed') === 'true';
@@ -146,7 +151,7 @@ class PWALifecycleService {
     if (wasInstalled) {
       // The app was installed but is no longer in standalone mode
       // This could mean uninstallation
-      console.warn('[PWA Lifecycle] App was previously installed but is no longer in standalone mode');
+      logger.warn('App was previously installed but is no longer in standalone mode');
 
       // We can't immediately decommission because the user might just be testing
       // Instead, we mark this state and wait
@@ -165,8 +170,7 @@ class PWALifecycleService {
       const registrations = await navigator.serviceWorker.getRegistrations();
 
       if (registrations.length === 0 && this.isInstalled) {
-        console.error('[PWA Lifecycle] Service worker unregistered while app is installed!');
-        console.error('[PWA Lifecycle] This may indicate app uninstallation');
+        logger.error('Service worker unregistered while app is installed - may indicate uninstallation', undefined, ErrorCategory.PWA);
 
         // Try to decommission device in background
         await this.attemptBackgroundDecommission();
@@ -181,19 +185,19 @@ class PWALifecycleService {
   private async attemptBackgroundDecommission() {
     try {
       const deviceId = getDeviceIdentifier();
-      console.log('[PWA Lifecycle] Attempting background decommission for:', deviceId);
+      logger.info('Attempting background decommission', { deviceId });
 
       // Try to update backend
       const success = await SupabaseService.decommissionDevice(deviceId);
 
       if (success) {
-        console.log('[PWA Lifecycle] ✅ Device decommissioned successfully');
+        logger.info('Device decommissioned successfully');
         localStorage.setItem('pwa_decommissioned', 'true');
       } else {
-        console.warn('[PWA Lifecycle] ⚠️ Failed to decommission device in backend');
+        logger.warn('Failed to decommission device in backend');
       }
     } catch (err) {
-      console.error('[PWA Lifecycle] Error during background decommission:', err);
+      logger.error('Error during background decommission', err, ErrorCategory.PWA);
     }
   }
 
@@ -202,7 +206,7 @@ class PWALifecycleService {
    * Used on fresh installations to prevent data carry-over
    */
   private async clearAllDataOnInstall() {
-    console.warn('[PWA Lifecycle] Performing fresh install data cleanup...');
+    logger.warn('Performing fresh install data cleanup');
 
     try {
       // 1. Clear IndexedDB
@@ -221,9 +225,9 @@ class PWALifecycleService {
       // 3. Clear session storage
       sessionStorage.clear();
 
-      console.log('[PWA Lifecycle] ✅ Fresh install cleanup complete');
+      logger.info('Fresh install cleanup complete');
     } catch (err) {
-      console.error('[PWA Lifecycle] Failed to clear data on install:', err);
+      logger.error('Failed to clear data on install', err, ErrorCategory.STORAGE);
     }
   }
 
@@ -241,8 +245,7 @@ class PWALifecycleService {
 
     // If app hasn't been active for 30+ days and we detected potential uninstall
     if (daysSinceActive > 30) {
-      console.warn(`[PWA Lifecycle] Device inactive for ${daysSinceActive.toFixed(0)} days`);
-      console.warn('[PWA Lifecycle] Decommissioning due to extended inactivity');
+      logger.warn('Decommissioning due to extended inactivity', { daysSinceActive: Math.round(daysSinceActive) });
 
       await this.attemptBackgroundDecommission();
     }

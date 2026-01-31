@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Camera, RefreshCw, Check } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { PhotoQuality } from '../types';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Photo quality configuration for data saving
 const QUALITY_CONFIG: Record<PhotoQuality, { scale: number; jpegQuality: number }> = {
@@ -41,7 +42,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, mode = 'photo'
         setError('');
       }
     } catch (err: any) {
-      console.error("Error accessing camera:", err);
+      logger.error('Error accessing camera', err, ErrorCategory.CAMERA);
 
       // Provide specific error messages
       if (err.name === 'NotAllowedError') {
@@ -85,12 +86,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, mode = 'photo'
             },
             (decodedText) => {
               // QR Code detected!
-              console.log("QR Code detected:", decodedText);
+              logger.info('QR Code detected', { decodedText });
               onQrScanned(decodedText);
               // Stop scanner after successful scan
               if (qrScanner && isScanning) {
                 isScanning = false;
-                qrScanner.stop().catch(console.error);
+                qrScanner.stop().catch((err) => logger.error('Failed to stop QR scanner', err, ErrorCategory.CAMERA));
               }
             },
             (errorMessage) => {
@@ -99,7 +100,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, mode = 'photo'
           );
           isScanning = true;
         } catch (err) {
-          console.error("QR Scanner error:", err);
+          logger.error('QR Scanner error', err, ErrorCategory.CAMERA);
           setError("Failed to start QR scanner");
         }
       } else if (mode === 'photo') {
@@ -116,7 +117,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, mode = 'photo'
         qrScanner.stop().catch((err) => {
           // Ignore "scanner not running" errors during cleanup
           if (!err?.message?.includes('not running')) {
-            console.error("QR Scanner cleanup error:", err);
+            logger.error('QR Scanner cleanup error', err, ErrorCategory.CAMERA);
           }
         });
       } else {
@@ -133,7 +134,7 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, mode = 'photo'
       // Get quality settings based on photo quality prop
       const config = QUALITY_CONFIG[photoQuality];
 
-      console.log('📸 Capturing photo...', {
+      logger.debug('Capturing photo', {
         videoWidth: video.videoWidth,
         videoHeight: video.videoHeight,
         quality: photoQuality,
@@ -150,12 +151,12 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, mode = 'photo'
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL('image/jpeg', config.jpegQuality);
         const sizeKB = Math.round(dataUrl.length * 0.75 / 1024); // Approximate KB
-        console.log(`✅ Photo captured! Quality: ${photoQuality}, Size: ~${sizeKB}KB`);
+        logger.info('Photo captured', { quality: photoQuality, sizeKB });
         setCapturedImage(dataUrl);
         onCapture(dataUrl);
       }
     } else {
-      console.error('❌ Cannot capture: video or canvas ref is null');
+      logger.error('Cannot capture: video or canvas ref is null', undefined, ErrorCategory.CAMERA);
     }
   };
 

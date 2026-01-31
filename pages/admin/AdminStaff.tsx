@@ -16,6 +16,7 @@ interface SearchableSelectProps {
   placeholder?: string;
   searchPlaceholder?: string;
   emptyMessage?: string;
+  alwaysVisibleValues?: Array<number | string>;
   className?: string;
 }
 
@@ -26,6 +27,7 @@ function SearchableSelect({
   placeholder = 'Selecione...',
   searchPlaceholder = 'Pesquisar...',
   emptyMessage = 'Nenhum resultado encontrado',
+  alwaysVisibleValues = [],
   className = ''
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,6 +36,7 @@ function SearchableSelect({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const filteredOptions = options.filter(option =>
+    alwaysVisibleValues.includes(option.value) ||
     option.label.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -484,16 +487,18 @@ export default function AdminStaff() {
             className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <select
-          value={filterCondoId || ''}
-          onChange={(e) => setFilterCondoId(e.target.value ? parseInt(e.target.value) : null)}
-          className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Todos os Condomínios</option>
-          {condominiums.map(condo => (
-            <option key={condo.id} value={condo.id}>{condo.name}</option>
-          ))}
-        </select>
+        <SearchableSelect
+          options={[
+            { value: 'ALL', label: 'Todos os Condomínios' },
+            ...condominiums.map(condo => ({ value: condo.id, label: condo.name }))
+          ]}
+          value={filterCondoId}
+          onChange={(val) => setFilterCondoId(val === 'ALL' ? null : val as number | null)}
+          placeholder="Todos os condomínios"
+          searchPlaceholder="Pesquisar condomínio..."
+          emptyMessage="Nenhum condomínio encontrado"
+          alwaysVisibleValues={['ALL']}
+        />
         <select
           value={filterRole}
           onChange={(e) => setFilterRole(e.target.value)}

@@ -1,10 +1,138 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { UserCheck, Loader2, Search, Download, X, FileText, RotateCcw, History } from 'lucide-react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import { UserCheck, Loader2, Search, Download, X, FileText, RotateCcw, History, ChevronDown, Check } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { Visit, VisitEvent, Condominium, VisitStatus, VisitTypeConfig, ServiceTypeConfig } from '../../types';
 import { useToast } from '../../components/Toast';
 import { exportVisitsToCSV, exportVisitsToPDF } from '../../utils/csvExport';
 import { AuthContext } from '../../App';
+
+// Searchable Select Component
+interface SearchableSelectProps {
+  options: { value: number | string; label: string }[];
+  value: number | string | null;
+  onChange: (value: number | string | null) => void;
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
+  alwaysVisibleValues?: Array<number | string>;
+  className?: string;
+}
+
+function SearchableSelect({
+  options,
+  value,
+  onChange,
+  placeholder = 'Selecione...',
+  searchPlaceholder = 'Pesquisar...',
+  emptyMessage = 'Nenhum resultado encontrado',
+  alwaysVisibleValues = [],
+  className = ''
+}: SearchableSelectProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filteredOptions = options.filter(option =>
+    alwaysVisibleValues.includes(option.value) ||
+    option.label.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const selectedOption = options.find(opt => opt.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const handleSelect = (optionValue: number | string) => {
+    onChange(optionValue);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(null);
+    setSearch('');
+  };
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-left flex items-center justify-between cursor-pointer"
+      >
+        <span className={selectedOption ? 'text-text-main' : 'text-text-dim'}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <div className="flex items-center gap-1">
+          {selectedOption && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="p-1 hover:bg-bg-root rounded transition-colors"
+            >
+              <X size={14} className="text-text-dim" />
+            </button>
+          )}
+          <ChevronDown size={18} className={`text-text-dim transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </div>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-bg-surface border border-border-main rounded-lg shadow-lg">
+          <div className="p-2 border-b border-border-main">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim" size={16} />
+              <input
+                ref={inputRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full pl-9 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              />
+            </div>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {filteredOptions.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-text-dim text-center">
+                {emptyMessage}
+              </div>
+            ) : (
+              filteredOptions.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleSelect(option.value)}
+                  className={`w-full px-4 py-2 text-left text-sm hover:bg-bg-root flex items-center justify-between transition-colors ${option.value === value ? 'bg-accent/10 text-accent' : 'text-text-main'
+                    }`}
+                >
+                  <span>{option.label}</span>
+                  {option.value === value && <Check size={16} className="text-blue-600" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Calculate months difference between two dates
 const getMonthsDifference = (start: string, end: string): number => {
@@ -364,16 +492,18 @@ export default function AdminVisits() {
               className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <select
-            value={filterCondoId || ''}
-            onChange={(e) => setFilterCondoId(e.target.value ? parseInt(e.target.value) : null)}
-            className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Todos os Condomínios</option>
-            {condominiums.map(condo => (
-              <option key={condo.id} value={condo.id}>{condo.name}</option>
-            ))}
-          </select>
+          <SearchableSelect
+            options={[
+              { value: 'ALL', label: 'Todos os Condomínios' },
+              ...condominiums.map(condo => ({ value: condo.id, label: condo.name }))
+            ]}
+            value={filterCondoId}
+            onChange={(val) => setFilterCondoId(val === 'ALL' ? null : val as number | null)}
+            placeholder="Todos os condomínios"
+            searchPlaceholder="Pesquisar condomínio..."
+            emptyMessage="Nenhum condomínio encontrado"
+            alwaysVisibleValues={['ALL']}
+          />
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}

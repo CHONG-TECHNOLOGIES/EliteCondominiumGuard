@@ -8,6 +8,7 @@ import { Visit, VisitStatus } from '../types';
 import { AuthContext } from '../App';
 import { useToast } from '../components/Toast';
 import { audioService } from '../services/audioService';
+import { logger, ErrorCategory } from '@/services/logger';
 
 export default function Dashboard() {
   const navigate = useNavigate();

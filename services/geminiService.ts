@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { logger, ErrorCategory } from '@/services/logger';
 
 const API_KEY = process.env.API_KEY || ''; 
 
@@ -34,7 +35,7 @@ export const askConcierge = async (question: string, condoContext: string): Prom
 
     return response.text || "Desculpe, não consegui gerar uma resposta.";
   } catch (error) {
-    console.error("Gemini API Error:", error);
+    logger.error('Gemini API error', error, ErrorCategory.NETWORK);
     return "Erro ao conectar com o assistente IA.";
   }
 };

@@ -5,6 +5,7 @@ import { AuthContext } from '../App';
 import { api } from '../services/dataService';
 import { UserRole } from '../types';
 import { audioService } from '../services/audioService';
+import { logger, ErrorCategory } from '@/services/logger';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -68,12 +69,12 @@ export default function Login() {
         login(staff);
 
         // Initialize audio service immediately after successful login
-        console.log('[Login] 🔊 Initializing audio service after login...');
+        logger.info('Initializing audio service after login');
         audioService.initialize().then(success => {
           if (success) {
-            console.log('[Login] ✅ Audio service initialized - alerts will work automatically');
+            logger.info('Audio service initialized - alerts will work automatically');
           } else {
-            console.warn('[Login] ⚠️ Audio initialization failed - user may need to enable manually');
+            logger.warn('Audio initialization failed - user may need to enable manually');
           }
         });
 
@@ -89,7 +90,7 @@ export default function Login() {
       }
     } catch (err: any) {
       setError(err.message || 'Erro de conexão.');
-      console.error(err);
+      logger.error('Login failed', err, ErrorCategory.AUTH);
     } finally {
       setLoading(false);
     }

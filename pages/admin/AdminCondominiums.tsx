@@ -5,6 +5,7 @@ import { Condominium, Street } from '../../types';
 import { useToast } from '../../components/Toast';
 import { Trash2 } from 'lucide-react';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
+import { logger, ErrorCategory } from '../../services/logger';
 
 export default function AdminCondominiums() {
   const { showToast, showConfirm } = useToast();

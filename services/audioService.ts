@@ -8,6 +8,8 @@
  * - Alert sound generation
  */
 
+import { logger } from '@/services/logger';
+
 class AudioService {
   private audioContext: AudioContext | null = null;
   private readonly STORAGE_KEY = 'audio_permission_enabled';
@@ -17,7 +19,7 @@ class AudioService {
     // Auto-initialize if permission was previously granted
     if (this.hasStoredPermission()) {
       this.initialize().catch(err => {
-        console.warn('[AudioService] Auto-initialization failed:', err);
+        logger.warn('Auto-initialization failed', { error: String(err) });
       });
     }
 
@@ -36,9 +38,9 @@ class AudioService {
 
       this.fallbackAudio = new Audio(audioDataUri);
       this.fallbackAudio.volume = 1.0;
-      console.log('[AudioService] ✅ Fallback HTML5 Audio created');
+      logger.debug('Fallback HTML5 Audio created');
     } catch (err) {
-      console.error('[AudioService] ❌ Failed to create fallback audio:', err);
+      logger.warn('Failed to create fallback audio', { error: String(err) });
     }
   }
 
@@ -47,7 +49,7 @@ class AudioService {
    */
   private playFallbackSound(): boolean {
     if (!this.fallbackAudio) {
-      console.warn('[AudioService] ⚠️ Fallback audio not available');
+      logger.warn('Fallback audio not available');
       return false;
     }
 
@@ -59,7 +61,7 @@ class AudioService {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log('[AudioService] 🔊 Fallback sound played successfully');
+            logger.debug('Fallback sound played successfully');
 
             // Play 3 more times with delay
             setTimeout(() => {
@@ -84,13 +86,13 @@ class AudioService {
             }, 1200);
           })
           .catch(err => {
-            console.error('[AudioService] ❌ Fallback sound play failed:', err);
+            logger.warn('Fallback sound play failed', { error: String(err) });
           });
       }
 
       return true;
     } catch (err) {
-      console.error('[AudioService] ❌ Error playing fallback sound:', err);
+      logger.warn('Error playing fallback sound', { error: String(err) });
       return false;
     }
   }
@@ -117,18 +119,18 @@ class AudioService {
     try {
       if (!this.audioContext) {
         this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        console.log('[AudioService] ✅ AudioContext created');
+        logger.debug('AudioContext created');
       }
 
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
-        console.log('[AudioService] ✅ AudioContext resumed');
+        logger.debug('AudioContext resumed');
       }
 
       this.savePermission(true);
       return true;
     } catch (err) {
-      console.error('[AudioService] ❌ Initialization failed:', err);
+      logger.warn('Initialization failed', { error: String(err) });
       this.savePermission(false);
       return false;
     }
@@ -148,16 +150,14 @@ class AudioService {
    * Returns true if sound was played, false if audio not initialized
    */
   playAlertSound(): boolean {
-    console.log('[AudioService] 🔊 playAlertSound() called');
-    console.log('[AudioService] AudioContext state:', this.audioContext?.state || 'null');
-    console.log('[AudioService] Has stored permission:', this.hasStoredPermission());
+    logger.debug('playAlertSound() called', { state: this.audioContext?.state || 'null', hasPermission: this.hasStoredPermission() });
 
     if (!this.audioContext) {
-      console.warn('[AudioService] ⚠️ AudioContext not initialized - attempting to initialize now...');
+      logger.warn('AudioContext not initialized - attempting to initialize now');
       // Try to initialize on-the-fly
       this.initialize().then(success => {
         if (success) {
-          console.log('[AudioService] ✅ Auto-initialization successful, retrying sound...');
+          logger.debug('Auto-initialization successful, retrying sound');
           this.playAlertSound();
         }
       });
@@ -165,9 +165,9 @@ class AudioService {
     }
 
     if (this.audioContext.state === 'suspended') {
-      console.warn('[AudioService] ⚠️ AudioContext suspended - attempting to resume...');
+      logger.warn('AudioContext suspended - attempting to resume');
       this.audioContext.resume().then(() => {
-        console.log('[AudioService] ✅ AudioContext resumed, retrying sound...');
+        logger.debug('AudioContext resumed, retrying sound');
         this.playAlertSound();
       });
       return false;
@@ -207,10 +207,10 @@ class AudioService {
         playBeep(cycleStart + 0.8, 880, 0.3);     // High beep
       }
 
-      console.log('[AudioService] 🔊 Alert sound played successfully (4 cycles - Web Audio API)');
+      logger.debug('Alert sound played successfully (4 cycles - Web Audio API)');
       return true;
     } catch (err) {
-      console.error('[AudioService] ❌ Error playing Web Audio API alert, trying fallback...', err);
+      logger.warn('Error playing Web Audio API alert, trying fallback', { error: String(err) });
       // Try fallback HTML5 Audio
       return this.playFallbackSound();
     }
@@ -247,7 +247,7 @@ class AudioService {
       this.audioContext.close();
       this.audioContext = null;
     }
-    console.log('[AudioService] 🔄 Audio service reset');
+    logger.debug('Audio service reset');
   }
 
   /**

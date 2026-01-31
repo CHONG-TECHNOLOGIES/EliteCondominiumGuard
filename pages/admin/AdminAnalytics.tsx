@@ -290,10 +290,11 @@ export default function AdminAnalytics() {
               Badges verdes = Visitas hoje | Badges vermelhos = Incidentes abertos
             </p>
           </div>
-          <div style={{ height: '600px', width: '100%' }}>
+          <div style={{ height: '600px', width: '100%' }} className="relative z-0">
             <MapContainer
               center={mapCenter}
               zoom={13}
+              className="relative z-0"
               style={{ height: '100%', width: '100%' }}
               scrollWheelZoom={true}
             >

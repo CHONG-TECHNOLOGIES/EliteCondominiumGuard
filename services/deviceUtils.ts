@@ -3,6 +3,8 @@
  * Generates and manages a unique device identifier for this tablet/browser.
  */
 
+import { logger } from '@/services/logger';
+
 const DEVICE_ID_KEY = 'condo_guard_device_id';
 
 /**
@@ -30,7 +32,7 @@ export function getDeviceIdentifier(): string {
         // Generate a temporary UUID (will be replaced by central DB ID after configuration)
         deviceId = generateUUID();
         localStorage.setItem(DEVICE_ID_KEY, deviceId);
-        console.log('[DeviceUtils] Generated NEW device ID (temporary until configured):', deviceId);
+        logger.info('Generated NEW device ID (temporary until configured)', { deviceId });
     }
 
     return deviceId;

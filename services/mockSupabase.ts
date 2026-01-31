@@ -1,6 +1,7 @@
 
 import { supabase } from './supabaseClient';
 import { SupabaseService } from './Supabase';
+import { logger, ErrorCategory } from '@/services/logger';
 import { Visit, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig } from '../types';
 
 // Fallback Mock Data (Usado se não houver Supabase configurado)
@@ -36,7 +37,7 @@ class DataService {
         }
         return null;
       } catch (e) {
-        console.error("Login Error:", e);
+        logger.error('Login error', e, ErrorCategory.AUTH);
         return null;
       }
     } else {
