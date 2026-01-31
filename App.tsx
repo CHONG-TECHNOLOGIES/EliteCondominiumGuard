@@ -23,6 +23,7 @@ const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const NewEntry = React.lazy(() => import('./pages/NewEntry'));
 const DailyList = React.lazy(() => import('./pages/DailyList'));
 const Incidents = React.lazy(() => import('./pages/Incidents'));
+const ResidentSearch = React.lazy(() => import('./pages/ResidentSearch'));
 const Setup = React.lazy(() => import('./pages/Setup'));
 
 const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
@@ -582,6 +583,7 @@ export default function App() {
                 <Route path="/new-entry" element={<ConfigGuard><ProtectedRoute><NewEntry /></ProtectedRoute></ConfigGuard>} />
                 <Route path="/day-list" element={<ConfigGuard><ProtectedRoute><DailyList /></ProtectedRoute></ConfigGuard>} />
                 <Route path="/incidents" element={<ConfigGuard><ProtectedRoute><Incidents /></ProtectedRoute></ConfigGuard>} />
+                <Route path="/resident-search" element={<ConfigGuard><ProtectedRoute><ResidentSearch /></ProtectedRoute></ConfigGuard>} />
 
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>

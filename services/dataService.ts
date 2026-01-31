@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality } from '../types';
+import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 import { logger, ErrorCategory } from '@/services/logger';
@@ -1167,7 +1167,9 @@ class DataService {
 
   // --- Units ---
   async getUnits(): Promise<Unit[]> {
-    const local = await db.units.toArray();
+    const local = this.currentCondoId
+      ? await db.units.where('condominium_id').equals(this.currentCondoId).toArray()
+      : await db.units.toArray();
 
     // If we have local data, return it and sync in background
     if (local.length > 0) {
@@ -1187,24 +1189,39 @@ class DataService {
     return [];
   }
 
+  private async cacheResidentsFromUnits(units: Unit[]): Promise<void> {
+    const residents = units.flatMap(unit => (unit.residents || []).map(resident => ({
+      ...resident,
+      condominium_id: resident.condominium_id ?? unit.condominium_id,
+      unit_id: resident.unit_id ?? unit.id
+    })));
+
+    if (residents.length > 0) {
+      await db.residents.bulkPut(residents);
+    }
+  }
+
   // Fetch units with residents (online only)
-  async getUnitsWithResidents(): Promise<Unit[]> {
-    if (!this.isBackendHealthy || !this.currentCondoId) {
+  async getUnitsWithResidents(condoId?: number): Promise<Unit[]> {
+    const targetCondoId = condoId ?? this.currentCondoId;
+    if (!this.isBackendHealthy || !targetCondoId) {
       // Offline: Return units without residents
       return await this.getUnits();
     }
 
     try {
-      const unitsWithResidents = await SupabaseService.getUnitsWithResidents(this.currentCondoId);
+      const unitsWithResidents = await SupabaseService.getUnitsWithResidents(targetCondoId);
+      const scopedUnits = unitsWithResidents.filter(unit => unit.condominium_id === targetCondoId);
 
       // Cache units (without residents to save space)
-      const unitsOnly = unitsWithResidents.map(u => {
+      const unitsOnly = scopedUnits.map(u => {
         const { residents, ...unitWithoutResidents } = u;
         return unitWithoutResidents;
       });
       if (unitsOnly.length) await db.units.bulkPut(unitsOnly);
+      await this.cacheResidentsFromUnits(scopedUnits);
 
-      return unitsWithResidents;
+      return scopedUnits;
     } catch (e) {
       console.error("[DataService] Failed to fetch units with residents", e);
       this.backendHealthScore--;
@@ -1213,16 +1230,76 @@ class DataService {
     }
   }
 
+  async getResidentDirectory(condoId?: number): Promise<{ residents: Resident[]; units: Unit[] }> {
+    const targetCondoId = condoId ?? this.currentCondoId;
+    const units = await this.getUnitsWithResidents(targetCondoId ?? undefined);
+    const unitsOnly = units.map(unit => {
+      const { residents, ...unitWithoutResidents } = unit;
+      return unitWithoutResidents;
+    });
+    const unitIdSet = new Set<number>(unitsOnly.map(unit => unit.id));
+    const unitCondoMap = new Map<number, number>();
+    unitsOnly.forEach(unit => {
+      unitCondoMap.set(unit.id, unit.condominium_id);
+    });
+    const residentsFromUnits = units.flatMap(unit => (unit.residents || []).map(resident => ({
+      ...resident,
+      condominium_id: resident.condominium_id ?? unit.condominium_id,
+      unit_id: resident.unit_id ?? unit.id
+    })));
+
+    if (residentsFromUnits.length > 0) {
+      const scopedByUnit = unitIdSet.size > 0
+        ? residentsFromUnits.filter(resident => resident.unit_id && unitIdSet.has(resident.unit_id))
+        : residentsFromUnits;
+      const scopedByCondo = targetCondoId
+        ? scopedByUnit.filter(resident => resident.condominium_id === targetCondoId)
+        : scopedByUnit;
+      const uniqueResidents = new Map<number, Resident>();
+      scopedByCondo.forEach(resident => {
+        uniqueResidents.set(resident.id, resident);
+      });
+      const normalizedResidents = Array.from(uniqueResidents.values());
+      return {
+        residents: normalizedResidents,
+        units: targetCondoId ? unitsOnly.filter(u => u.condominium_id === targetCondoId) : unitsOnly
+      };
+    }
+
+    const [cachedResidents, cachedUnits] = await Promise.all([
+      db.residents.toArray(),
+      db.units.toArray()
+    ]);
+
+    const scopedResidents = targetCondoId
+      ? cachedResidents.filter(resident => {
+          if (resident.condominium_id === targetCondoId) return true;
+          if (unitIdSet.size === 0) return false;
+          const mappedCondoId = resident.unit_id ? unitCondoMap.get(resident.unit_id) : undefined;
+          return mappedCondoId === targetCondoId && unitIdSet.has(resident.unit_id ?? -1);
+        })
+      : cachedResidents;
+
+    return {
+      residents: scopedResidents,
+      units: targetCondoId
+        ? (cachedUnits.length > 0 ? cachedUnits : units).filter(u => u.condominium_id === targetCondoId)
+        : (cachedUnits.length > 0 ? cachedUnits : units)
+    };
+  }
+
   private async refreshUnits(condoId: number) {
     if (!this.isBackendHealthy) return;
     try {
       const units = await SupabaseService.getUnitsWithResidents(condoId);
+      const scopedUnits = units.filter(unit => unit.condominium_id === condoId);
       // Save only unit data (without residents) to local DB
-      const unitsOnly = units.map(u => {
+      const unitsOnly = scopedUnits.map(u => {
         const { residents, ...unitWithoutResidents } = u;
         return unitWithoutResidents;
       });
       if (unitsOnly.length) await db.units.bulkPut(unitsOnly);
+      await this.cacheResidentsFromUnits(scopedUnits);
     } catch (e) {
       console.error("[DataService] Units sync failed", e);
       this.backendHealthScore--;
