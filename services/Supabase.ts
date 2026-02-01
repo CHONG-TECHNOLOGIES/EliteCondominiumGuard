@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street } from '../types';
+import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident } from '../types';
 import { logger, ErrorCategory } from '@/services/logger';
 
 logger.setContext({ service: 'Supabase' });
@@ -53,14 +53,14 @@ const getStoragePathFromPublicUrl = (publicUrl: string, bucket: string): string 
 type AdminDeleteStaffResult =
   | { success: true }
   | {
-      success: false;
-      error?: {
-        message?: string;
-        code?: string;
-        details?: string;
-        hint?: string;
-      };
+    success: false;
+    error?: {
+      message?: string;
+      code?: string;
+      details?: string;
+      hint?: string;
     };
+  };
 
 export const SupabaseService = {
 
@@ -167,7 +167,7 @@ export const SupabaseService = {
       return data as Staff | null;
 
     } catch (err: any) {
-      console.error('Supabase Login RPC Error:', err.message || JSON.stringify(err));
+      logger.error('Login RPC error', err, ErrorCategory.AUTH);
       return null;
     }
   },
@@ -175,7 +175,7 @@ export const SupabaseService = {
   // --- Configurações ---
   async getVisitTypes(condoId: number): Promise<VisitTypeConfig[]> {
     if (!supabase) {
-      console.error('[SupabaseService] Supabase client not initialized');
+      logger.error('Supabase client not initialized', null, ErrorCategory.NETWORK);
       return [];
     }
 
@@ -187,7 +187,7 @@ export const SupabaseService = {
       const visitTypes = (data as VisitTypeConfig[]) || [];
       return visitTypes.sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
-      console.error("[SupabaseService] Error getting visit types:", err.message || JSON.stringify(err));
+      logger.error('Error getting visit types', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -203,7 +203,7 @@ export const SupabaseService = {
       const serviceTypes = (data as ServiceTypeConfig[]) || [];
       return serviceTypes.sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
-      console.error("Error getting service types:", err.message || JSON.stringify(err));
+      logger.error('Error getting service types', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -221,7 +221,7 @@ export const SupabaseService = {
         .filter((restaurant) => restaurant.status === 'ACTIVE')
         .sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
-      console.error("[SupabaseService] Error getting restaurants:", err.message || JSON.stringify(err));
+      logger.error('Error getting restaurants', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -239,7 +239,7 @@ export const SupabaseService = {
         .filter((sport) => sport.status === 'ACTIVE')
         .sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
-      console.error("[SupabaseService] Error getting sports:", err.message || JSON.stringify(err));
+      logger.error('Error getting sports', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -255,7 +255,35 @@ export const SupabaseService = {
       if (error) throw error;
       return (data as Staff[]) || [];
     } catch (err: any) {
-      console.error("Error syncing staff:", err.message || JSON.stringify(err));
+      logger.error('Error syncing staff', err, ErrorCategory.SYNC);
+      return [];
+    }
+  },
+
+  async adminGetResidents(condoId: number): Promise<Resident[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_get_residents', { p_condominium_id: condoId });
+
+      if (error) throw error;
+
+      const residents = (data as Resident[]) || [];
+
+      // Process photos: generate public URLs if needed
+      return residents.map(resident => {
+        if (resident.photo_url && !resident.photo_url.startsWith('http')) {
+          const { data: { publicUrl } } = supabase!.storage
+            .from('resident-photos')
+            .getPublicUrl(resident.photo_url);
+          return { ...resident, photo_url: publicUrl };
+        }
+        return resident;
+      });
+
+    } catch (err: any) {
+      logger.error('Error fetching residents (admin)', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -270,8 +298,9 @@ export const SupabaseService = {
       if (error) throw error;
       return (data as Unit[]) || [];
     } catch (err: any) {
-      console.error("Error fetching units:", err.message || JSON.stringify(err));
-      return [];
+      logger.error('Error fetching units', err, ErrorCategory.NETWORK);
+      // RETHROW error so callers can handle fallback
+      throw err;
     }
   },
 
@@ -282,10 +311,7 @@ export const SupabaseService = {
     try {
       const normalizedCondoId = Number(condoId);
       if (!Number.isInteger(normalizedCondoId)) {
-        console.error("Error fetching visits: invalid condominium_id", {
-          condoId,
-          type: typeof condoId
-        });
+        logger.error('Error fetching visits: invalid condominium_id', null, ErrorCategory.NETWORK, { condoId, type: typeof condoId });
         return [];
       }
 
@@ -959,7 +985,7 @@ export const SupabaseService = {
    * @returns Unsubscribe function
    */
   subscribeToDeviceChanges(condominiumId: number | null, onChange: () => void): () => void {
-    if (!supabase) return () => {};
+    if (!supabase) return () => { };
 
     const filter = condominiumId ? `condominium_id=eq.${condominiumId}` : undefined;
     const channel = supabase

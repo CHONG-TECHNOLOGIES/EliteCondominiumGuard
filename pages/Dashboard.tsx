@@ -44,7 +44,7 @@ export default function Dashboard() {
   const playAlertSound = () => {
     const played = audioService.playAlertSound();
     if (!played) {
-      console.warn('[Dashboard] Audio not enabled - user must enable it first');
+      logger.warn('Audio not enabled - user must enable it first');
     }
   };
 

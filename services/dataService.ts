@@ -25,6 +25,7 @@ class DataService {
   private readonly pendingAuditLogsKey = 'pending_audit_logs';
 
   constructor() {
+    logger.setContext({ service: 'DataService' });
     window.addEventListener('online', () => this.setOnlineStatus(true));
     window.addEventListener('offline', () => this.setOnlineStatus(false));
     this.init();
@@ -64,13 +65,13 @@ class DataService {
    */
   private async verifyConnectivity(): Promise<void> {
     if (!navigator.onLine) {
-      console.log('[DataService] Browser reports offline - setting offline state');
+      logger.info('Browser reports offline - setting offline state');
       this.isOnline = false;
       this.backendHealthScore = 0;
       return;
     }
 
-    console.log('[DataService] Verifying backend connectivity...');
+    logger.info('Verifying backend connectivity...');
     try {
       // Quick backend health check with 3 second timeout
       const controller = new AbortController();
@@ -93,7 +94,7 @@ class DataService {
 
       if (response.ok || response.status === 401 || response.status === 404) {
         // Backend is reachable (401/404 are expected for HEAD requests)
-        console.log('[DataService] ✓ Backend is reachable');
+        logger.info('Backend is reachable');
         this.isOnline = true;
         this.backendHealthScore = 3;
       } else {
@@ -1192,12 +1193,14 @@ class DataService {
   private async cacheResidentsFromUnits(units: Unit[]): Promise<void> {
     const residents = units.flatMap(unit => (unit.residents || []).map(resident => ({
       ...resident,
-      condominium_id: resident.condominium_id ?? unit.condominium_id,
+      // FORCE overwrite condominium_id from the unit to ensure consistency
+      condominium_id: unit.condominium_id,
       unit_id: resident.unit_id ?? unit.id
     })));
 
     if (residents.length > 0) {
       await db.residents.bulkPut(residents);
+      console.log(`[DataService] Cached ${residents.length} residents from units`);
     }
   }
 
@@ -1225,66 +1228,64 @@ class DataService {
     } catch (e) {
       console.error("[DataService] Failed to fetch units with residents", e);
       this.backendHealthScore--;
-      // Fallback to cached units without residents
-      return await this.getUnits();
+      // RETHROW error so callers (like getResidentDirectory) can fallback to their own robust cache logic
+      throw e;
     }
   }
 
   async getResidentDirectory(condoId?: number): Promise<{ residents: Resident[]; units: Unit[] }> {
     const targetCondoId = condoId ?? this.currentCondoId;
-    const units = await this.getUnitsWithResidents(targetCondoId ?? undefined);
-    const unitsOnly = units.map(unit => {
-      const { residents, ...unitWithoutResidents } = unit;
-      return unitWithoutResidents;
-    });
-    const unitIdSet = new Set<number>(unitsOnly.map(unit => unit.id));
-    const unitCondoMap = new Map<number, number>();
-    unitsOnly.forEach(unit => {
-      unitCondoMap.set(unit.id, unit.condominium_id);
-    });
-    const residentsFromUnits = units.flatMap(unit => (unit.residents || []).map(resident => ({
-      ...resident,
-      condominium_id: resident.condominium_id ?? unit.condominium_id,
-      unit_id: resident.unit_id ?? unit.id
-    })));
 
-    if (residentsFromUnits.length > 0) {
-      const scopedByUnit = unitIdSet.size > 0
-        ? residentsFromUnits.filter(resident => resident.unit_id && unitIdSet.has(resident.unit_id))
-        : residentsFromUnits;
-      const scopedByCondo = targetCondoId
-        ? scopedByUnit.filter(resident => resident.condominium_id === targetCondoId)
-        : scopedByUnit;
-      const uniqueResidents = new Map<number, Resident>();
-      scopedByCondo.forEach(resident => {
-        uniqueResidents.set(resident.id, resident);
-      });
-      const normalizedResidents = Array.from(uniqueResidents.values());
-      return {
-        residents: normalizedResidents,
-        units: targetCondoId ? unitsOnly.filter(u => u.condominium_id === targetCondoId) : unitsOnly
-      };
+    console.log(`[DataService] getResidentDirectory called. condoId arg: ${condoId}, currentCondoId: ${this.currentCondoId}, target: ${targetCondoId}`);
+
+    if (targetCondoId === null || targetCondoId === undefined) {
+      console.warn('[DataService] getResidentDirectory called without targetCondoId. Returning empty.');
+      return { residents: [], units: [] };
     }
 
+    // 1. Try to fetch online first if possible (best data freshness)
+    if (this.isBackendHealthy) {
+      try {
+        console.log(`[DataService] Fetching online resident directory (RPC - admin) for condo: ${targetCondoId}`);
+
+        const [residentsRaw, unitsRaw] = await Promise.all([
+          SupabaseService.adminGetResidents(targetCondoId),
+          SupabaseService.getUnitsWithResidents(targetCondoId)
+        ]);
+
+        // Strict filtering to prevent cross-contamination
+        const residents = residentsRaw.filter(r => r.condominium_id === targetCondoId);
+        const unitsOnly = unitsRaw
+          .filter(u => u.condominium_id === targetCondoId)
+          .map(u => {
+            const { residents, ...rest } = u;
+            return rest;
+          });
+
+        console.log(`[DataService] RPC Success. Cached ${residents.length} residents, ${unitsOnly.length} units.`);
+
+        if (unitsOnly.length) await db.units.bulkPut(unitsOnly);
+        if (residents.length) await db.residents.bulkPut(residents);
+
+        return { residents, units: unitsOnly };
+      } catch (e) {
+        console.warn('[DataService] Online resident fetch failed, falling back to cache', e);
+      }
+    }
+
+    // 2. Offline/Fallback: efficient local query
+    console.log(`[DataService] Fetching resident directory from cache for condo: ${targetCondoId}`);
+
     const [cachedResidents, cachedUnits] = await Promise.all([
-      db.residents.toArray(),
-      db.units.toArray()
+      db.residents.where('condominium_id').equals(targetCondoId).toArray(),
+      db.units.where('condominium_id').equals(targetCondoId).toArray()
     ]);
 
-    const scopedResidents = targetCondoId
-      ? cachedResidents.filter(resident => {
-          if (resident.condominium_id === targetCondoId) return true;
-          if (unitIdSet.size === 0) return false;
-          const mappedCondoId = resident.unit_id ? unitCondoMap.get(resident.unit_id) : undefined;
-          return mappedCondoId === targetCondoId && unitIdSet.has(resident.unit_id ?? -1);
-        })
-      : cachedResidents;
+    console.log(`[DataService] Found cached: ${cachedResidents.length} residents, ${cachedUnits.length} units`);
 
     return {
-      residents: scopedResidents,
-      units: targetCondoId
-        ? (cachedUnits.length > 0 ? cachedUnits : units).filter(u => u.condominium_id === targetCondoId)
-        : (cachedUnits.length > 0 ? cachedUnits : units)
+      residents: cachedResidents,
+      units: cachedUnits
     };
   }
 
@@ -2331,7 +2332,7 @@ class DataService {
   subscribeToDeviceStatusChanges(onChange: () => void): () => void {
     const user = this.getStoredUser();
     if (!user || (user.role !== UserRole.ADMIN && user.role !== UserRole.SUPER_ADMIN)) {
-      return () => {};
+      return () => { };
     }
 
     const scopedCondoId = this.getAdminScopeCondoId();

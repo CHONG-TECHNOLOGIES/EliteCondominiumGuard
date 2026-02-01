@@ -61,7 +61,7 @@ export default function ResidentSearch() {
 
   const filteredResidents = useMemo(() => {
     const trimmed = searchTerm.trim().toLowerCase();
-    const scopedResidents = condoId ? residents.filter(resident => resident.condominium_id === condoId) : residents;
+    const scopedResidents = condoId ? residents.filter(resident => resident.condominium_id === condoId) : [];
     if (!trimmed) {
       return scopedResidents.map(resident => ({
         ...resident,
@@ -101,40 +101,47 @@ export default function ResidentSearch() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-200 focus:border-sky-400 focus:outline-none text-slate-700"
-            placeholder="Nome, telefone ou condominio..."
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              aria-label="Limpar pesquisa"
-            >
-              <X size={18} />
-            </button>
-          )}
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-          <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-full font-semibold">
-            {filteredResidents.length} resultado(s)
-          </span>
-          {condoName && (
-            <span className="bg-sky-50 text-sky-700 px-2 py-1 rounded-full font-semibold">
-              {condoName}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-lg shadow-slate-200/50 p-6 mb-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-sky-50 rounded-bl-full -mr-8 -mt-8 opacity-50 pointer-events-none" />
+
+        <div className="relative z-10">
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-500 transition-colors" size={22} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-12 py-4 rounded-2xl bg-slate-50/50 border border-slate-200 focus:bg-white focus:border-sky-400 focus:ring-4 focus:ring-sky-100 focus:outline-none text-slate-700 placeholder:text-slate-400 transition-all font-medium text-lg"
+              placeholder="Nome, telefone ou condomínio..."
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 bg-slate-200 hover:bg-slate-300 text-slate-500 rounded-full transition-colors"
+                aria-label="Limpar pesquisa"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <span className="text-sm font-bold text-slate-400">Filtros:</span>
+            <span className="bg-sky-50 text-sky-700 px-3 py-1.5 rounded-full text-xs font-bold border border-sky-100 flex items-center gap-1.5">
+              <User size={12} strokeWidth={3} />
+              {filteredResidents.length} encontrados
             </span>
-          )}
-          {!isOnline && (
-            <span className="bg-amber-50 text-amber-700 px-2 py-1 rounded-full font-semibold">
-              Offline
-            </span>
-          )}
+            {condoName && (
+              <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full text-xs font-bold border border-slate-200">
+                {condoName}
+              </span>
+            )}
+            {!isOnline && (
+              <span className="bg-amber-50 text-amber-700 px-3 py-1.5 rounded-full text-xs font-bold border border-amber-200 flex items-center gap-1.5">
+                Offline
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -153,41 +160,45 @@ export default function ResidentSearch() {
             return (
               <div
                 key={`${resident.id}-${resident.unit_id}`}
-                className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm"
+                className="group bg-white rounded-3xl border border-slate-100 p-5 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
               >
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
-                      <User size={22} />
+                {/* Decorative Side Gradient */}
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-sky-400 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                <div className="flex items-start justify-between gap-4 mb-4 pl-2">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-50 flex items-center justify-center text-sky-600 shadow-inner group-hover:scale-110 transition-transform duration-300">
+                      <User size={24} strokeWidth={2.5} />
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500">Nome completo</p>
-                      <p className="text-lg font-bold text-slate-800">{resident.name}</p>
+                      <p className="text-xs font-bold text-sky-500 uppercase tracking-wider mb-0.5">Nome completo</p>
+                      <p className="text-lg font-bold text-slate-800 leading-tight group-hover:text-blue-700 transition-colors">
+                        {resident.name}
+                      </p>
                     </div>
                   </div>
                   {condoName && (
-                    <div className="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-1 rounded-full">
+                    <div className="text-[10px] font-bold bg-slate-50 text-slate-500 px-3 py-1.5 rounded-full border border-slate-100">
                       {condoName}
                     </div>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-600">
-                  <div>
-                    <span className="font-semibold text-slate-700">Primeiro nome:</span>{' '}
-                    {firstName || '-'}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-4 pl-2">
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100/50 group-hover:border-sky-100 transition-colors">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Telefone</p>
+                    <div className="flex items-center gap-2 text-slate-700 font-semibold">
+                      <Phone size={14} className="text-sky-500" />
+                      <span>{resident.phone || 'N/A'}</span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-semibold text-slate-700">Ultimo nome:</span>{' '}
-                    {lastName || '-'}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone size={16} className="text-slate-400" />
-                    <span>{resident.phone || 'Sem telefone'}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Home size={16} className="text-slate-400" />
-                    <span>{resident.unitLabel || 'Unidade N/D'}</span>
+
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100/50 group-hover:border-sky-100 transition-colors">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Unidade</p>
+                    <div className="flex items-center gap-2 text-slate-700 font-semibold">
+                      <Home size={14} className="text-sky-500" />
+                      <span className="truncate">{resident.unitLabel || 'N/A'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
