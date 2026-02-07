@@ -416,6 +416,8 @@ export default function AdminResidents() {
         return { label: 'Expirado', className: 'bg-gray-100 text-gray-700' };
       case 'REVOKED':
         return { label: 'Revogado', className: 'bg-red-100 text-red-700' };
+      case 'USED':
+        return { label: 'Usado', className: 'bg-amber-100 text-amber-700' };
       default:
         return { label: status || 'Desconhecido', className: 'bg-gray-100 text-gray-700' };
     }

@@ -176,20 +176,33 @@ export default function Dashboard() {
     setThinking(false);
   };
 
-  const handleQuickAction = async (visit: Visit, action: 'APPROVE' | 'CHECKOUT') => {
+  const handleQuickAction = async (visit: Visit, action: 'APPROVE' | 'MARK_INSIDE' | 'CHECKOUT') => {
     if (action === 'APPROVE') {
       await api.updateVisitStatus(visit.id, VisitStatus.APPROVED);
       loadQuickActions();
-    } else {
+      return;
+    }
+
+    if (action === 'MARK_INSIDE') {
       showConfirm(
-        `Marcar saída para ${visit.visitor_name}?`,
+        `Marcar entrada (interior) para ${visit.visitor_name}?`,
         async () => {
-          await api.updateVisitStatus(visit.id, VisitStatus.LEFT);
+          await api.updateVisitStatus(visit.id, VisitStatus.INSIDE);
           loadQuickActions();
-          showToast('success', 'Saída registada com sucesso!');
+          showToast('success', 'Entrada marcada como interior!');
         }
       );
+      return;
     }
+
+    showConfirm(
+      `Marcar saída para ${visit.visitor_name}?`,
+      async () => {
+        await api.updateVisitStatus(visit.id, VisitStatus.LEFT);
+        loadQuickActions();
+        showToast('success', 'Saída registada com sucesso!');
+      }
+    );
   };
 
   const handleContactResident = (visit: Visit) => {
@@ -487,8 +500,18 @@ export default function Dashboard() {
                       </>
                     )}
 
-                    {/* APPROVED/INSIDE: Show only "Mark Exit" button (enabled) */}
-                    {(visit.status === VisitStatus.APPROVED || visit.status === VisitStatus.INSIDE) && (
+                    {/* APPROVED: Show "Mark Inside" */}
+                    {visit.status === VisitStatus.APPROVED && (
+                      <button
+                        onClick={() => handleQuickAction(visit, 'MARK_INSIDE')}
+                        className="flex-1 md:flex-none h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
+                      >
+                        <ShieldCheck size={18} /> Marcar Interior
+                      </button>
+                    )}
+
+                    {/* INSIDE: Show "Mark Exit" */}
+                    {visit.status === VisitStatus.INSIDE && (
                       <button
                         onClick={() => handleQuickAction(visit, 'CHECKOUT')}
                         className="flex-1 md:flex-none h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"

@@ -1728,6 +1728,9 @@ class DataService {
         if (createdVisit) {
           createdVisit.sync_status = SyncStatus.SYNCED;
           await db.visits.put(createdVisit);
+          if (visitData.qr_token) {
+            await SupabaseService.markQrCodeUsed(visitData.qr_token);
+          }
           await this.createVisitEvent(
             createdVisit.id,
             createdVisit.status,

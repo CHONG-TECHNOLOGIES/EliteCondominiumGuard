@@ -121,7 +121,7 @@ export interface ResidentQrCode {
   start_date?: string;
   end_date?: string;
   expires_at?: string;
-  status?: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+  status?: 'ACTIVE' | 'EXPIRED' | 'REVOKED' | 'USED';
   created_at?: string;
   updated_at?: string;
 }

@@ -189,6 +189,17 @@ export const SupabaseService = {
     }
   },
 
+  async markQrCodeUsed(qrCode: string): Promise<void> {
+    if (!supabase) return;
+
+    try {
+      const { error } = await supabase.rpc('mark_qr_code_used', { p_qr_code: qrCode });
+      if (error) throw error;
+    } catch (err: any) {
+      logger.error('Mark QR used error', err, ErrorCategory.NETWORK);
+    }
+  },
+
   // --- Configurações ---
   async getVisitTypes(condoId: number): Promise<VisitTypeConfig[]> {
     if (!supabase) {
