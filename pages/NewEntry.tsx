@@ -379,14 +379,7 @@ export default function NewEntry() {
               <p className="text-sm text-slate-500 font-medium mt-0.5">Preencha as informações do visitante</p>
             </div>
           </div>
-          {!hideQrButton && !qrToken && !qrConfirmed && (
-            <button
-              onClick={handleStartQrFlow}
-              className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl shadow-lg shadow-slate-900/20 hover:shadow-xl hover:from-slate-800 hover:to-black w-full md:w-auto text-sm font-bold transition-all active:scale-95"
-            >
-              <QrCode size={20} /> Tenho QR Code
-            </button>
-          )}
+          {/* QR flow is initiated via visit-type modal decision */}
         </div>
       </div>
 
