@@ -595,7 +595,7 @@ export default function NewEntry() {
             <h3 className="text-sm font-black text-slate-400 uppercase tracking-wider mb-4">
               Captura de Imagem
             </h3>
-            {approvalMode === ApprovalMode.QR_SCAN && !isScanningQr ? (
+            {approvalMode === ApprovalMode.QR_SCAN && !isScanningQr && !qrConfirmed ? (
               <div className="flex flex-col items-center justify-center h-80 w-full bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400">
                 <QrCode size={48} className="mb-4 opacity-20" />
                 <p className="font-medium">Câmara em espera...</p>
@@ -604,7 +604,7 @@ export default function NewEntry() {
               <ErrorBoundary>
                 <CameraCapture
                   onCapture={handlePhotoCapture}
-                  mode={approvalMode === ApprovalMode.QR_SCAN ? 'scan' : 'photo'}
+                  mode={approvalMode === ApprovalMode.QR_SCAN && !qrConfirmed ? 'scan' : 'photo'}
                   onQrScanned={handleQrScanned}
                   photoQuality={photoQuality}
                 />
