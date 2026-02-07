@@ -1,5 +1,5 @@
 import Dexie, { Table } from 'dexie';
-import { Visit, VisitEvent, Unit, VisitTypeConfig, ServiceTypeConfig, Staff, Condominium, Restaurant, Sport, Incident, IncidentType, IncidentStatus, Device, Resident } from '../types';
+import { Visit, VisitEvent, Unit, VisitTypeConfig, ServiceTypeConfig, Staff, Condominium, Restaurant, Sport, Incident, IncidentType, IncidentStatus, Device, Resident, CondominiumNews } from '../types';
 
 export interface AppSetting {
   key: string;
@@ -22,6 +22,7 @@ export class CondoDatabase extends Dexie {
   incidentStatuses!: Table<IncidentStatus>;
   devices!: Table<Device>;
   residents!: Table<Resident>;
+  news!: Table<CondominiumNews>;
 
   constructor() {
     super('AccesControlDB');
@@ -84,6 +85,11 @@ export class CondoDatabase extends Dexie {
     (this as Dexie).version(11).stores({
       residents: 'id, condominium_id, unit_id, name, phone'
     });
+
+    // Version 12: Add news table for condominium news
+    (this as Dexie).version(12).stores({
+      news: 'id, condominium_id, created_at'
+    });
   }
 
   async clearAllData() {
@@ -102,6 +108,7 @@ export class CondoDatabase extends Dexie {
     await this.incidentStatuses.clear();
     await this.devices.clear();
     await this.residents.clear();
+    await this.news.clear();
   }
 }
 

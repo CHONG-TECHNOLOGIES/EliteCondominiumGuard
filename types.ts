@@ -131,7 +131,9 @@ export interface QrValidationResult {
   resident_id: number | null;
   unit_id: number | null;
   visitor_name: string | null;
+  visitor_phone: string | null;
   purpose: string | null;
+  notes: string | null;
   message: string;
 }
 
@@ -288,6 +290,27 @@ export interface CondominiumStats {
   total_visits_today: number;       // Count of all visits today
   total_incidents_open: number;     // Count of open/acknowledged incidents
   status: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface NewsCategory {
+  id: number;
+  name: string;
+  label?: string;
+  created_at?: string;
+}
+
+export interface CondominiumNews {
+  id: number;
+  condominium_id: number;
+  title: string;
+  description?: string;
+  content?: string;
+  image_url?: string;
+  category_id?: number;
+  category_name?: string;          // From join with news_categories
+  category_label?: string;         // From join with news_categories
+  created_at?: string;
+  updated_at?: string;
 }
 
 export enum Theme {

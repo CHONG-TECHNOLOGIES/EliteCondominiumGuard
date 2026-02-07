@@ -30,7 +30,8 @@ import {
   ShieldCheck,
   Palette,
   Moon,
-  Sparkles
+  Sparkles,
+  Newspaper
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -127,6 +128,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           label: 'Desportos',
           path: '/admin/sports',
           icon: <Dumbbell size={18} />
+        },
+        {
+          label: 'Notícias',
+          path: '/admin/news',
+          icon: <Newspaper size={18} />
         }
       ]
     },

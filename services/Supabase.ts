@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult } from '../types';
+import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory } from '../types';
 import { logger, ErrorCategory } from '@/services/logger';
 
 logger.setContext({ service: 'Supabase' });
@@ -258,6 +258,219 @@ export const SupabaseService = {
     } catch (err: any) {
       logger.error('Error getting sports', err, ErrorCategory.NETWORK);
       return [];
+    }
+  },
+
+  // --- News ---
+  async getNews(condoId: number, days: number = 7): Promise<CondominiumNews[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .rpc('get_news', { p_condominium_id: condoId, p_days: days });
+
+      if (error) throw error;
+      return (data as CondominiumNews[]) || [];
+    } catch (err: any) {
+      logger.error('Error getting news', err, ErrorCategory.NETWORK);
+      return [];
+    }
+  },
+
+  async adminGetAllNews(condominiumId?: number): Promise<CondominiumNews[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_get_all_news', { p_condominium_id: condominiumId || null });
+
+      if (error) throw error;
+      return (data as CondominiumNews[]) || [];
+    } catch (err: any) {
+      logger.error('Error getting all news', err, ErrorCategory.NETWORK);
+      return [];
+    }
+  },
+
+  async adminCreateNews(news: Partial<CondominiumNews>): Promise<CondominiumNews | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_create_news', {
+          p_data: {
+            condominium_id: news.condominium_id,
+            title: news.title,
+            description: news.description,
+            content: news.content,
+            image_url: news.image_url,
+            category_id: news.category_id
+          }
+        });
+
+      if (error) throw error;
+      return data as CondominiumNews;
+    } catch (err: any) {
+      logger.error('Error creating news', err, ErrorCategory.NETWORK);
+      return null;
+    }
+  },
+
+  async adminUpdateNews(id: number, news: Partial<CondominiumNews>): Promise<CondominiumNews | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_update_news', {
+          p_id: id,
+          p_data: {
+            title: news.title,
+            description: news.description,
+            content: news.content,
+            image_url: news.image_url,
+            category_id: news.category_id
+          }
+        });
+
+      if (error) throw error;
+      return data as CondominiumNews;
+    } catch (err: any) {
+      logger.error('Error updating news', err, ErrorCategory.NETWORK);
+      return null;
+    }
+  },
+
+  async adminDeleteNews(id: number): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .rpc('admin_delete_news', { p_id: id });
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logger.error('Error deleting news', err, ErrorCategory.NETWORK);
+      return false;
+    }
+  },
+
+  // --- News Categories ---
+  async getNewsCategories(): Promise<NewsCategory[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .rpc('get_news_categories');
+
+      if (error) throw error;
+      return (data as NewsCategory[]) || [];
+    } catch (err: any) {
+      logger.error('Error getting news categories', err, ErrorCategory.NETWORK);
+      return [];
+    }
+  },
+
+  async adminCreateNewsCategory(category: Partial<NewsCategory>): Promise<NewsCategory | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_create_news_category', {
+          p_data: {
+            name: category.name,
+            label: category.label
+          }
+        });
+
+      if (error) throw error;
+      return data as NewsCategory;
+    } catch (err: any) {
+      logger.error('Error creating news category', err, ErrorCategory.NETWORK);
+      return null;
+    }
+  },
+
+  async adminUpdateNewsCategory(id: number, category: Partial<NewsCategory>): Promise<NewsCategory | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_update_news_category', {
+          p_id: id,
+          p_data: {
+            name: category.name,
+            label: category.label
+          }
+        });
+
+      if (error) throw error;
+      return data as NewsCategory;
+    } catch (err: any) {
+      logger.error('Error updating news category', err, ErrorCategory.NETWORK);
+      return null;
+    }
+  },
+
+  async adminDeleteNewsCategory(id: number): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { error } = await supabase
+        .rpc('admin_delete_news_category', { p_id: id });
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logger.error('Error deleting news category', err, ErrorCategory.NETWORK);
+      return false;
+    }
+  },
+
+  // --- News Image Upload ---
+  async uploadNewsImage(file: File, condominiumId: number, newsId: number): Promise<string | null> {
+    if (!supabase) return null;
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${condominiumId}/${newsId}_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('news-images')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('news-images')
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    } catch (err: any) {
+      logger.error('Error uploading news image', err, ErrorCategory.NETWORK);
+      return null;
+    }
+  },
+
+  async deleteNewsImage(imageUrl: string): Promise<boolean> {
+    if (!supabase || !imageUrl) return false;
+
+    try {
+      const storagePath = getStoragePathFromPublicUrl(imageUrl, 'news-images');
+      if (!storagePath) return false;
+
+      const { error } = await supabase.storage
+        .from('news-images')
+        .remove([storagePath]);
+
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logger.error('Error deleting news image', err, ErrorCategory.NETWORK);
+      return false;
     }
   },
 

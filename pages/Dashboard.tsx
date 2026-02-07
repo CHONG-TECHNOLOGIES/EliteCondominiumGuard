@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, List, AlertTriangle, RefreshCw, MessageSquare, Send, X, Clock, CheckCircle, LogOut, User, MapPin, ShieldCheck, ChevronRight, Phone, Search } from 'lucide-react';
+import { UserPlus, List, AlertTriangle, RefreshCw, MessageSquare, Send, X, Clock, CheckCircle, LogOut, User, MapPin, ShieldCheck, ChevronRight, Phone, Search, Newspaper } from 'lucide-react';
 import { api } from '../services/dataService';
 import { askConcierge } from '../services/geminiService';
 import { Visit, VisitStatus } from '../types';
@@ -299,6 +299,20 @@ export default function Dashboard() {
             <div>
               <h2 className="text-2xl font-bold mb-1">Pesquisar Morador</h2>
               <p className="text-slate-500 font-medium">Nome, telefone ou condominio.</p>
+            </div>
+          </button>
+
+          {/* Secondary Button: Latest News */}
+          <button
+            onClick={() => navigate('/news')}
+            className="group col-span-1 rounded-3xl bg-white p-8 text-slate-800 shadow-lg shadow-slate-200/50 transition-all hover:-translate-y-1 hover:shadow-xl md:min-h-[220px] flex flex-col justify-between text-left border border-slate-100 relative"
+          >
+            <div className="bg-emerald-50 text-emerald-600 w-14 h-14 rounded-2xl flex items-center justify-center mb-4 group-hover:bg-emerald-100 transition-colors">
+              <Newspaper size={28} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold mb-1">Últimas Notícias</h2>
+              <p className="text-slate-500 font-medium">Notícias do condomínio.</p>
             </div>
           </button>
         </div>

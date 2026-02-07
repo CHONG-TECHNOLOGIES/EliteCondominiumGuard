@@ -421,7 +421,7 @@ Each tablet must be configured before use:
 
 ### 5. Database Schema (IndexedDB via Dexie)
 
-**Tables** (services/db.ts - Version 10):
+**Tables** (services/db.ts - Version 12):
 ```typescript
 visits          // User visits with sync_status and device_id
 visitEvents     // Visit status change events (audit trail)
@@ -437,6 +437,8 @@ incidents       // Incident reports with sync_status
 incidentTypes   // Incident type lookup table
 incidentStatuses // Incident status lookup table
 devices         // Device registry (cached)
+residents       // Resident list (cached for offline search)
+news            // Condominium news (cached, last 7 days)
 ```
 
 **Critical Indexes**:
@@ -540,7 +542,12 @@ ApprovalMode: APP | PHONE | INTERCOM | GUARD_MANUAL | QR_SCAN
 
 ### 8. Backend Integration (Supabase)
 
-**RPC Functions** (services/Supabase.ts - 2,316 lines) ??? 94 functions total, grouped by domain:
+**RPC Migration Status**: ✅ 99% Complete (February 2026)
+- 79 RPC functions implemented and in use
+- 1 remaining `.from()` call (`device_registration_errors` table)
+- 10 storage bucket `.from()` calls (correct - Supabase Storage API)
+
+**RPC Functions** (services/Supabase.ts - 2,316 lines) — 79+ functions total, grouped by domain:
 
 **Authentication (3)**:
 | Function | Parameters | Description |
@@ -649,6 +656,11 @@ ApprovalMode: APP | PHONE | INTERCOM | GUARD_MANUAL | QR_SCAN
 | `admin_create_sport` | p_data (JSONB) | Create sport |
 | `admin_update_sport` | p_id (INT), p_data (JSONB) | Update sport |
 | `admin_delete_sport` | p_id (INT) | Delete sport |
+
+**News (1)**:
+| Function | Parameters | Description |
+|----------|-----------|-------------|
+| `get_news` | p_condominium_id (INT), p_days (INT DEFAULT 7) | Get news from last N days for a condo |
 
 **QR Codes (5)**:
 | Function | Parameters | Description |
@@ -792,6 +804,8 @@ src/
 │   ├── NewEntry.tsx             # Register visit/delivery (multi-step)
 │   ├── DailyList.tsx            # Today's visits list
 │   ├── Incidents.tsx            # Incident management with alerts
+│   ├── ResidentSearch.tsx       # Resident search functionality
+│   ├── News.tsx                 # Condominium news (last 7 days)
 │   ├── Settings.tsx             # Device settings and storage info
 │   └── admin/                   # Admin pages (15 pages)
 │       ├── AdminDashboard.tsx
@@ -929,6 +943,8 @@ HashRouter (# based URLs for compatibility)
     ├── /new-entry  - New visitor entry
     ├── /day-list   - Daily activity list
     ├── /incidents  - Incident reporting
+    ├── /resident-search - Search residents
+    ├── /news       - Condominium news (last 7 days)
     ├── /settings   - Device settings
     └── /admin/*    - Admin routes (AdminRoute)
         ├── /admin              - Admin dashboard
@@ -1451,6 +1467,17 @@ interface NewsCategory {
 - Guard notes and acknowledgment
 - Status updates (in-progress/resolved)
 
+#### News (/news)
+**Purpose**: View condominium news from the last 7 days.
+
+**Features**:
+- News cards with title, description, category, and date
+- Modal for full article view
+- Auto-refresh every 60 seconds
+- Offline support with cached news
+- Empty state when no news available
+- Relative time display (e.g., "há 2 horas")
+
 #### Settings (/settings)
 **Purpose**: Device settings and information.
 
@@ -1515,6 +1542,7 @@ getVisitTypes(): Promise<VisitTypeConfig[]>
 getServiceTypes(): Promise<ServiceTypeConfig[]>
 getRestaurants(): Promise<Restaurant[]>
 getSports(): Promise<Sport[]>
+getNews(): Promise<CondominiumNews[]>
 ```
 
 **Visits**:

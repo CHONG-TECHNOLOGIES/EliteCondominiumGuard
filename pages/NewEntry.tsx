@@ -194,9 +194,12 @@ export default function NewEntry() {
       if (result && result.is_valid) {
         // Pre-fill form with QR data
         setVisitorName(result.visitor_name || '');
-        setReason(result.purpose || '');
+        setVisitorPhone(result.visitor_phone || '');
+        const notesText = result.notes || '';
+        const purposeText = result.purpose || '';
+        setReason(notesText || purposeText);
         if (result.unit_id) {
-          setUnitId(result.unit_id.toString());
+          setUnitId(String(result.unit_id));
         }
         setQrConfirmed(true);
         setStep(2); // Go to form with filled data
@@ -279,7 +282,7 @@ export default function NewEntry() {
   };
 
   const getSelectedUnitLabel = () => {
-    const u = units.find(u => u.id === unitId);
+    const u = units.find(u => String(u.id) === unitId);
     return u ? `Bloco ${u.code_block || ''} - ${u.number}` : '';
   };
 
@@ -376,7 +379,7 @@ export default function NewEntry() {
               <p className="text-sm text-slate-500 font-medium mt-0.5">Preencha as informações do visitante</p>
             </div>
           </div>
-          {!hideQrButton && (
+          {!hideQrButton && !qrToken && !qrConfirmed && (
             <button
               onClick={handleStartQrFlow}
               className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl shadow-lg shadow-slate-900/20 hover:shadow-xl hover:from-slate-800 hover:to-black w-full md:w-auto text-sm font-bold transition-all active:scale-95"
@@ -573,7 +576,7 @@ export default function NewEntry() {
   );
 
   const renderStep3 = () => {
-    const selectedUnit = units.find(u => u.id === unitId);
+    const selectedUnit = units.find(u => String(u.id) === unitId);
 
     // Check if visit type requires approval (restaurant and sport don't need approval)
     const isFreeEntry = selectedTypeConfig?.requires_restaurant || selectedTypeConfig?.requires_sport;
@@ -872,23 +875,23 @@ export default function NewEntry() {
               {filteredUnits.map(u => (
                 <button
                   key={u.id}
-                  onClick={() => { setUnitId(u.id); setShowUnitModal(false); }}
-                  className={`relative group overflow-hidden h-32 rounded-2xl border-2 transition-all duration-300 flex flex-col items-start justify-end p-4 shadow-sm hover:shadow-md ${unitId === u.id
+                  onClick={() => { setUnitId(String(u.id)); setShowUnitModal(false); }}
+                  className={`relative group overflow-hidden h-32 rounded-2xl border-2 transition-all duration-300 flex flex-col items-start justify-end p-4 shadow-sm hover:shadow-md ${unitId === String(u.id)
                     ? 'border-accent bg-sky-50'
                     : 'border-slate-100 bg-white hover:border-accent/50'
                     }`}
                 >
-                  <div className={`absolute -right-4 -top-4 transition-transform duration-500 group-hover:scale-110 ${unitId === u.id ? 'text-accent/20' : 'text-slate-100'
+                  <div className={`absolute -right-4 -top-4 transition-transform duration-500 group-hover:scale-110 ${unitId === String(u.id) ? 'text-accent/20' : 'text-slate-100'
                     }`}>
                     <Building size={80} />
                   </div>
 
                   <div className="relative z-10 w-full text-left">
-                    <span className={`text-xs font-bold uppercase tracking-wider mb-0.5 block ${unitId === u.id ? 'text-accent' : 'text-slate-400'
+                    <span className={`text-xs font-bold uppercase tracking-wider mb-0.5 block ${unitId === String(u.id) ? 'text-accent' : 'text-slate-400'
                       }`}>
                       Bloco {u.code_block || '-'}
                     </span>
-                    <span className={`text-3xl font-black ${unitId === u.id ? 'text-slate-800' : 'text-slate-600'
+                    <span className={`text-3xl font-black ${unitId === String(u.id) ? 'text-slate-800' : 'text-slate-600'
                       }`}>
                       {u.number}
                     </span>

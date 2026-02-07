@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident, ResidentQrCode, QrValidationResult } from '../types';
+import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 import { logger, ErrorCategory } from '@/services/logger';
@@ -1043,7 +1043,9 @@ class DataService {
         resident_id: null,
         unit_id: null,
         visitor_name: null,
+        visitor_phone: null,
         purpose: null,
+        notes: null,
         message: 'Validação de QR requer ligação à internet.'
       };
     }
@@ -1078,7 +1080,9 @@ class DataService {
         resident_id: null,
         unit_id: null,
         visitor_name: null,
+        visitor_phone: null,
         purpose: null,
+        notes: null,
         message: 'Erro ao validar código QR.'
       };
     }
@@ -1215,6 +1219,168 @@ class DataService {
       logger.error('Restaurants/Sports sync failed', e, ErrorCategory.SYNC);
       this.backendHealthScore--;
     }
+  }
+
+  // --- News ---
+  async getNews(): Promise<CondominiumNews[]> {
+    // Calculate 7 days ago for filtering
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // Get local news filtered by condominium and date
+    const local = this.currentCondoId
+      ? await db.news
+          .where('condominium_id')
+          .equals(this.currentCondoId)
+          .toArray()
+      : await db.news.toArray();
+
+    // Filter by last 7 days
+    const filteredLocal = local.filter(n =>
+      n.created_at && new Date(n.created_at) >= sevenDaysAgo
+    ).sort((a, b) =>
+      new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+    );
+
+    // If we have local data, return it and sync in background
+    if (filteredLocal.length > 0) {
+      if (this.isBackendHealthy && this.currentCondoId) {
+        this.refreshNews(this.currentCondoId); // Fire-and-forget
+      }
+      return filteredLocal;
+    }
+
+    // If local DB is empty, wait for sync to complete
+    if (this.isBackendHealthy && this.currentCondoId) {
+      await this.refreshNews(this.currentCondoId);
+      const synced = await db.news
+        .where('condominium_id')
+        .equals(this.currentCondoId)
+        .toArray();
+      return synced.filter(n =>
+        n.created_at && new Date(n.created_at) >= sevenDaysAgo
+      ).sort((a, b) =>
+        new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+      );
+    }
+
+    return [];
+  }
+
+  private async refreshNews(condoId: number) {
+    if (!this.isBackendHealthy) return;
+    try {
+      const news = await SupabaseService.getNews(condoId, 7);
+      if (news.length) {
+        // Clear old news for this condo first, then add fresh
+        await db.news.where('condominium_id').equals(condoId).delete();
+        await db.news.bulkPut(news);
+      }
+    } catch (e) {
+      logger.error('News sync failed', e, ErrorCategory.SYNC);
+      this.backendHealthScore--;
+    }
+  }
+
+  // --- Admin News Management ---
+  async adminGetAllNews(condominiumId?: number): Promise<CondominiumNews[]> {
+    const scopedCondoId = this.getAdminScopeCondoId();
+    const effectiveCondoId = scopedCondoId ?? condominiumId;
+    return await SupabaseService.adminGetAllNews(effectiveCondoId);
+  }
+
+  async adminCreateNews(news: Partial<CondominiumNews>): Promise<CondominiumNews | null> {
+    const created = await SupabaseService.adminCreateNews(news);
+    if (created) {
+      await this.logAudit({
+        action: 'CREATE',
+        target_table: 'condominium_news',
+        target_id: created.id,
+        condominium_id: created.condominium_id,
+        details: { title: created.title }
+      });
+    }
+    return created;
+  }
+
+  async adminUpdateNews(id: number, news: Partial<CondominiumNews>, auditDetails?: any): Promise<CondominiumNews | null> {
+    const updated = await SupabaseService.adminUpdateNews(id, news);
+    if (updated) {
+      await this.logAudit({
+        action: 'UPDATE',
+        target_table: 'condominium_news',
+        target_id: id,
+        condominium_id: updated.condominium_id,
+        details: auditDetails ?? { title: updated.title }
+      });
+    }
+    return updated;
+  }
+
+  async adminDeleteNews(id: number, newsTitle?: string): Promise<boolean> {
+    const result = await SupabaseService.adminDeleteNews(id);
+    if (result) {
+      await this.logAudit({
+        action: 'DELETE',
+        target_table: 'condominium_news',
+        target_id: id,
+        details: { title: newsTitle }
+      });
+    }
+    return result;
+  }
+
+  // --- News Categories ---
+  async getNewsCategories(): Promise<NewsCategory[]> {
+    return await SupabaseService.getNewsCategories();
+  }
+
+  async adminCreateNewsCategory(category: Partial<NewsCategory>): Promise<NewsCategory | null> {
+    const created = await SupabaseService.adminCreateNewsCategory(category);
+    if (created) {
+      await this.logAudit({
+        action: 'CREATE',
+        target_table: 'news_categories',
+        target_id: created.id,
+        details: { name: created.name, label: created.label }
+      });
+    }
+    return created;
+  }
+
+  async adminUpdateNewsCategory(id: number, category: Partial<NewsCategory>, auditDetails?: any): Promise<NewsCategory | null> {
+    const updated = await SupabaseService.adminUpdateNewsCategory(id, category);
+    if (updated) {
+      await this.logAudit({
+        action: 'UPDATE',
+        target_table: 'news_categories',
+        target_id: id,
+        details: auditDetails ?? { name: updated.name, label: updated.label }
+      });
+    }
+    return updated;
+  }
+
+  async adminDeleteNewsCategory(id: number, categoryName?: string): Promise<boolean> {
+    const result = await SupabaseService.adminDeleteNewsCategory(id);
+    if (result) {
+      await this.logAudit({
+        action: 'DELETE',
+        target_table: 'news_categories',
+        target_id: id,
+        details: { name: categoryName }
+      });
+    }
+    return result;
+  }
+
+  // --- News Image Upload ---
+  async uploadNewsImage(file: File, condominiumId: number, newsId: number): Promise<string | null> {
+    return await SupabaseService.uploadNewsImage(file, condominiumId, newsId);
+  }
+
+  async deleteNewsImage(imageUrl: string): Promise<boolean> {
+    return await SupabaseService.deleteNewsImage(imageUrl);
   }
 
   // --- Units ---

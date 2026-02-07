@@ -24,6 +24,7 @@ const NewEntry = React.lazy(() => import('./pages/NewEntry'));
 const DailyList = React.lazy(() => import('./pages/DailyList'));
 const Incidents = React.lazy(() => import('./pages/Incidents'));
 const ResidentSearch = React.lazy(() => import('./pages/ResidentSearch'));
+const News = React.lazy(() => import('./pages/News'));
 const Setup = React.lazy(() => import('./pages/Setup'));
 
 const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
@@ -41,6 +42,7 @@ const AdminServiceTypes = React.lazy(() => import('./pages/admin/AdminServiceTyp
 const AdminAnalytics = React.lazy(() => import('./pages/admin/AdminAnalytics'));
 const AdminAuditLogs = React.lazy(() => import('./pages/admin/AdminAuditLogs'));
 const AdminDeviceRegistrationErrors = React.lazy(() => import('./pages/admin/AdminDeviceRegistrationErrors'));
+const AdminNews = React.lazy(() => import('./pages/admin/AdminNews'));
 
 const PageLoader: React.FC = () => (
   <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white">
@@ -577,6 +579,7 @@ export default function App() {
                 <Route path="/admin/analytics" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAnalytics /></AdminLayout></AdminRoute></ConfigGuard>} />
                 <Route path="/admin/audit-logs" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAuditLogs /></AdminLayout></AdminRoute></ConfigGuard>} />
                 <Route path="/admin/device-registration-errors" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDeviceRegistrationErrors /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/news" element={<ConfigGuard><AdminRoute><AdminLayout><AdminNews /></AdminLayout></AdminRoute></ConfigGuard>} />
 
                 {/* Guard Routes */}
                 <Route path="/" element={<ConfigGuard><ProtectedRoute><Dashboard /></ProtectedRoute></ConfigGuard>} />
@@ -584,6 +587,7 @@ export default function App() {
                 <Route path="/day-list" element={<ConfigGuard><ProtectedRoute><DailyList /></ProtectedRoute></ConfigGuard>} />
                 <Route path="/incidents" element={<ConfigGuard><ProtectedRoute><Incidents /></ProtectedRoute></ConfigGuard>} />
                 <Route path="/resident-search" element={<ConfigGuard><ProtectedRoute><ResidentSearch /></ProtectedRoute></ConfigGuard>} />
+                <Route path="/news" element={<ConfigGuard><ProtectedRoute><News /></ProtectedRoute></ConfigGuard>} />
 
                 <Route path="*" element={<Navigate to="/" />} />
               </Routes>
