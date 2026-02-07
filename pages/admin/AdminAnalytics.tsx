@@ -5,6 +5,7 @@ import { BarChart3, Loader2, MapPin, Users, AlertTriangle, RefreshCw, Search, X 
 import { api } from '../../services/dataService';
 import { CondominiumStats } from '../../types';
 import { useToast } from '../../components/Toast';
+import { logger, ErrorCategory } from '@/services/logger';
 
 export default function AdminAnalytics() {
   const { showToast } = useToast();
@@ -20,7 +21,7 @@ export default function AdminAnalytics() {
   const [mapCenter, setMapCenter] = useState<[number, number]>(defaultCenter);
 
   useEffect(() => {
-    console.log('AdminAnalytics mounted');
+    logger.info('AdminAnalytics mounted');
     loadData();
     // Auto-refresh every 30 seconds for real-time data
     const interval = setInterval(() => {
@@ -31,12 +32,12 @@ export default function AdminAnalytics() {
   }, []);
 
   const loadData = async () => {
-    console.log('Loading analytics data...');
+    logger.info('Loading analytics data...');
     setLoading(true);
     setError(null);
     try {
       const data = await api.adminGetCondominiumStats();
-      console.log('Received analytics data:', data);
+      logger.info('Received analytics data', { data: data });
       setStats(data);
       setLastUpdated(new Date());
 
@@ -48,7 +49,7 @@ export default function AdminAnalytics() {
         }
       }
     } catch (error: any) {
-      console.error('Error loading analytics data:', error);
+      logger.error('Error loading analytics data', error, ErrorCategory.NETWORK);
       setError(error.message || 'Erro desconhecido');
       showToast('error', 'Erro ao carregar dados de analytics');
     } finally {
@@ -63,7 +64,7 @@ export default function AdminAnalytics() {
       setStats(data);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('Error refreshing analytics data:', error);
+      logger.error('Error refreshing analytics data', error, ErrorCategory.NETWORK);
     } finally {
       setRefreshing(false);
     }

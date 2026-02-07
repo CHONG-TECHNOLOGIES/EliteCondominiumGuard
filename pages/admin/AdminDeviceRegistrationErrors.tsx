@@ -3,6 +3,7 @@ import { AlertTriangle, Calendar, ChevronLeft, ChevronRight, FileText, Loader2, 
 import { api } from '../../services/dataService';
 import { DeviceRegistrationError } from '../../types';
 import { useToast } from '../../components/Toast';
+import { logger, ErrorCategory } from '@/services/logger';
 
 export default function AdminDeviceRegistrationErrors() {
   const { showToast } = useToast();
@@ -34,7 +35,7 @@ export default function AdminDeviceRegistrationErrors() {
       setErrors(result.errors);
       setTotal(result.total);
     } catch (error) {
-      console.error('Error loading device registration errors:', error);
+      logger.error('Error loading device registration errors', error, ErrorCategory.DEVICE);
       showToast('error', 'Erro ao carregar erros de registo de dispositivos');
     } finally {
       setLoading(false);

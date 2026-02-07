@@ -4,6 +4,7 @@ import { api } from '../../services/dataService';
 import { Restaurant, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -166,7 +167,7 @@ export default function AdminRestaurants() {
       setRestaurants(restaurantsData);
       setCondominiums(condosData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      logger.error('Error loading data', error, ErrorCategory.NETWORK);
     } finally {
       setLoading(false);
     }
@@ -193,7 +194,7 @@ export default function AdminRestaurants() {
         showToast('error', 'Erro ao criar restaurante');
       }
     } catch (error) {
-      console.error('Error creating restaurant:', error);
+      logger.error('Error creating restaurant', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao criar restaurante');
     }
   };
@@ -219,7 +220,7 @@ export default function AdminRestaurants() {
         showToast('error', 'Erro ao atualizar restaurante');
       }
     } catch (error) {
-      console.error('Error updating restaurant:', error);
+      logger.error('Error updating restaurant', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao atualizar restaurante');
     }
   };
@@ -237,7 +238,7 @@ export default function AdminRestaurants() {
             showToast('error', 'Erro ao remover restaurante');
           }
         } catch (error) {
-          console.error('Error deleting restaurant:', error);
+          logger.error('Error deleting restaurant', error, ErrorCategory.NETWORK);
           showToast('error', 'Erro ao remover restaurante');
         }
       }

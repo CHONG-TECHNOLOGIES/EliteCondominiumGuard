@@ -5,6 +5,7 @@ import { AuditLog, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
 import { exportAuditLogsToCSV } from '../../utils/csvExport';
 import { AuthContext } from '../../App';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -166,7 +167,7 @@ export default function AdminAuditLogs() {
       const data = await api.adminGetAllCondominiums();
       setCondominiums(data);
     } catch (error) {
-      console.error('Error loading condominiums:', error);
+      logger.error('Error loading condominiums', error, ErrorCategory.NETWORK);
     }
   };
 
@@ -187,7 +188,7 @@ export default function AdminAuditLogs() {
       setTotal(result.total);
       setHasMore(result.logs.length < result.total);
     } catch (error) {
-      console.error('Error loading audit logs:', error);
+      logger.error('Error loading audit logs', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao carregar logs de auditoria');
     } finally {
       setLoading(false);
@@ -223,7 +224,7 @@ export default function AdminAuditLogs() {
         return combined;
       });
     } catch (error) {
-      console.error('Error loading more audit logs:', error);
+      logger.error('Error loading more audit logs', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao carregar mais logs');
     } finally {
       setLoadingMore(false);

@@ -4,6 +4,7 @@ import { api } from '../../services/dataService';
 import { Unit, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -165,7 +166,7 @@ export default function AdminUnits() {
       setUnits(unitsData);
       setCondominiums(condosData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      logger.error('Error loading data', error, ErrorCategory.NETWORK);
     } finally {
       setLoading(false);
     }
@@ -192,7 +193,7 @@ export default function AdminUnits() {
         showToast('error', 'Erro ao criar unidade');
       }
     } catch (error) {
-      console.error('Error creating unit:', error);
+      logger.error('Error creating unit', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao criar unidade');
     }
   };
@@ -218,7 +219,7 @@ export default function AdminUnits() {
         showToast('error', 'Erro ao atualizar unidade');
       }
     } catch (error) {
-      console.error('Error updating unit:', error);
+      logger.error('Error updating unit', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao atualizar unidade');
     }
   };
@@ -236,7 +237,7 @@ export default function AdminUnits() {
             showToast('error', 'Erro ao remover unidade');
           }
         } catch (error) {
-          console.error('Error deleting unit:', error);
+          logger.error('Error deleting unit', error, ErrorCategory.NETWORK);
           showToast('error', 'Erro ao remover unidade');
         }
       }

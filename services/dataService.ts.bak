@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident, ResidentQrCode, QrValidationResult } from '../types';
+import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 import { logger, ErrorCategory } from '@/services/logger';
@@ -98,12 +98,12 @@ class DataService {
         this.isOnline = true;
         this.backendHealthScore = 3;
       } else {
-        logger.warn('Backend returned non-OK status', { data: response.status });
+        console.warn('[DataService] Backend returned non-OK status:', response.status);
         this.isOnline = false;
         this.backendHealthScore = 0;
       }
     } catch (error) {
-      logger.warn('Backend unreachable - setting offline mode', { error: String(error) });
+      console.warn('[DataService] Backend unreachable - setting offline mode:', error);
       this.isOnline = false;
       this.backendHealthScore = 0;
     }
@@ -119,11 +119,11 @@ class DataService {
         const device = await SupabaseService.getDeviceByIdentifier(deviceIdentifier);
         if (device && device.id) {
           this.currentDeviceId = device.id;
-          logger.info('Device ID loaded for visit tracking', { data: device.id });
+          console.log('[DataService] Device ID loaded for visit tracking:', device.id);
         }
       }
     } catch (error) {
-      logger.warn('Could not load device ID, will track visits without device_id', { error: String(error) });
+      console.warn('[DataService] Could not load device ID, will track visits without device_id:', error);
     }
   }
 
@@ -133,7 +133,7 @@ class DataService {
    */
   private async requestPersistentStorage() {
     if (!navigator.storage || !navigator.storage.persist) {
-      logger.warn('Persistent storage API not supported');
+      console.warn('[DataService] Persistent storage API not supported');
       return;
     }
 
@@ -141,16 +141,16 @@ class DataService {
       const isPersisted = await navigator.storage.persisted();
 
       if (!isPersisted) {
-        logger.info('Requesting persistent storage...');
+        console.log('[DataService] Requesting persistent storage...');
         const granted = await navigator.storage.persist();
 
         if (granted) {
-          logger.info('Persistent storage GRANTED - data will not be auto-deleted');
+          console.log('[DataService] ✅ Persistent storage GRANTED - data won\'t be auto-deleted');
         } else {
-          logger.warn('Persistent storage DENIED - data may be deleted if disk is low');
+          console.warn('[DataService] ⚠️ Persistent storage DENIED - data may be deleted if disk is low');
         }
       } else {
-        logger.info('Persistent storage already granted');
+        console.log('[DataService] ✅ Persistent storage already granted');
       }
 
       // Log storage quota info
@@ -159,13 +159,13 @@ class DataService {
       const quotaMB = (estimate.quota || 0) / 1024 / 1024;
       const percentUsed = ((estimate.usage || 0) / (estimate.quota || 1) * 100).toFixed(2);
 
-      logger.info('Storage usage:', {
+      console.log('[DataService] Storage usage:', {
         used: `${usedMB.toFixed(2)} MB`,
         quota: `${quotaMB.toFixed(2)} MB`,
         percentage: `${percentUsed}%`
       });
     } catch (err) {
-      logger.error('Error requesting persistent storage', err, ErrorCategory.STORAGE);
+      console.error('[DataService] Error requesting persistent storage:', err);
     }
   }
 
@@ -193,19 +193,19 @@ class DataService {
           // If backend just recovered, sync pending items automatically
           if (wasUnhealthy) {
             void this.flushPendingAuditLogs();
-            logger.info('Backend recovered - auto-syncing pending items...');
+            console.log('[DataService] Backend recovered - auto-syncing pending items...');
             // syncPendingItems already emits all necessary events
             this.syncPendingItems().then(count => {
               if (count > 0) {
-                logger.info('Auto-synced pending items after recovery', { count: count });
+                console.log(`[DataService] ✓ Auto-synced ${count} pending items after recovery`);
               }
             }).catch(err => {
-              logger.error('Auto-sync after recovery failed', err, ErrorCategory.SYNC);
+              console.error('[DataService] Auto-sync after recovery failed:', err);
             });
           }
         } else {
           this.backendHealthScore = Math.max(0, this.backendHealthScore - 1);
-          logger.info('Health check failed, score', { data: this.backendHealthScore });
+          console.log('[DataService] Health check failed, score:', this.backendHealthScore);
         }
       }
     }, 60000); // Check every minute
@@ -250,7 +250,7 @@ class DataService {
     const isEmpty = await this.isLocalCacheEmpty();
     if (!isEmpty) return;
 
-    logger.info('Local cache empty - bootstrapping sync from backend...');
+    console.log('[DataService] Local cache empty - bootstrapping sync from backend...');
 
     try {
       if (this.currentCondoDetails) {
@@ -277,9 +277,9 @@ class DataService {
         this.getTodaysVisits()
       ]);
 
-      logger.info('Bootstrap sync complete');
+      console.log('[DataService] Bootstrap sync complete');
     } catch (error) {
-      logger.error('Bootstrap sync failed', error, ErrorCategory.SYNC);
+      console.error('[DataService] Bootstrap sync failed:', error);
       this.backendHealthScore--;
     }
   }
@@ -422,23 +422,23 @@ class DataService {
   async isDeviceConfigured(): Promise<boolean> {
     // Quick check: If browser is offline, skip backend checks entirely
     if (!navigator.onLine) {
-      logger.info('Browser offline - skipping backend checks');
+      console.log('[DataService] Browser offline - skipping backend checks');
       this.isOnline = false;
       this.backendHealthScore = 0;
     }
 
     // PRIORITY 1: If ONLINE, central database is the source of truth
     if (this.isBackendHealthy) {
-      logger.info('Online - checking central database first...');
+      console.log('[DataService] Online - checking central database first...');
 
       try {
         // Get local device identifier (fallback to fingerprint if storage is empty)
         let localDeviceId = localStorage.getItem('condo_guard_device_id');
         if (!localDeviceId) {
           localDeviceId = getDeviceIdentifier();
-          logger.info('Local device ID missing, using fingerprint', { data: localDeviceId });
+          console.log('[DataService] Local device ID missing, using fingerprint:', localDeviceId);
         } else {
-          logger.info('Local device ID from localStorage', { data: localDeviceId });
+          console.log('[DataService] Local device ID from localStorage:', localDeviceId);
         }
 
         // Try to find device in central database by local device ID
@@ -453,31 +453,31 @@ class DataService {
           const localSetting = await db.settings.get('device_condo_details');
           if (localSetting) {
             const condoId = (localSetting.value as Condominium).id;
-            logger.info('No central device found by local ID, checking by condominium', { data: condoId });
+            console.log('[DataService] No central device found by local ID, checking by condominium:', condoId);
 
             // Find active device for this condominium
             const devicesForCondo = await SupabaseService.getActiveDevicesByCondominium(condoId);
             if (devicesForCondo.length === 1) {
               centralDevice = devicesForCondo[0];
-              logger.info('Found single active device for this condominium', { data: centralDevice.device_identifier });
+              console.log('[DataService] Found single active device for this condominium:', centralDevice.device_identifier);
             }
           }
         }
 
         if (!centralDevice) {
-          logger.warn('No device found in central database - needs configuration');
+          console.warn('[DataService] No device found in central database - needs configuration');
           return false; // No device registered in central DB
         }
 
         if (centralDevice.status !== 'ACTIVE') {
-          logger.warn('Device status is not ACTIVE', { data: centralDevice.status });
+          console.warn('[DataService] Device status is not ACTIVE:', centralDevice.status);
           return false; // Device is inactive
         }
 
         // SYNC: Get condominium details from central database
         const correctCondo = await SupabaseService.getCondominium(centralDevice.condominium_id);
         if (!correctCondo) {
-          logger.error('Condominium not found in central database', null, ErrorCategory.NETWORK);
+          console.error('[DataService] Condominium not found in central database');
           return false;
         }
 
@@ -492,7 +492,7 @@ class DataService {
         localStorage.setItem('condo_guard_device_id', centralDeviceId);
         localStorage.setItem('device_condo_backup', JSON.stringify(correctCondo));
 
-        logger.info('Synced from central DB → IndexedDB + localStorage:', {
+        console.log('[DataService] Synced from central DB → IndexedDB + localStorage:', {
           deviceId: centralDeviceId,
           condo: correctCondo.name
         });
@@ -500,22 +500,22 @@ class DataService {
         this.currentCondoDetails = correctCondo;
         this.currentCondoId = correctCondo.id;
 
-        logger.info('Device configured from central database', { data: correctCondo.name });
+        console.log('[DataService] ✓ Device configured from central database:', correctCondo.name);
         await this.bootstrapSyncIfEmpty();
         return true;
 
       } catch (err) {
-        logger.error('Error checking central database', err, ErrorCategory.NETWORK);
+        console.error('[DataService] Error checking central database:', err);
         // Fall through to offline checks
       }
     }
 
     // PRIORITY 2: OFFLINE - Check local cache (IndexedDB)
-    logger.info('Offline or central check failed - checking local cache...');
+    console.log('[DataService] Offline or central check failed - checking local cache...');
     const localSetting = await db.settings.get('device_condo_details');
 
     if (localSetting) {
-      logger.info('Local device configuration found for condo', { detail: String((localSetting.value as Condominium).name) });
+      console.log('[DataService] ✓ Local device configuration found for condo:', (localSetting.value as Condominium).name);
 
       // OFFLINE: Restore device ID from IndexedDB to localStorage if missing
       try {
@@ -523,17 +523,17 @@ class DataService {
         if (!localDeviceId) {
           const storedDeviceId = await db.settings.get('device_id');
           if (storedDeviceId && storedDeviceId.value) {
-            logger.info('[OFFLINE] Restoring device ID from IndexedDB to localStorage', { data: storedDeviceId.value });
+            console.log('[DataService] [OFFLINE] Restoring device ID from IndexedDB to localStorage:', storedDeviceId.value);
             localStorage.setItem('condo_guard_device_id', storedDeviceId.value as string);
           } else {
-            logger.warn('[OFFLINE] No device ID in IndexedDB - device will need to sync when online');
+            console.warn('[DataService] [OFFLINE] No device ID in IndexedDB - device will need to sync when online');
           }
         }
 
         // Save condominium data to localStorage as backup
         localStorage.setItem('device_condo_backup', JSON.stringify(localSetting.value));
       } catch (e) {
-        logger.warn('Failed to sync localStorage', { error: String(e) });
+        console.warn('[DataService] Failed to sync localStorage:', e);
       }
 
       this.currentCondoDetails = localSetting.value as Condominium;
@@ -542,12 +542,12 @@ class DataService {
     }
 
     // PRIORITY 3: Try localStorage backup as last resort
-    logger.info('No IndexedDB configuration - checking localStorage backup');
+    console.log('[DataService] No IndexedDB configuration - checking localStorage backup');
     try {
       const backupData = localStorage.getItem('device_condo_backup');
       if (backupData) {
         const condoData = JSON.parse(backupData) as Condominium;
-        logger.info('Restored from localStorage backup', { data: condoData.name });
+        console.log('[DataService] ✓ Restored from localStorage backup:', condoData.name);
 
         // SYNC: Restore to IndexedDB (keep them in sync)
         await db.settings.put({ key: 'device_condo_details', value: condoData });
@@ -556,7 +556,7 @@ class DataService {
         const localDeviceId = localStorage.getItem('condo_guard_device_id');
         if (localDeviceId) {
           await db.settings.put({ key: 'device_id', value: localDeviceId });
-          logger.info('Also restored device_id to IndexedDB', { data: localDeviceId });
+          console.log('[DataService] Also restored device_id to IndexedDB:', localDeviceId);
         }
 
         this.currentCondoDetails = condoData;
@@ -564,11 +564,11 @@ class DataService {
         return true;
       }
     } catch (e) {
-      logger.warn('Failed to restore from localStorage', { error: String(e) });
+      console.warn('[DataService] Failed to restore from localStorage:', e);
     }
 
     // No configuration found anywhere
-    logger.warn('Device not configured - no data found');
+    console.warn('[DataService] ✗ Device not configured - no data found');
     return false;
   }
 
@@ -602,7 +602,7 @@ class DataService {
         // 4. Filter out condominiums that are already assigned to active devices
         const availableCondos = allCondos.filter(c => !assignedCondoIds.has(c.id));
 
-        logger.info('Found active condos, already assigned, available for setup', { totalCondos: allCondos.length, assignedCount: assignedCondoIds.size, availableCount: availableCondos.length });
+        console.log(`[DataService] Found ${allCondos.length} active condos, ${assignedCondoIds.size} already assigned, ${availableCondos.length} available for setup`);
 
         // 5. Cache available condominiums for offline use
         if (availableCondos.length > 0) {
@@ -611,7 +611,7 @@ class DataService {
 
         return availableCondos;
       } catch (e) {
-        logger.error('Error fetching available condominiums', e, ErrorCategory.NETWORK);
+        console.error('[DataService] Error fetching available condominiums:', e);
         this.backendHealthScore--;
       }
     }
@@ -636,7 +636,7 @@ class DataService {
     const existingDevices = await SupabaseService.getActiveDevicesByCondominium(condo.id, deviceId);
 
     if (existingDevices.length > 0) {
-      logger.warn(`Condominium ${condo.name} is already assigned to ${existingDevices.length} active device(s)`);
+      console.warn(`[DataService] Condominium ${condo.name} is already assigned to ${existingDevices.length} active device(s)`);
       return {
         success: false,
         error: `Este condomínio já está associado a ${existingDevices.length} dispositivo(s) ativo(s). Cada condomínio só pode ter um tablet configurado.`,
@@ -653,7 +653,7 @@ class DataService {
     });
 
     if (!deviceRegistered) {
-      logger.warn('Failed to register device with Supabase, but continuing with local setup');
+      console.warn("Failed to register device with Supabase, but continuing with local setup");
     }
 
     // Save configuration locally (IndexedDB + localStorage sync)
@@ -663,7 +663,7 @@ class DataService {
     // SYNC: Also save to localStorage for redundancy and fast access
     localStorage.setItem('condo_guard_device_id', deviceId);
     localStorage.setItem('device_condo_backup', JSON.stringify(condo));
-    logger.info('Device configured - synced to IndexedDB + localStorage');
+    console.log('[DataService] Device configured - synced to IndexedDB + localStorage');
 
     this.currentCondoDetails = condo;
     this.currentCondoId = condo.id;
@@ -732,7 +732,7 @@ class DataService {
       this.currentCondoDetails = offlineCondo;
       this.currentCondoId = condoId;
 
-      logger.info('⚠️ OFFLINE configuration saved - will sync when online:', {
+      console.log('[DataService] ⚠️ OFFLINE configuration saved - will sync when online:', {
         condoId,
         condoName,
         deviceId
@@ -740,7 +740,7 @@ class DataService {
 
       return { success: true };
     } catch (error) {
-      logger.error('Offline configuration failed', error, ErrorCategory.NETWORK);
+      console.error('[DataService] Offline configuration failed:', error);
       return { success: false, error: "Falha ao configurar dispositivo offline" };
     }
   }
@@ -805,7 +805,7 @@ class DataService {
       this.currentCondoDetails = condo;
       this.currentCondoId = condo.id;
 
-      logger.info('✓ Device configuration recovered:', {
+      console.log('[DataService] ✓ Device configuration recovered:', {
         deviceId: deviceIdentifier,
         condo: condo.name
       });
@@ -815,7 +815,7 @@ class DataService {
 
       return { success: true };
     } catch (error) {
-      logger.error('Device recovery failed', error, ErrorCategory.DEVICE);
+      console.error('[DataService] Device recovery failed:', error);
       return { success: false, error: "Falha ao recuperar configuração do dispositivo." };
     }
   }
@@ -849,7 +849,7 @@ class DataService {
       const deviceId = getDeviceIdentifier();
       const condoDetails = await this.getDeviceCondoDetails();
 
-      logger.info('Starting device decommission...', {
+      console.log('[DataService] Starting device decommission...', {
         deviceId,
         condominium: condoDetails?.name
       });
@@ -858,31 +858,31 @@ class DataService {
       if (this.isBackendHealthy) {
         try {
           await SupabaseService.decommissionDevice(deviceId);
-          logger.info('Device marked as DECOMMISSIONED in backend');
+          console.log('[DataService] ✓ Device marked as DECOMMISSIONED in backend');
         } catch (err) {
-          logger.error('Failed to update backend (continuing with local cleanup)', err, ErrorCategory.NETWORK);
+          console.error('[DataService] Failed to update backend (continuing with local cleanup):', err);
           // Continue with local cleanup even if backend fails
         }
       } else {
-        logger.warn('Offline - skipping backend update. Device will remain in previous state in central database.');
+        console.warn('[DataService] Offline - skipping backend update. Device will remain in previous state in central database.');
       }
 
       // Step 2: Clear IndexedDB
       await db.clearAllData();
-      logger.info('IndexedDB cleared');
+      console.log('[DataService] ✓ IndexedDB cleared');
 
       // Step 3: Clear localStorage
       localStorage.removeItem('condo_guard_device_id');
       localStorage.removeItem('device_condo_backup');
       localStorage.clear();
-      logger.info('localStorage cleared');
+      console.log('[DataService] ✓ localStorage cleared');
 
       // Step 4: Unregister service worker
       if ('serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const registration of registrations) {
           await registration.unregister();
-          logger.info('Service worker unregistered');
+          console.log('[DataService] ✓ Service worker unregistered');
         }
       }
 
@@ -890,7 +890,7 @@ class DataService {
       if ('caches' in window) {
         const cacheNames = await caches.keys();
         await Promise.all(cacheNames.map(name => caches.delete(name)));
-        logger.info('Cache storage cleared');
+        console.log('[DataService] ✓ Cache storage cleared');
       }
 
       // Reset internal state
@@ -898,11 +898,11 @@ class DataService {
       this.currentCondoDetails = null;
       this.backendHealthScore = 3;
 
-      logger.info('Device decommission complete');
+      console.log('[DataService] ✅ Device decommission complete');
 
       return { success: true };
     } catch (error) {
-      logger.error('Decommission failed', error, ErrorCategory.DEVICE);
+      console.error('[DataService] Decommission failed:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Erro desconhecido'
@@ -916,9 +916,9 @@ class DataService {
     try {
       const staffList = await SupabaseService.getStaffForSync(condoId);
       await db.staff.bulkPut(staffList);
-      logger.info('staff members synced.', { length: staffList.length });
+      console.log(`${staffList.length} staff members synced.`);
     } catch (e) {
-      logger.error('Staff sync failed', e, ErrorCategory.SYNC);
+      console.error("Staff sync failed", e);
       this.backendHealthScore--;
     }
   }
@@ -979,7 +979,7 @@ class DataService {
         }
         setFailure('INVALID_CREDENTIALS', 'Credenciais inválidas.', 'online');
       } catch (e) {
-        logger.error('Login online falhou, tentando offline', e, ErrorCategory.AUTH);
+        console.error("Login online falhou, tentando offline:", e);
         if (!failureCode) {
           setFailure('ONLINE_ERROR', 'Falha ao autenticar online.', 'online');
         }
@@ -994,7 +994,7 @@ class DataService {
     if (localStaff?.pin_hash) {
       const isValid = await bcrypt.compare(pin, localStaff.pin_hash);
       if (isValid) {
-        logger.warn('Login OFFLINE bem-sucedido.');
+        console.warn("Login OFFLINE bem-sucedido.");
         await this.logAudit({
           condominium_id: localStaff.condominium_id ?? deviceCondoId,
           actor_id: localStaff.id,
@@ -1033,85 +1033,34 @@ class DataService {
     throw new Error("Credenciais inválidas ou sem acesso offline.");
   }
 
-  // --- QR Code Validation (Online Only) ---
-  async validateQrCode(qrCode: string): Promise<QrValidationResult | null> {
-    // QR validation REQUIRES online connection for security
-    if (!this.isBackendHealthy) {
-      logger.warn('QR validation requires online connection');
-      return {
-        is_valid: false,
-        resident_id: null,
-        unit_id: null,
-        visitor_name: null,
-        purpose: null,
-        message: 'Validação de QR requer ligação à internet.'
-      };
-    }
-
-    try {
-      const result = await SupabaseService.validateQrCode(qrCode);
-
-      if (result) {
-        // Log the QR validation attempt for audit
-        await this.logAudit({
-          condominium_id: this.currentCondoId,
-          actor_id: null,
-          action: result.is_valid ? 'QR_VALIDATED' : 'QR_VALIDATION_FAILED',
-          target_table: 'resident_qr_codes',
-          target_id: null,
-          details: {
-            qr_code: qrCode,
-            is_valid: result.is_valid,
-            message: result.message,
-            visitor_name: result.visitor_name,
-            unit_id: result.unit_id
-          }
-        });
-      }
-
-      return result;
-    } catch (error) {
-      logger.error('QR validation failed', error, ErrorCategory.NETWORK);
-      this.backendHealthScore--;
-      return {
-        is_valid: false,
-        resident_id: null,
-        unit_id: null,
-        visitor_name: null,
-        purpose: null,
-        message: 'Erro ao validar código QR.'
-      };
-    }
-  }
-
   // --- Configurações (Cache-then-Network) ---
   private async refreshConfigs(condoId: number) {
     if (!this.isBackendHealthy) return;
-    logger.info('refreshConfigs called for condo', { data: condoId });
+    console.log('[DataService] refreshConfigs called for condo:', condoId);
     try {
       const vt = await SupabaseService.getVisitTypes(condoId);
-      logger.debug('Received visit types from Supabase', { count: vt.length, data: vt });
+      console.log('[DataService] Received visit types from Supabase:', vt.length, 'items', vt);
       if (vt.length) {
         await db.visitTypes.bulkPut(vt);
-        logger.info('Visit types saved to IndexedDB');
+        console.log('[DataService] Visit types saved to IndexedDB');
       }
 
       const st = await SupabaseService.getServiceTypes();
-      logger.debug('Received service types from Supabase', { arg1: st.length, arg2: 'items' });
+      console.log('[DataService] Received service types from Supabase:', st.length, 'items');
       if (st.length) await db.serviceTypes.bulkPut(st);
     } catch (e) {
-      logger.error('Config sync failed', e, ErrorCategory.SYNC);
+      console.error("[DataService] Config sync failed", e);
       this.backendHealthScore--;
     }
   }
 
   async getVisitTypes(): Promise<VisitTypeConfig[]> {
     const local = await db.visitTypes.toArray();
-    logger.debug('getVisitTypes - Local cache', { arg1: local.length, arg2: 'items' });
+    console.log('[DataService] getVisitTypes - Local cache:', local.length, 'items');
 
     // If we have local data, return it and sync in background
     if (local.length > 0) {
-      logger.info('Returning cached visit types');
+      console.log('[DataService] Returning cached visit types');
       if (this.isBackendHealthy && this.currentCondoId) {
         this.refreshConfigs(this.currentCondoId); // Fire-and-forget
       }
@@ -1120,17 +1069,17 @@ class DataService {
 
     // If local DB is empty, wait for sync to complete
     if (this.isBackendHealthy && this.currentCondoId) {
-      logger.info('Fetching visit types from backend for condo', { data: this.currentCondoId });
+      console.log('[DataService] Fetching visit types from backend for condo:', this.currentCondoId);
       await this.refreshConfigs(this.currentCondoId);
       const synced = await db.visitTypes.toArray();
-      logger.debug('Synced visit types', { arg1: synced.length, arg2: 'items' });
+      console.log('[DataService] Synced visit types:', synced.length, 'items');
       if (synced.length > 0) return synced;
     } else {
-      logger.warn('Backend unhealthy or no condo ID. Health', { detail: String(this.isBackendHealthy, 'CondoID:', this.currentCondoId) });
+      console.warn('[DataService] Backend unhealthy or no condo ID. Health:', this.isBackendHealthy, 'CondoID:', this.currentCondoId);
     }
 
     // Fallback to hardcoded defaults
-    logger.warn('Using hardcoded fallback visit types');
+    console.warn('[DataService] Using hardcoded fallback visit types');
     return [
       { id: 'vt1', name: 'Visitante', icon_key: 'USER', requires_service_type: false },
       { id: 'vt4', name: 'Serviço', icon_key: 'WRENCH', requires_service_type: true },
@@ -1212,7 +1161,7 @@ class DataService {
       const sports = await SupabaseService.getSports(condoId);
       if (sports.length) await db.sports.bulkPut(sports);
     } catch (e) {
-      logger.error('Restaurants/Sports sync failed', e, ErrorCategory.SYNC);
+      console.error("[DataService] Restaurants/Sports sync failed", e);
       this.backendHealthScore--;
     }
   }
@@ -1251,7 +1200,7 @@ class DataService {
 
     if (residents.length > 0) {
       await db.residents.bulkPut(residents);
-      logger.info('Cached residents from units', { length: residents.length });
+      console.log(`[DataService] Cached ${residents.length} residents from units`);
     }
   }
 
@@ -1277,7 +1226,7 @@ class DataService {
 
       return scopedUnits;
     } catch (e) {
-      logger.error('Failed to fetch units with residents', e, ErrorCategory.NETWORK);
+      console.error("[DataService] Failed to fetch units with residents", e);
       this.backendHealthScore--;
       // RETHROW error so callers (like getResidentDirectory) can fallback to their own robust cache logic
       throw e;
@@ -1287,17 +1236,17 @@ class DataService {
   async getResidentDirectory(condoId?: number): Promise<{ residents: Resident[]; units: Unit[] }> {
     const targetCondoId = condoId ?? this.currentCondoId;
 
-    logger.info('getResidentDirectory called. condoId arg: , currentCondoId: , target', { condoId: condoId, currentCondoId: this.currentCondoId, targetCondoId: targetCondoId });
+    console.log(`[DataService] getResidentDirectory called. condoId arg: ${condoId}, currentCondoId: ${this.currentCondoId}, target: ${targetCondoId}`);
 
     if (targetCondoId === null || targetCondoId === undefined) {
-      logger.warn('getResidentDirectory called without targetCondoId. Returning empty.');
+      console.warn('[DataService] getResidentDirectory called without targetCondoId. Returning empty.');
       return { residents: [], units: [] };
     }
 
     // 1. Try to fetch online first if possible (best data freshness)
     if (this.isBackendHealthy) {
       try {
-        logger.info('Fetching online resident directory (RPC - admin) for condo', { targetCondoId: targetCondoId });
+        console.log(`[DataService] Fetching online resident directory (RPC - admin) for condo: ${targetCondoId}`);
 
         const [residentsRaw, unitsRaw] = await Promise.all([
           SupabaseService.adminGetResidents(targetCondoId),
@@ -1313,26 +1262,26 @@ class DataService {
             return rest;
           });
 
-        logger.info('RPC Success. Cached residents, units.', { residentsCount: residents.length, unitsCount: unitsOnly.length });
+        console.log(`[DataService] RPC Success. Cached ${residents.length} residents, ${unitsOnly.length} units.`);
 
         if (unitsOnly.length) await db.units.bulkPut(unitsOnly);
         if (residents.length) await db.residents.bulkPut(residents);
 
         return { residents, units: unitsOnly };
       } catch (e) {
-        logger.warn('Online resident fetch failed, falling back to cache', { error: String(e) });
+        console.warn('[DataService] Online resident fetch failed, falling back to cache', e);
       }
     }
 
     // 2. Offline/Fallback: efficient local query
-    logger.info('Fetching resident directory from cache for condo', { targetCondoId: targetCondoId });
+    console.log(`[DataService] Fetching resident directory from cache for condo: ${targetCondoId}`);
 
     const [cachedResidents, cachedUnits] = await Promise.all([
       db.residents.where('condominium_id').equals(targetCondoId).toArray(),
       db.units.where('condominium_id').equals(targetCondoId).toArray()
     ]);
 
-    logger.info('Found cached: residents, units', { residentsCount: cachedResidents.length, unitsCount: cachedUnits.length });
+    console.log(`[DataService] Found cached: ${cachedResidents.length} residents, ${cachedUnits.length} units`);
 
     return {
       residents: cachedResidents,
@@ -1353,7 +1302,7 @@ class DataService {
       if (unitsOnly.length) await db.units.bulkPut(unitsOnly);
       await this.cacheResidentsFromUnits(scopedUnits);
     } catch (e) {
-      logger.error('Units sync failed', e, ErrorCategory.SYNC);
+      console.error("[DataService] Units sync failed", e);
       this.backendHealthScore--;
     }
   }
@@ -1365,7 +1314,7 @@ class DataService {
     // PRIORITY 1: If ONLINE, fetch ONLY from central database (source of truth)
     if (this.isBackendHealthy && this.currentCondoId) {
       try {
-        logger.info('ONLINE - fetching today\'s visits from Supabase (ignoring cache)...');
+        console.log('[DataService] ONLINE - fetching today\'s visits from Supabase (ignoring cache)...');
         const backendVisits = await SupabaseService.getTodaysVisits(this.currentCondoId);
 
         const localVisits = await db.visits
@@ -1376,7 +1325,7 @@ class DataService {
         // Cache fresh backend data
         if (backendVisits.length > 0) {
           await db.visits.bulkPut(backendVisits);
-          logger.info('Cached visits from backend', { length: backendVisits.length });
+          console.log(`[DataService] Cached ${backendVisits.length} visits from backend`);
         }
 
         // Merge: backend visits + any pending local changes + local-only synced visits not returned yet
@@ -1389,26 +1338,26 @@ class DataService {
           .forEach(v => merged.set(v.id, v));
         const allVisits = Array.from(merged.values());
 
-        logger.info('Returning backend visits + pending local', { backendCount: backendVisits.length, pendingCount: pendingLocalVisits.length });
+        console.log(`[DataService] ✓ Returning ${backendVisits.length} backend visits + ${pendingLocalVisits.length} pending local`);
 
         return allVisits.sort((a, b) =>
           new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime()
         );
       } catch (e) {
-        logger.error('Failed to fetch from backend, falling back to local cache', e, ErrorCategory.NETWORK);
+        console.error("[DataService] Failed to fetch from backend, falling back to local cache", e);
         this.backendHealthScore--;
         // Fall through to offline mode
       }
     }
 
     // PRIORITY 2: OFFLINE - return only local cached visits
-    logger.info('OFFLINE - fetching today\'s visits from local cache...');
+    console.log('[DataService] OFFLINE - fetching today\'s visits from local cache...');
     const localVisits = await db.visits
       .where('check_in_at')
       .between(`${today}T00:00:00`, `${today}T23:59:59`, true, true)
       .toArray();
 
-    logger.info('Returning visits from local cache', { length: localVisits.length });
+    console.log(`[DataService] ✓ Returning ${localVisits.length} visits from local cache`);
 
     return localVisits.sort((a, b) =>
       new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime()
@@ -1543,7 +1492,7 @@ class DataService {
       try {
         // Upload photo to Supabase Storage if provided
         if (visitData.photo_data_url && this.currentCondoId) {
-          logger.info('Uploading visitor photo to Supabase Storage...');
+          console.log("[DataService] Uploading visitor photo to Supabase Storage...");
           const photoUrl = await SupabaseService.uploadVisitorPhoto(
             visitData.photo_data_url,
             this.currentCondoId,
@@ -1552,9 +1501,9 @@ class DataService {
 
           if (photoUrl) {
             visitPayload.photo_url = photoUrl;
-            logger.info('Photo uploaded successfully', { data: photoUrl });
+            console.log("[DataService] Photo uploaded successfully:", photoUrl);
           } else {
-            logger.warn('Photo upload failed, saving visit without photo URL');
+            console.warn("[DataService] Photo upload failed, saving visit without photo URL");
           }
         }
 
@@ -1568,13 +1517,13 @@ class DataService {
             createdVisit.check_in_at,
             createdVisit.guard_id
           );
-          logger.info('Visit saved to Supabase and cached locally', { data: createdVisit.id });
+          console.log("[DataService] Visit saved to Supabase and cached locally:", createdVisit.id);
           return createdVisit;
         } else {
           throw new Error("Failed to save to Supabase");
         }
       } catch (e) {
-        logger.error('Failed to save to Supabase, falling back to local', e, ErrorCategory.NETWORK);
+        console.error("[DataService] Failed to save to Supabase, falling back to local:", e);
         this.backendHealthScore--;
         // Fallback to local save with temporary negative ID
         const tempVisit: Visit & { photo_data_url?: string } = {
@@ -1598,7 +1547,7 @@ class DataService {
           tempVisit.check_in_at,
           tempVisit.guard_id
         );
-        logger.warn('Visit saved locally with temp ID, will sync later');
+        console.warn("[DataService] Visit saved locally with temp ID, will sync later");
         return tempVisit;
       }
     } else {
@@ -1624,7 +1573,7 @@ class DataService {
         tempVisit.check_in_at,
         tempVisit.guard_id
       );
-      logger.warn('Offline: Visit saved locally with temp ID, will sync when online');
+      console.warn("[DataService] Offline: Visit saved locally with temp ID, will sync when online");
       return tempVisit;
     }
   }
@@ -1674,7 +1623,7 @@ class DataService {
         visit.sync_status = SyncStatus.SYNCED;
         await db.visits.put(visit);
       } catch (e) {
-        logger.warn('Visit status updated locally, will sync later');
+        console.warn("[DataService] Visit status updated locally, will sync later");
         this.backendHealthScore--;
       }
     }
@@ -1683,13 +1632,13 @@ class DataService {
   async syncPendingItems(): Promise<number> {
     // Prevent concurrent syncs
     if (this.isSyncing) {
-      logger.info('Sync already in progress, skipping');
+      console.log("[DataService] Sync already in progress, skipping");
       return 0;
     }
 
     if (!this.isBackendHealthy) return 0;
     if (!this.currentCondoId) {
-      logger.warn('Cannot sync: no condominium ID set');
+      console.warn("[DataService] Cannot sync: no condominium ID set");
       return 0;
     }
 
@@ -1734,7 +1683,7 @@ class DataService {
           const visitWithPhoto = visit as Visit & { photo_data_url?: string };
 
           if (visitWithPhoto.photo_data_url && !visitWithPhoto.photo_url) {
-            logger.info('Uploading offline photo for visit', { data: visit.id });
+            console.log("[DataService] Uploading offline photo for visit:", visit.id);
             const photoUrl = await SupabaseService.uploadVisitorPhoto(
               visitWithPhoto.photo_data_url,
               this.currentCondoId!,
@@ -1743,9 +1692,9 @@ class DataService {
 
             if (photoUrl) {
               visit.photo_url = photoUrl;
-              logger.info('Offline photo uploaded successfully', { data: photoUrl });
+              console.log("[DataService] Offline photo uploaded successfully:", photoUrl);
             } else {
-              logger.warn('Failed to upload offline photo, syncing visit without photo');
+              console.warn("[DataService] Failed to upload offline photo, syncing visit without photo");
             }
 
             // Remove photo_data_url before syncing to Supabase (not a DB column)
@@ -1763,7 +1712,7 @@ class DataService {
               .equals(visit.id)
               .modify({ visit_id: createdVisit.id });
             totalSynced++;
-            logger.debug('Synced pending visit', { arg1: visit.id, arg2: "-> new ID:", arg3: createdVisit.id });
+            console.log("[DataService] Synced pending visit:", visit.id, "-> new ID:", createdVisit.id);
 
             // Emit progress event
             this.emitSyncEvent('sync:progress', {
@@ -1773,7 +1722,7 @@ class DataService {
             });
           }
         } catch (e) {
-          logger.error('Failed to sync visit', e, ErrorCategory.SYNC, { id: visit.id });
+          console.error("[DataService] Failed to sync visit:", visit.id, e);
           this.backendHealthScore--;
           this.emitSyncEvent('sync:error', {
             error: `Erro ao sincronizar visita: ${e instanceof Error ? e.message : 'Erro desconhecido'}`
@@ -1806,7 +1755,7 @@ class DataService {
             });
           }
         } catch (e) {
-          logger.error('Failed to sync visit event', e, ErrorCategory.SYNC, { id: visitEvent.id });
+          console.error("[DataService] Failed to sync visit event:", visitEvent.id, e);
           this.backendHealthScore--;
           this.emitSyncEvent('sync:error', {
             error: `Erro ao sincronizar evento da visita: ${e instanceof Error ? e.message : 'Erro desconhecido'}`
@@ -1839,7 +1788,7 @@ class DataService {
             incident.sync_status = SyncStatus.SYNCED;
             await db.incidents.put(incident);
             totalSynced++;
-            logger.info('Synced incident', { data: incident.id });
+            console.log("[DataService] Synced incident:", incident.id);
 
             // Emit progress event
             this.emitSyncEvent('sync:progress', {
@@ -1849,7 +1798,7 @@ class DataService {
             });
           }
         } catch (e) {
-          logger.error('Failed to sync incident', e, ErrorCategory.SYNC, { id: incident.id });
+          console.error("[DataService] Failed to sync incident:", incident.id, e);
           this.backendHealthScore--;
           this.emitSyncEvent('sync:error', {
             error: `Erro ao sincronizar incidente: ${e instanceof Error ? e.message : 'Erro desconhecido'}`
@@ -1858,7 +1807,7 @@ class DataService {
         }
       }
 
-      logger.info('Sync complete: items synced', { totalSynced: totalSynced });
+      console.log(`[DataService] Sync complete: ${totalSynced} items synced`);
 
       // Emit complete event
       this.emitSyncEvent('sync:complete', {
@@ -1885,9 +1834,9 @@ class DataService {
       const statuses = await SupabaseService.getIncidentStatuses();
       if (statuses.length) await db.incidentStatuses.bulkPut(statuses);
 
-      logger.info('Incident types and statuses synced');
+      console.log('[DataService] Incident types and statuses synced');
     } catch (e) {
-      logger.error('Failed to sync incident configs', e, ErrorCategory.SYNC);
+      console.error("[DataService] Failed to sync incident configs", e);
       this.backendHealthScore--;
     }
   }
@@ -1901,7 +1850,7 @@ class DataService {
     // If online, fetch from backend and replace local cache (proper bidirectional sync)
     if (this.isBackendHealthy && this.currentCondoId) {
       try {
-        logger.info('Syncing incidents from backend...');
+        console.log('[DataService] Syncing incidents from backend...');
 
         // Fetch ALL incidents from backend (including acknowledged, resolved, etc.)
         const backendIncidents = await SupabaseService.getIncidents(this.currentCondoId);
@@ -1927,13 +1876,13 @@ class DataService {
         if (incidentsToDelete.length > 0) {
           const idsToDelete = incidentsToDelete.map(inc => inc.id);
           await db.incidents.bulkDelete(idsToDelete);
-          logger.info('Cleared old incidents from local cache', { length: idsToDelete.length });
+          console.log(`[DataService] Cleared ${idsToDelete.length} old incidents from local cache`);
         }
 
         // Insert fresh backend data
         if (backendIncidents.length > 0) {
           await db.incidents.bulkPut(backendIncidents);
-          logger.info('Synced incidents from backend', { length: backendIncidents.length });
+          console.log(`[DataService] Synced ${backendIncidents.length} incidents from backend`);
         }
 
         // Merge backend incidents with pending local changes
@@ -1951,7 +1900,7 @@ class DataService {
           new Date(b.reported_at).getTime() - new Date(a.reported_at).getTime()
         );
       } catch (e) {
-        logger.error('Failed to sync incidents from backend, using local cache', e, ErrorCategory.SYNC);
+        console.error("[DataService] Failed to sync incidents from backend, using local cache", e);
         this.backendHealthScore--;
       }
     }
@@ -2009,7 +1958,7 @@ class DataService {
           await db.incidents.put(incident);
         }
       } catch (e) {
-        logger.warn('Incident acknowledged locally, will sync later');
+        console.warn("[DataService] Incident acknowledged locally, will sync later");
         this.backendHealthScore--;
       }
     }
@@ -2073,7 +2022,7 @@ class DataService {
           await db.incidents.put(incident);
         }
       } catch (e) {
-        logger.warn('Incident action reported locally, will sync later');
+        console.warn("[DataService] Incident action reported locally, will sync later");
         this.backendHealthScore--;
       }
     }
@@ -2102,7 +2051,7 @@ class DataService {
             incident.sync_status = SyncStatus.SYNCED;
             await db.incidents.put(incident);
             synced++;
-            logger.info('Synced incident acknowledgment', { data: incident.id });
+            console.log("[DataService] Synced incident acknowledgment:", incident.id);
           }
         } else if ((incident.status === 'inprogress' || incident.status === 'resolved') && incident.guard_notes) {
           // Sync action report
@@ -2119,11 +2068,11 @@ class DataService {
             incident.sync_status = SyncStatus.SYNCED;
             await db.incidents.put(incident);
             synced++;
-            logger.info('Synced incident action', { data: incident.id });
+            console.log("[DataService] Synced incident action:", incident.id);
           }
         }
       } catch (e) {
-        logger.error('Failed to sync incident', e, ErrorCategory.SYNC, { id: incident.id });
+        console.error("[DataService] Failed to sync incident:", incident.id, e);
         this.backendHealthScore--;
         break; // Stop on first failure
       }
@@ -2178,7 +2127,7 @@ class DataService {
       }
       return await SupabaseService.adminGetAllCondominiums();
     } catch (e) {
-      logger.error('Failed to fetch condominiums (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch condominiums (online required):', e);
       return [];
     }
   }
@@ -2194,7 +2143,7 @@ class DataService {
       const effectiveCondoId = scopedCondoId ?? condominiumId;
       return await SupabaseService.adminGetAllUnits(effectiveCondoId);
     } catch (e) {
-      logger.error('Failed to fetch units (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch units (online required):', e);
       return [];
     }
   }
@@ -2212,7 +2161,7 @@ class DataService {
       const effectiveCondoId = scopedCondoId ?? condominiumId;
       return await SupabaseService.adminGetAllVisits(startDate, endDate, effectiveCondoId);
     } catch (e) {
-      logger.error('Failed to fetch visits (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch visits (online required):', e);
       return [];
     }
   }
@@ -2248,7 +2197,7 @@ class DataService {
         status
       );
     } catch (e) {
-      logger.error('Failed to fetch filtered visits (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch filtered visits (online required):', e);
       return [];
     }
   }
@@ -2264,7 +2213,7 @@ class DataService {
       const effectiveCondoId = scopedCondoId ?? condominiumId;
       return await SupabaseService.adminGetAllIncidents(effectiveCondoId);
     } catch (e) {
-      logger.error('Failed to fetch incidents (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch incidents (online required):', e);
       return [];
     }
   }
@@ -2280,7 +2229,7 @@ class DataService {
       const effectiveCondoId = scopedCondoId ?? condominiumId;
       return await SupabaseService.adminGetAllStaff(effectiveCondoId);
     } catch (e) {
-      logger.error('Failed to fetch staff (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch staff (online required):', e);
       return [];
     }
   }
@@ -2370,7 +2319,7 @@ class DataService {
         activeDevices: onlineDevices
       };
     } catch (error) {
-      logger.error('Error fetching dashboard stats (online required)', error, ErrorCategory.ADMIN);
+      console.error('[Admin] Error fetching dashboard stats (online required):', error);
       return null;
     }
   }
@@ -2429,7 +2378,7 @@ class DataService {
       }
       return created;
     } catch (e) {
-      logger.error('Failed to create condominium (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to create condominium (online required):', e);
       return null;
     }
   }
@@ -2455,7 +2404,7 @@ class DataService {
       }
       return updated;
     } catch (e) {
-      logger.error('Failed to update condominium (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update condominium (online required):', e);
       return null;
     }
   }
@@ -2485,7 +2434,7 @@ class DataService {
       }
       return success;
     } catch (e) {
-      logger.error('Failed to toggle condominium status (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to toggle condominium status (online required):', e);
       return false;
     }
   }
@@ -2505,7 +2454,7 @@ class DataService {
 
       for (const device of devices) {
         if (!device.id) {
-          logger.error('Device missing id, cannot deactivate', null, ErrorCategory.ADMIN, { data: device });
+          console.error('[Admin] Device missing id, cannot deactivate:', device);
           return false;
         }
 
@@ -2530,7 +2479,7 @@ class DataService {
       });
       return true;
     } catch (e) {
-      logger.error('Failed to deactivate condominium devices (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to deactivate condominium devices (online required):', e);
       return false;
     }
   }
@@ -2542,7 +2491,7 @@ class DataService {
     try {
       return await SupabaseService.getStreets(condoId);
     } catch (e) {
-      logger.error('Failed to fetch streets (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch streets (online required):', e);
       return [];
     }
   }
@@ -2566,7 +2515,7 @@ class DataService {
       }
       return created;
     } catch (e) {
-      logger.error('Failed to add street (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to add street (online required):', e);
       return null;
     }
   }
@@ -2588,7 +2537,7 @@ class DataService {
       }
       return success;
     } catch (e) {
-      logger.error('Failed to remove street (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to remove street (online required):', e);
       return false;
     }
   }
@@ -2600,7 +2549,7 @@ class DataService {
     try {
       return await SupabaseService.uploadCondoLogo(file, condoName);
     } catch (e) {
-      logger.error('Failed to upload condominium logo (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to upload condominium logo (online required):', e);
       return null;
     }
   }
@@ -2614,7 +2563,7 @@ class DataService {
       const effectiveCondoId = scopedCondoId ?? condominiumId;
       return await SupabaseService.adminGetAllDevices(effectiveCondoId);
     } catch (e) {
-      logger.error('Failed to fetch devices (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch devices (online required):', e);
       return [];
     }
   }
@@ -2639,7 +2588,7 @@ class DataService {
       }
       return updated;
     } catch (e) {
-      logger.error('Failed to update device (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update device (online required):', e);
       return null;
     }
   }
@@ -2666,7 +2615,7 @@ class DataService {
       }
       return success;
     } catch (e) {
-      logger.error('Failed to decommission device (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to decommission device (online required):', e);
       return false;
     }
   }
@@ -2692,7 +2641,7 @@ class DataService {
       }
       return created;
     } catch (e) {
-      logger.error('Failed to create staff (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to create staff (online required):', e);
       return null;
     }
   }
@@ -2733,7 +2682,7 @@ class DataService {
       }
       return created;
     } catch (e) {
-      logger.error('Failed to create staff (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to create staff (online required):', e);
       return null;
     }
   }
@@ -2758,7 +2707,7 @@ class DataService {
       }
       return updated;
     } catch (e) {
-      logger.error('Failed to update staff PIN (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update staff PIN (online required):', e);
       return null;
     }
   }
@@ -2781,7 +2730,7 @@ class DataService {
       }
       return updated;
     } catch (e) {
-      logger.error('Failed to update staff (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update staff (online required):', e);
       return null;
     }
   }
@@ -2797,7 +2746,7 @@ class DataService {
       if (photoUrl) {
         const photoDeleted = await SupabaseService.deleteStaffPhotoByUrl(photoUrl);
         if (!photoDeleted) {
-          logger.error('Failed to delete staff photo from storage', null, ErrorCategory.ADMIN);
+          console.error('[Admin] Failed to delete staff photo from storage');
         }
       }
       const result = await SupabaseService.adminDeleteStaff(id);
@@ -2814,7 +2763,7 @@ class DataService {
       }
       return result;
     } catch (e) {
-      logger.error('Failed to delete staff (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to delete staff (online required):', e);
       return { success: false, error: { message: 'Failed to delete staff' } };
     }
   }
@@ -2841,7 +2790,7 @@ class DataService {
       }
       return created;
     } catch (e) {
-      logger.error('Failed to create unit (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to create unit (online required):', e);
       return null;
     }
   }
@@ -2863,7 +2812,7 @@ class DataService {
       }
       return updated;
     } catch (e) {
-      logger.error('Failed to update unit (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update unit (online required):', e);
       return null;
     }
   }
@@ -2885,7 +2834,7 @@ class DataService {
       }
       return success;
     } catch (e) {
-      logger.error('Failed to delete unit (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to delete unit (online required):', e);
       return false;
     }
   }
@@ -2913,7 +2862,7 @@ class DataService {
         afterId ?? null
       );
     } catch (e) {
-      logger.error('Failed to fetch residents (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch residents (online required):', e);
       return [];
     }
   }
@@ -2940,7 +2889,7 @@ class DataService {
       }
       return created;
     } catch (e) {
-      logger.error('Failed to create resident (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to create resident (online required):', e);
       return null;
     }
   }
@@ -2963,7 +2912,7 @@ class DataService {
       }
       return updated;
     } catch (e) {
-      logger.error('Failed to update resident (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update resident (online required):', e);
       return null;
     }
   }
@@ -2985,20 +2934,8 @@ class DataService {
       }
       return success;
     } catch (e) {
-      logger.error('Failed to delete resident (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to delete resident (online required):', e);
       return false;
-    }
-  }
-
-  /**
-   * Admin: Get all QR codes for a resident
-   */
-  async adminGetResidentQrCodes(residentId: number): Promise<ResidentQrCode[]> {
-    try {
-      return await SupabaseService.adminGetResidentQrCodes(residentId);
-    } catch (e) {
-      logger.error('Failed to fetch resident QR codes (online required)', e, ErrorCategory.ADMIN);
-      return [];
     }
   }
 
@@ -3013,7 +2950,7 @@ class DataService {
       const effectiveCondoId = scopedCondoId ?? condominiumId;
       return await SupabaseService.adminGetAllRestaurants(effectiveCondoId);
     } catch (e) {
-      logger.error('Failed to fetch restaurants (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch restaurants (online required):', e);
       return [];
     }
   }
@@ -3038,7 +2975,7 @@ class DataService {
       }
       return created;
     } catch (e) {
-      logger.error('Failed to create restaurant (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to create restaurant (online required):', e);
       return null;
     }
   }
@@ -3060,7 +2997,7 @@ class DataService {
       }
       return updated;
     } catch (e) {
-      logger.error('Failed to update restaurant (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update restaurant (online required):', e);
       return null;
     }
   }
@@ -3082,7 +3019,7 @@ class DataService {
       }
       return success;
     } catch (e) {
-      logger.error('Failed to delete restaurant (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to delete restaurant (online required):', e);
       return false;
     }
   }
@@ -3098,7 +3035,7 @@ class DataService {
       const effectiveCondoId = scopedCondoId ?? condominiumId;
       return await SupabaseService.adminGetAllSports(effectiveCondoId);
     } catch (e) {
-      logger.error('Failed to fetch sports (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch sports (online required):', e);
       return [];
     }
   }
@@ -3123,7 +3060,7 @@ class DataService {
       }
       return created;
     } catch (e) {
-      logger.error('Failed to create sport (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to create sport (online required):', e);
       return null;
     }
   }
@@ -3145,7 +3082,7 @@ class DataService {
       }
       return updated;
     } catch (e) {
-      logger.error('Failed to update sport (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update sport (online required):', e);
       return null;
     }
   }
@@ -3167,7 +3104,7 @@ class DataService {
       }
       return success;
     } catch (e) {
-      logger.error('Failed to delete sport (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to delete sport (online required):', e);
       return false;
     }
   }
@@ -3200,7 +3137,7 @@ class DataService {
       }
       return visit;
     } catch (e) {
-      logger.error('Failed to update visit status (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update visit status (online required):', e);
       return null;
     }
   }
@@ -3234,7 +3171,7 @@ class DataService {
       }
       return incident;
     } catch (e) {
-      logger.error('Failed to acknowledge incident (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to acknowledge incident (online required):', e);
       return null;
     }
   }
@@ -3266,7 +3203,7 @@ class DataService {
       }
       return incident;
     } catch (e) {
-      logger.error('Failed to resolve incident (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to resolve incident (online required):', e);
       return null;
     }
   }
@@ -3292,7 +3229,7 @@ class DataService {
       }
       return incident;
     } catch (e) {
-      logger.error('Failed to update incident notes (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update incident notes (online required):', e);
       return null;
     }
   }
@@ -3306,7 +3243,7 @@ class DataService {
     try {
       return await SupabaseService.adminGetAllVisitTypes();
     } catch (e) {
-      logger.error('Failed to fetch visit types (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch visit types (online required):', e);
       return [];
     }
   }
@@ -3330,7 +3267,7 @@ class DataService {
       }
       return created;
     } catch (e) {
-      logger.error('Failed to create visit type (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to create visit type (online required):', e);
       return null;
     }
   }
@@ -3355,7 +3292,7 @@ class DataService {
       }
       return updated;
     } catch (e) {
-      logger.error('Failed to update visit type (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update visit type (online required):', e);
       return null;
     }
   }
@@ -3377,7 +3314,7 @@ class DataService {
       }
       return success;
     } catch (e) {
-      logger.error('Failed to delete visit type (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to delete visit type (online required):', e);
       return false;
     }
   }
@@ -3391,7 +3328,7 @@ class DataService {
     try {
       return await SupabaseService.adminGetAllServiceTypes();
     } catch (e) {
-      logger.error('Failed to fetch service types (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch service types (online required):', e);
       return [];
     }
   }
@@ -3414,7 +3351,7 @@ class DataService {
       }
       return created;
     } catch (e) {
-      logger.error('Failed to create service type (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to create service type (online required):', e);
       return null;
     }
   }
@@ -3439,7 +3376,7 @@ class DataService {
       }
       return updated;
     } catch (e) {
-      logger.error('Failed to update service type (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to update service type (online required):', e);
       return null;
     }
   }
@@ -3461,7 +3398,7 @@ class DataService {
       }
       return success;
     } catch (e) {
-      logger.error('Failed to delete service type (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to delete service type (online required):', e);
       return false;
     }
   }
@@ -3479,7 +3416,7 @@ class DataService {
       }
       return stats;
     } catch (e) {
-      logger.error('Failed to fetch condominium stats (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch condominium stats (online required):', e);
       return [];
     }
   }
@@ -3500,7 +3437,7 @@ class DataService {
       const effectiveFilters = scopedCondoId ? { ...filters, condominiumId: scopedCondoId } : filters;
       return await SupabaseService.adminGetAuditLogs(effectiveFilters, limit, offset);
     } catch (e) {
-      logger.error('Failed to fetch audit logs (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch audit logs (online required):', e);
       return { logs: [], total: 0 };
     }
   }
@@ -3516,7 +3453,7 @@ class DataService {
     try {
       return await SupabaseService.adminGetDeviceRegistrationErrors(filters, limit, offset);
     } catch (e) {
-      logger.error('Failed to fetch device registration errors (online required)', e, ErrorCategory.ADMIN);
+      console.error('[Admin] Failed to fetch device registration errors (online required):', e);
       return { errors: [], total: 0 };
     }
   }

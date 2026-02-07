@@ -20,6 +20,7 @@ import {
   PhoneOutgoing,
   AlertCircle
 } from 'lucide-react';
+import { logger } from '@/services/logger';
 
 interface ApprovalModeSelectorProps {
   selectedMode: ApprovalMode;
@@ -99,7 +100,7 @@ export default function ApprovalModeSelector({
       const context = isOnline
         ? (hasAppInstalled ? 'ONLINE + HAS APP' : 'ONLINE + NO APP')
         : 'OFFLINE';
-      console.log(`🔄 Auto-switching approval mode: ${selectedMode} → ${defaultMode} (${context})`);
+      logger.info('🔄 Auto-switching approval mode: → ()', { selectedMode: selectedMode, defaultMode: defaultMode, context: context });
       onModeSelect(defaultMode);
     }
   }, [isOnline, unit, availableModes, selectedMode, onModeSelect, hasAppInstalled]);

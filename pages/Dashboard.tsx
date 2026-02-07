@@ -51,12 +51,12 @@ export default function Dashboard() {
   const vibrateDevice = () => {
     if ('vibrate' in navigator) {
       navigator.vibrate([200, 100, 200, 100, 200]);
-      console.log('[Dashboard] Device vibrated');
+      logger.info('Device vibrated');
     }
   };
 
   const testAlertSound = async () => {
-    console.log('[Dashboard] 🔊 Manual test sound triggered');
+    logger.info('Manual test sound triggered');
     const success = await audioService.testSound();
     if (success) {
       vibrateDevice();
@@ -76,7 +76,7 @@ export default function Dashboard() {
       // Detect if new incidents appeared (only if we have previous data)
       if (previousIncidentCountRef.current > 0 && currentCount > previousIncidentCountRef.current) {
         const newIncidentCount = currentCount - previousIncidentCountRef.current;
-        console.log(`[Dashboard] 🚨 ${newIncidentCount} NEW INCIDENT(S) DETECTED!`);
+        logger.info('New incident(s) detected', { newIncidentCount: newIncidentCount });
 
         // Play alert sound and vibrate
         playAlertSound();
@@ -89,7 +89,7 @@ export default function Dashboard() {
       previousIncidentCountRef.current = currentCount;
       setIncidentsCount(currentCount);
     } catch (error) {
-      console.error('Error loading incidents count:', error);
+      logger.error('Error loading incidents count', error, ErrorCategory.NETWORK);
     }
   };
 

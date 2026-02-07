@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Edit2, Trash2, Loader2, Search, X, Building2, Home, ChevronDown, Check } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Loader2, Search, X, Building2, Home, ChevronDown, Check, Smartphone, QrCode, Calendar, Clock, User } from 'lucide-react';
 import { api } from '../../services/dataService';
-import { Resident, Condominium, Unit } from '../../types';
+import { Resident, Condominium, Unit, ResidentQrCode } from '../../types';
 import { useToast } from '../../components/Toast';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -151,6 +152,10 @@ export default function AdminResidents() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedResident, setSelectedResident] = useState<Resident | null>(null);
+  const [showQrCodesModal, setShowQrCodesModal] = useState(false);
+  const [selectedResidentForQr, setSelectedResidentForQr] = useState<Resident | null>(null);
+  const [qrCodes, setQrCodes] = useState<ResidentQrCode[]>([]);
+  const [loadingQrCodes, setLoadingQrCodes] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -198,7 +203,7 @@ export default function AdminResidents() {
       setHasMore(residentsData.length === PAGE_SIZE);
       await loadUnitsForResidentList(residentsData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      logger.error('Error loading data', error, ErrorCategory.NETWORK);
     } finally {
       setLoading(false);
     }
@@ -209,7 +214,7 @@ export default function AdminResidents() {
       const condosData = await api.adminGetAllCondominiums();
       setCondominiums(condosData);
     } catch (error) {
-      console.error('Error loading condominiums:', error);
+      logger.error('Error loading condominiums', error, ErrorCategory.NETWORK);
     }
   };
 
@@ -218,7 +223,7 @@ export default function AdminResidents() {
       const unitsData = await api.adminGetAllUnits(condoId);
       setUnits(unitsData);
     } catch (error) {
-      console.error('Error loading units:', error);
+      logger.error('Error loading units', error, ErrorCategory.NETWORK);
     }
   };
 
@@ -271,7 +276,7 @@ export default function AdminResidents() {
       setHasMore(moreResidents.length === PAGE_SIZE);
       await loadUnitsForResidentList(updatedResidents);
     } catch (error) {
-      console.error('Error loading more residents:', error);
+      logger.error('Error loading more residents', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao carregar mais residentes');
     } finally {
       setLoadingMore(false);
@@ -303,7 +308,7 @@ export default function AdminResidents() {
         showToast('error', 'Erro ao criar residente');
       }
     } catch (error) {
-      console.error('Error creating resident:', error);
+      logger.error('Error creating resident', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao criar residente');
     }
   };
@@ -329,7 +334,7 @@ export default function AdminResidents() {
         showToast('error', 'Erro ao atualizar residente');
       }
     } catch (error) {
-      console.error('Error updating resident:', error);
+      logger.error('Error updating resident', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao atualizar residente');
     }
   };
@@ -347,7 +352,7 @@ export default function AdminResidents() {
             showToast('error', 'Erro ao remover residente');
           }
         } catch (error) {
-          console.error('Error deleting resident:', error);
+          logger.error('Error deleting resident', error, ErrorCategory.NETWORK);
           showToast('error', 'Erro ao remover residente');
         }
       }
@@ -379,6 +384,52 @@ export default function AdminResidents() {
       type: 'OWNER'
     });
     setUnits([]);
+  };
+
+  const openQrCodesModal = async (resident: Resident) => {
+    setSelectedResidentForQr(resident);
+    setShowQrCodesModal(true);
+    setLoadingQrCodes(true);
+
+    try {
+      const codes = await api.adminGetResidentQrCodes(resident.id);
+      setQrCodes(codes);
+    } catch (error) {
+      logger.error('Error loading QR codes', error, ErrorCategory.NETWORK);
+      showToast('error', 'Erro ao carregar QR codes');
+    } finally {
+      setLoadingQrCodes(false);
+    }
+  };
+
+  const closeQrCodesModal = () => {
+    setShowQrCodesModal(false);
+    setSelectedResidentForQr(null);
+    setQrCodes([]);
+  };
+
+  const formatQrCodeStatus = (status?: string): { label: string; className: string } => {
+    switch (status) {
+      case 'ACTIVE':
+        return { label: 'Ativo', className: 'bg-green-100 text-green-700' };
+      case 'EXPIRED':
+        return { label: 'Expirado', className: 'bg-gray-100 text-gray-700' };
+      case 'REVOKED':
+        return { label: 'Revogado', className: 'bg-red-100 text-red-700' };
+      default:
+        return { label: status || 'Desconhecido', className: 'bg-gray-100 text-gray-700' };
+    }
+  };
+
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString('pt-PT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const getCondominiumName = (condoId: number) => {
@@ -493,7 +544,7 @@ export default function AdminResidents() {
                     <Users className="text-blue-600" size={24} />
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
+                    <div className="flex items-center gap-3 mb-1 flex-wrap">
                       <h3 className="text-lg font-bold text-text-main">
                         {resident.name}
                       </h3>
@@ -503,6 +554,17 @@ export default function AdminResidents() {
                           : 'bg-green-100 text-green-700'
                       }`}>
                         {resident.type === 'OWNER' ? 'Proprietário' : 'Inquilino'}
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 ${
+                          resident.has_app_installed
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}
+                        title={resident.has_app_installed ? 'App instalada' : 'Sem app'}
+                      >
+                        <Smartphone size={12} />
+                        {resident.has_app_installed ? 'App' : 'Sem App'}
                       </span>
                     </div>
                     <div className="space-y-1 text-sm text-text-dim">
@@ -526,6 +588,15 @@ export default function AdminResidents() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  {resident.has_app_installed && (
+                    <button
+                      onClick={() => openQrCodesModal(resident)}
+                      className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                      title="Ver QR Codes"
+                    >
+                      <QrCode size={18} />
+                    </button>
+                  )}
                   <button
                     onClick={() => openEditModal(resident)}
                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -808,6 +879,130 @@ export default function AdminResidents() {
               >
                 Salvar Alterações
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Codes Modal */}
+      {showQrCodesModal && selectedResidentForQr && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-2xl lg:max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-border-main flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="text-2xl font-bold text-text-main">QR Codes do Residente</h2>
+                <p className="text-sm text-text-dim mt-1">{selectedResidentForQr.name}</p>
+              </div>
+              <button
+                onClick={closeQrCodesModal}
+                className="p-2 hover:bg-bg-root rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              {loadingQrCodes ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
+                  <p className="text-text-dim">Carregando QR codes...</p>
+                </div>
+              ) : qrCodes.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <QrCode size={64} className="text-slate-300 mb-4" />
+                  <h3 className="text-xl font-bold text-slate-800 mb-2">Nenhum QR Code</h3>
+                  <p className="text-text-dim text-center">
+                    Este residente ainda não gerou nenhum QR code de convite.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {qrCodes.map((qr) => (
+                    <div
+                      key={qr.id}
+                      className="bg-white border border-border-main rounded-lg p-4 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <User size={16} className="text-slate-500" />
+                            <span className="font-semibold text-text-main">
+                              {qr.visitor_name || 'Visitante não especificado'}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${formatQrCodeStatus(qr.status).className}`}>
+                              {formatQrCodeStatus(qr.status).label}
+                            </span>
+                          </div>
+
+                          {qr.purpose && (
+                            <p className="text-sm text-text-dim mb-2">
+                              <span className="font-medium">Propósito:</span> {qr.purpose}
+                            </p>
+                          )}
+
+                          {qr.visitor_phone && (
+                            <p className="text-sm text-text-dim mb-2">
+                              <span className="font-medium">Telefone:</span> {qr.visitor_phone}
+                            </p>
+                          )}
+
+                          <div className="flex flex-wrap gap-4 text-sm text-text-dim">
+                            <div className="flex items-center gap-1">
+                              <Calendar size={14} />
+                              <span>Criado: {formatDate(qr.created_at)}</span>
+                            </div>
+                            {qr.expires_at && (
+                              <div className="flex items-center gap-1">
+                                <Clock size={14} />
+                                <span>Expira: {formatDate(qr.expires_at)}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {qr.is_recurring && (
+                            <div className="mt-2">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                                Recorrente
+                                {qr.recurrence_pattern && ` - ${qr.recurrence_pattern}`}
+                              </span>
+                            </div>
+                          )}
+
+                          {qr.notes && (
+                            <p className="mt-2 text-sm text-text-dim italic">
+                              Notas: {qr.notes}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="ml-4 p-2 bg-slate-50 rounded-lg">
+                          <QrCode size={40} className="text-slate-400" />
+                        </div>
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-border-main">
+                        <p className="text-xs text-text-dim font-mono break-all">
+                          QR: {qr.qr_code}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-border-main shrink-0">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-text-dim">
+                  {qrCodes.length} QR code{qrCodes.length !== 1 ? 's' : ''} encontrado{qrCodes.length !== 1 ? 's' : ''}
+                </span>
+                <button
+                  onClick={closeQrCodesModal}
+                  className="px-6 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+                >
+                  Fechar
+                </button>
+              </div>
             </div>
           </div>
         </div>

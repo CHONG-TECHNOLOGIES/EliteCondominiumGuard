@@ -246,7 +246,7 @@ jobs:
 
 ### 1. Offline-First Data Flow
 
-**ALL data operations go through `DataService`** (services/dataService.ts - 1,949 lines), which implements a Cache-Then-Network strategy:
+**ALL data operations go through `DataService`** (services/dataService.ts - 1,949 lines), which implements a Cache-Then-Network strategy and sentry for log:
 
 ```
 Component → DataService → IndexedDB (primary) + Supabase (sync)
@@ -261,6 +261,7 @@ Component → DataService → IndexedDB (primary) + Supabase (sync)
 - Device fingerprinting and heartbeat
 - Multi-layer storage sync (central DB → IndexedDB → localStorage)
 - Persistent storage requests for PWA
+- Allways use sentru for log
 
 ### 2. Data Synchronization Strategies
 
@@ -414,8 +415,8 @@ Each tablet must be configured before use:
 - AdminRoute guards admin-only pages
 
 **Role Hierarchy**:
-- `GUARD` - Standard guard access
-- `ADMIN` - Administrative access to management pages
+- `GUARD` - Standard guard access by Condominiun
+- `ADMIN` - Administrative access to management pages by Condominiun
 - `SUPER_ADMIN` - Full system access
 
 ### 5. Database Schema (IndexedDB via Dexie)
@@ -600,13 +601,14 @@ ApprovalMode: APP | PHONE | INTERCOM | GUARD_MANUAL | QR_SCAN
 | `admin_create_unit` | p_data (JSONB) | Create unit |
 | `admin_delete_unit` | p_id (INT) | Delete unit |
 
-**Residents (4)**:
+**Residents (5)**:
 | Function | Parameters | Description |
 |----------|-----------|-------------|
 | `get_resident` | p_id (INT) | Get single resident |
 | `admin_get_residents` | p_condominium_id, p_search, p_limit, p_after_id, p_after_name | Paginated resident search |
 | `admin_create_resident` | p_data (JSONB) | Create resident |
 | `admin_update_resident` | p_id (INT), p_data (JSONB) | Update resident |
+| `admin_get_resident_qr_codes` | p_resident_id (INT) | Get all QR codes for a resident (uses `get_active_qr_codes` RPC) |
 
 **Incidents (7)**:
 | Function | Parameters | Description |
@@ -652,7 +654,7 @@ ApprovalMode: APP | PHONE | INTERCOM | GUARD_MANUAL | QR_SCAN
 | Function | Parameters | Description |
 |----------|-----------|-------------|
 | `create_visitor_qr_code` | p_resident_id, p_condominium_id, p_unit_id (INT), p_purpose, p_visitor_name, p_visitor_phone (TEXT), p_expires_at (TIMESTAMP), p_notes (TEXT) | Create visitor QR invitation |
-| `validate_qr_code` | p_qr_code (TEXT) | Validate QR at gate |
+| `validate_qr_code` | p_qr_code (TEXT) | Validate QR at gate. Returns: is_valid, resident_id, unit_id, visitor_name, purpose, message |
 | `revoke_qr_code` | p_qr_code_id (UUID) | Revoke QR code |
 | `get_active_qr_codes` | p_resident_id (INT) | Active QR codes per resident |
 | `expire_qr_codes` | (none) | Expire outdated QR codes |
@@ -1314,6 +1316,20 @@ interface ResidentQrCode {
 }
 ```
 
+#### QrValidationResult
+```typescript
+interface QrValidationResult {
+  is_valid: boolean;
+  resident_id: number | null;
+  unit_id: number | null;
+  visitor_name: string | null;
+  purpose: string | null;
+  message: string;
+}
+```
+
+**Purpose**: Result returned by `validate_qr_code` RPC for guard QR scanning at the gatehouse.
+
 #### Notification
 ```typescript
 interface Notification {
@@ -1457,7 +1473,7 @@ interface NewsCategory {
 | AdminDeviceRegistrationErrors | View and troubleshoot device registration errors |
 | AdminStaff | Staff management with PIN reset |
 | AdminUnits | Unit/Block management |
-| AdminResidents | Resident directory |
+| AdminResidents | Resident directory with QR codes viewer |
 | AdminRestaurants | Restaurant configuration |
 | AdminSports | Sports facility configuration |
 | AdminVisits | Visit history and management |
@@ -1486,6 +1502,12 @@ resetDevice(): Promise<void>
 ```typescript
 login(firstName: string, lastName: string, pin: string): Promise<Staff | null>
 ```
+
+**QR Code Validation** (Online Only):
+```typescript
+validateQrCode(qrCode: string): Promise<QrValidationResult | null>
+```
+*Requires online connection for security. Validates resident-generated QR codes at the gatehouse.*
 
 **Configuration Data**:
 ```typescript

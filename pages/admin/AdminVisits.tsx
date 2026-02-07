@@ -5,6 +5,7 @@ import { Visit, VisitEvent, Condominium, VisitStatus, VisitTypeConfig, ServiceTy
 import { useToast } from '../../components/Toast';
 import { exportVisitsToCSV, exportVisitsToPDF } from '../../utils/csvExport';
 import { AuthContext } from '../../App';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -188,7 +189,7 @@ export default function AdminVisits() {
       const useBackendFilters = monthsDiff >= 6;
       setUsesBackendFiltering(useBackendFilters);
 
-      console.log('[AdminVisits] Loading data with filters:', {
+      logger.info('Loading data with filters', {
         startDate: startDate ? `${startDate}T00:00:00` : undefined,
         endDate: endDate ? `${endDate}T23:59:59` : undefined,
         filterCondoId: filterCondoId || undefined,
@@ -200,7 +201,7 @@ export default function AdminVisits() {
 
       if (useBackendFilters) {
         // >= 6 months: Use new RPC with all filters in backend
-        console.log('[AdminVisits] Using backend filtering (>= 6 months)');
+        logger.info('Using backend filtering (>= 6 months)');
         visitsData = await api.adminGetAllVisitsFiltered(
           startDate ? `${startDate}T00:00:00` : undefined,
           endDate ? `${endDate}T23:59:59` : undefined,
@@ -211,7 +212,7 @@ export default function AdminVisits() {
         );
       } else {
         // < 6 months: Use current RPC (frontend filtering)
-        console.log('[AdminVisits] Using frontend filtering (< 6 months)');
+        logger.info('Using frontend filtering (< 6 months)');
         visitsData = await api.adminGetAllVisits(
           startDate ? `${startDate}T00:00:00` : undefined,
           endDate ? `${endDate}T23:59:59` : undefined,
@@ -225,15 +226,15 @@ export default function AdminVisits() {
         api.getServiceTypes()
       ]);
 
-      console.log('[AdminVisits] Loaded visits:', visitsData.length, 'visits');
-      console.log('[AdminVisits] Loaded condominiums:', condosData.length, 'condos');
+      logger.debug('Loaded visits', { arg1: visitsData.length, arg2: 'visits' });
+      logger.debug('Loaded condominiums', { arg1: condosData.length, arg2: 'condos' });
 
       setVisits(visitsData);
       setCondominiums(condosData);
       setVisitTypes(visitTypesData);
       setServiceTypes(serviceTypesData);
     } catch (error) {
-      console.error('[AdminVisits] Error loading data:', error);
+      logger.error('Error loading data', error, ErrorCategory.NETWORK);
       showToast('error', `Erro ao carregar dados: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
@@ -276,7 +277,7 @@ export default function AdminVisits() {
         showToast('error', 'Erro ao atualizar estado da visita');
       }
     } catch (error) {
-      console.error('Error updating visit status:', error);
+      logger.error('Error updating visit status', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao atualizar estado da visita');
     } finally {
       closeConfirmModal();
@@ -294,7 +295,7 @@ export default function AdminVisits() {
         showToast('error', 'Erro ao atualizar estado da visita');
       }
     } catch (error) {
-      console.error('Error updating visit status:', error);
+      logger.error('Error updating visit status', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao atualizar estado da visita');
     }
   };
@@ -369,7 +370,7 @@ export default function AdminVisits() {
   });
 
   // Debug logging for filters
-  console.log('[AdminVisits] Filter summary:', {
+  logger.info('Filter summary', {
     totalVisits: visits.length,
     filteredVisits: filteredVisits.length,
     searchTerm,

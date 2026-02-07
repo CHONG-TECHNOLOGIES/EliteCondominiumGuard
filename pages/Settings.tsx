@@ -60,7 +60,7 @@ const Settings: React.FC = () => {
         percentage: `${percentUsed}%`
       });
     } catch (err) {
-      console.error('Error getting storage info:', err);
+      logger.error('Error getting storage info', err, ErrorCategory.STORAGE);
     }
   };
 

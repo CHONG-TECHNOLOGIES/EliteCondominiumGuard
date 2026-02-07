@@ -7,6 +7,7 @@ import CameraCapture from '../../components/CameraCapture';
 import { SupabaseService } from '../../services/Supabase';
 import { AuthContext } from '../../App';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -203,7 +204,7 @@ export default function AdminStaff() {
       setStaff(staffData);
       setCondominiums(condosData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      logger.error('Error loading data', error, ErrorCategory.NETWORK);
     } finally {
       setLoading(false);
     }
@@ -264,7 +265,7 @@ export default function AdminStaff() {
       resetForm();
       showToast('success', 'Staff criado com sucesso!');
     } catch (error) {
-      console.error('Error creating staff:', error);
+      logger.error('Error creating staff', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao criar staff');
     } finally {
       setUploadingPhoto(false);
@@ -320,7 +321,7 @@ export default function AdminStaff() {
         showToast('error', 'Erro ao atualizar staff');
       }
     } catch (error) {
-      console.error('Error updating staff:', error);
+      logger.error('Error updating staff', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao atualizar staff');
     } finally {
       setUploadingPhoto(false);
@@ -354,7 +355,7 @@ export default function AdminStaff() {
           showToast('error', 'Erro ao alterar PIN');
         }
       } catch (error) {
-        console.error('Error changing PIN:', error);
+        logger.error('Error changing PIN', error, ErrorCategory.NETWORK);
         showToast('error', 'Erro ao alterar PIN');
       }
     });
@@ -390,7 +391,7 @@ export default function AdminStaff() {
             }
           }
         } catch (error) {
-          console.error('Error deleting staff:', error);
+          logger.error('Error deleting staff', error, ErrorCategory.NETWORK);
           showToast('error', 'Erro ao remover staff');
         }
       }

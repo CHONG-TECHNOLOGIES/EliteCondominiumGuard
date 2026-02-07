@@ -7,6 +7,7 @@ import { api } from '../../services/dataService';
 import { ServiceTypeConfig } from '../../types';
 import { useToast } from '../../components/Toast';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Map service name to icon based on keywords (same logic as NewEntry.tsx)
 const getServiceIcon = (name: string, size: number = 32) => {
@@ -44,7 +45,7 @@ export default function AdminServiceTypes() {
       const data = await api.adminGetAllServiceTypes();
       setServiceTypes(data);
     } catch (error) {
-      console.error('Error loading service types:', error);
+      logger.error('Error loading service types', error, ErrorCategory.NETWORK);
     } finally {
       setLoading(false);
     }
@@ -71,7 +72,7 @@ export default function AdminServiceTypes() {
         showToast('error', 'Erro ao criar tipo de serviço');
       }
     } catch (error) {
-      console.error('Error creating service type:', error);
+      logger.error('Error creating service type', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao criar tipo de serviço');
     }
   };
@@ -97,7 +98,7 @@ export default function AdminServiceTypes() {
         showToast('error', 'Erro ao atualizar tipo de serviço');
       }
     } catch (error) {
-      console.error('Error updating service type:', error);
+      logger.error('Error updating service type', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao atualizar tipo de serviço');
     }
   };
@@ -115,7 +116,7 @@ export default function AdminServiceTypes() {
             showToast('error', 'Erro ao remover tipo de serviço');
           }
         } catch (error) {
-          console.error('Error deleting service type:', error);
+          logger.error('Error deleting service type', error, ErrorCategory.NETWORK);
           showToast('error', 'Erro ao remover tipo de serviço');
         }
       }

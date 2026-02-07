@@ -9,6 +9,7 @@ import { api } from '../../services/dataService';
 import { VisitTypeConfig } from '../../types';
 import { useToast } from '../../components/Toast';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Map icon_key to Lucide icons
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -62,7 +63,7 @@ export default function AdminVisitTypes() {
       const data = await api.adminGetAllVisitTypes();
       setVisitTypes(data);
     } catch (error) {
-      console.error('Error loading visit types:', error);
+      logger.error('Error loading visit types', error, ErrorCategory.NETWORK);
     } finally {
       setLoading(false);
     }
@@ -95,7 +96,7 @@ export default function AdminVisitTypes() {
         showToast('error', 'Erro ao criar tipo de visita');
       }
     } catch (error) {
-      console.error('Error creating visit type:', error);
+      logger.error('Error creating visit type', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao criar tipo de visita');
     }
   };
@@ -121,7 +122,7 @@ export default function AdminVisitTypes() {
         showToast('error', 'Erro ao atualizar tipo de visita');
       }
     } catch (error) {
-      console.error('Error updating visit type:', error);
+      logger.error('Error updating visit type', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao atualizar tipo de visita');
     }
   };
@@ -139,7 +140,7 @@ export default function AdminVisitTypes() {
             showToast('error', 'Erro ao remover tipo de visita');
           }
         } catch (error) {
-          console.error('Error deleting visit type:', error);
+          logger.error('Error deleting visit type', error, ErrorCategory.NETWORK);
           showToast('error', 'Erro ao remover tipo de visita');
         }
       }

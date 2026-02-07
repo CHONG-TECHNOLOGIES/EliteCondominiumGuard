@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast';
 import { AuthContext } from '../../App';
 import { exportIncidentsToCSV } from '../../utils/csvExport';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
+import { logger, ErrorCategory } from '@/services/logger';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -162,7 +163,7 @@ export default function AdminIncidents() {
       setIncidents(incidentsData);
       setCondominiums(condosData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      logger.error('Error loading data', error, ErrorCategory.NETWORK);
     } finally {
       setLoading(false);
     }
@@ -186,7 +187,7 @@ export default function AdminIncidents() {
         showToast('error', 'Erro ao reconhecer incidente');
       }
     } catch (error) {
-      console.error('Error acknowledging incident:', error);
+      logger.error('Error acknowledging incident', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao reconhecer incidente');
     }
   };
@@ -216,7 +217,7 @@ export default function AdminIncidents() {
         showToast('error', 'Erro ao resolver incidente');
       }
     } catch (error) {
-      console.error('Error resolving incident:', error);
+      logger.error('Error resolving incident', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao resolver incidente');
     }
   };
@@ -239,7 +240,7 @@ export default function AdminIncidents() {
         showToast('error', 'Erro ao resolver incidente');
       }
     } catch (error) {
-      console.error('Error saving notes:', error);
+      logger.error('Error saving notes', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao resolver incidente');
     }
   };

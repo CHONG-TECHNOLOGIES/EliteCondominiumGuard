@@ -4,7 +4,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { api } from '../services/dataService';
-import { Unit, VisitType, ApprovalMode, VisitStatus, VisitTypeConfig, ServiceTypeConfig, Restaurant, Sport, PhotoQuality } from '../types';
+import { Unit, VisitType, ApprovalMode, VisitStatus, VisitTypeConfig, ServiceTypeConfig, Restaurant, Sport, PhotoQuality, QrValidationResult } from '../types';
 import CameraCapture from '../components/CameraCapture';
 import ErrorBoundary from '../components/ErrorBoundary';
 import ApprovalModeSelector from '../components/ApprovalModeSelector';
@@ -65,6 +65,10 @@ export default function NewEntry() {
   const [pendingVisitType, setPendingVisitType] = useState<VisitTypeConfig | null>(null);
   const [hideQrButton, setHideQrButton] = useState(false);
   const [isScanningQr, setIsScanningQr] = useState(false);
+
+  // QR Validation State
+  const [qrValidating, setQrValidating] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.condominium_id) {
@@ -164,31 +168,50 @@ export default function NewEntry() {
     setApprovalMode(ApprovalMode.QR_SCAN);
     setQrToken('');
     setQrConfirmed(false);
+    setQrError(null);
+    setQrValidating(false);
     setVisitorName('');
     setVisitorPhone('');
     setReason('');
     setUnitId('');
-    setIsScanningQr(false); // Reset scanning state
+    setIsScanningQr(false);
     setStep(3);
   };
 
   const handlePerformScan = () => {
     setIsScanningQr(true);
-    // Camera will stay open for scanning
-    // TODO: Implement actual QR code scanning logic
-    // For now, this is a placeholder that keeps camera open
+    setQrError(null);
   };
 
-  const handleQrScanned = (qrData: string) => {
-    // This will be called when QR code is actually scanned
+  const handleQrScanned = async (qrData: string) => {
+    setQrValidating(true);
+    setQrError(null);
     setQrToken(qrData);
-    setVisitorName("Ricardo Mota (QR)");
-    setVisitorPhone("912345678");
-    setReason("Jantar de Aniversário");
-    if (units.length > 0) setUnitId(units[0].id);
-    setQrConfirmed(true);
-    setIsScanningQr(false);
-    setStep(2); // Go to form with filled data
+
+    try {
+      const result = await api.validateQrCode(qrData);
+
+      if (result && result.is_valid) {
+        // Pre-fill form with QR data
+        setVisitorName(result.visitor_name || '');
+        setReason(result.purpose || '');
+        if (result.unit_id) {
+          setUnitId(result.unit_id.toString());
+        }
+        setQrConfirmed(true);
+        setStep(2); // Go to form with filled data
+      } else {
+        // Show error message from RPC
+        setQrError(result?.message || 'Código QR inválido');
+        setQrConfirmed(false);
+      }
+    } catch (error) {
+      setQrError('Erro ao validar código QR. Verifique a ligação.');
+      setQrConfirmed(false);
+    } finally {
+      setQrValidating(false);
+      setIsScanningQr(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -684,33 +707,66 @@ export default function NewEntry() {
                 </div>
               ) : approvalMode === ApprovalMode.QR_SCAN ? (
                 <>
-                  {!qrToken ? (
+                  {!qrToken && !isScanningQr ? (
+                    // Initial state - waiting for scan
                     <div className="bg-blue-50 p-6 rounded-xl text-center border border-blue-200 flex flex-col gap-4">
                       <ScanLine size={48} className="mx-auto text-blue-400" />
                       <p className="text-blue-800 font-bold">Aguardando Leitura...</p>
                       <button
                         onClick={handlePerformScan}
-                        className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg hover:bg-blue-700 active:scale-95 transition-all"
+                        disabled={isOffline}
+                        className="w-full py-3 bg-blue-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg hover:bg-blue-700 active:scale-95 transition-all disabled:bg-slate-300 disabled:cursor-not-allowed"
                       >
                         <QrCode size={20} /> Scan QRCODE
                       </button>
+                      {isOffline && (
+                        <p className="text-red-600 text-sm font-medium">
+                          Validação de QR requer ligação à internet
+                        </p>
+                      )}
                     </div>
-                  ) : (
+                  ) : qrValidating ? (
+                    // Validating state - loading spinner
+                    <div className="p-6 bg-blue-50 rounded-xl border border-blue-200 flex flex-col items-center gap-4">
+                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+                      <p className="text-blue-800 font-bold">A validar código QR...</p>
+                      <p className="text-slate-500 text-sm">{qrToken}</p>
+                    </div>
+                  ) : qrError ? (
+                    // Error state - show error message
+                    <div className="p-6 bg-red-50 rounded-xl border-2 border-red-200 flex flex-col items-center gap-4">
+                      <X size={48} className="text-red-500" />
+                      <p className="text-red-800 font-bold text-center">{qrError}</p>
+                      <p className="text-slate-500 text-sm">Código: {qrToken}</p>
+                      <button
+                        onClick={() => {
+                          setQrToken('');
+                          setQrError(null);
+                          setIsScanningQr(true);
+                        }}
+                        className="w-full py-3 bg-red-600 text-white font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg hover:bg-red-700 active:scale-95 transition-all"
+                      >
+                        <QrCode size={20} /> Tentar Novamente
+                      </button>
+                    </div>
+                  ) : qrConfirmed ? (
+                    // Success state - show verified data
                     <div className="p-4 rounded-xl border-2 bg-green-50 border-green-200">
                       <div className="flex items-center gap-2 mb-3 text-green-800 font-bold border-b border-green-200 pb-2">
                         <QrCode size={20} />
                         <span>Dados Lidos do QR</span>
                       </div>
                       <div className="text-sm text-slate-700 space-y-1.5">
+                        <p><span className="font-semibold text-slate-500">Código:</span> {qrToken}</p>
                         <p><span className="font-semibold text-slate-500">Nome:</span> {visitorName}</p>
                         <p><span className="font-semibold text-slate-500">Unidade:</span> {getSelectedUnitLabel()}</p>
-                        <p><span className="font-semibold text-slate-500">Motivo:</span> {reason}</p>
+                        {reason && <p><span className="font-semibold text-slate-500">Motivo:</span> {reason}</p>}
                       </div>
                       <div className="mt-3 bg-green-100 text-green-700 text-xs p-2 rounded flex items-center gap-1">
-                        <CheckCircle size={12} /> Identidade Verificada
+                        <CheckCircle size={12} /> QR Válido - Identidade Verificada
                       </div>
                     </div>
-                  )}
+                  ) : null}
                 </>
               ) : (
                 <ApprovalModeSelector

@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident } from '../types';
+import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult } from '../types';
 import { logger, ErrorCategory } from '@/services/logger';
 
 logger.setContext({ service: 'Supabase' });
@@ -172,6 +172,23 @@ export const SupabaseService = {
     }
   },
 
+  // --- QR Code Validation ---
+  async validateQrCode(qrCode: string): Promise<QrValidationResult | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('validate_qr_code', { p_qr_code: qrCode })
+        .single();
+
+      if (error) throw error;
+      return data as QrValidationResult;
+    } catch (err: any) {
+      logger.error('QR validation error', err, ErrorCategory.NETWORK);
+      return null;
+    }
+  },
+
   // --- Configurações ---
   async getVisitTypes(condoId: number): Promise<VisitTypeConfig[]> {
     if (!supabase) {
@@ -332,7 +349,7 @@ export const SupabaseService = {
         sync_status: 'SINCRONIZADO'
       }));
     } catch (err: any) {
-      console.error("Error fetching visits:", err.message || JSON.stringify(err));
+      logger.error('Error fetching visits', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -366,7 +383,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Visit;
     } catch (err: any) {
-      console.error("Create Visit Error:", err.message || JSON.stringify(err));
+      logger.error('Create Visit Error', err, ErrorCategory.NETWORK);
       return null;
     }
   },
@@ -381,7 +398,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("Update Visit Error:", err.message || JSON.stringify(err));
+      logger.error('Update Visit Error', err, ErrorCategory.NETWORK);
       return false;
     }
   },
@@ -401,7 +418,7 @@ export const SupabaseService = {
       }
       return true;
     } catch (err: any) {
-      console.error("Update Visit Status Error:", err.message || JSON.stringify(err));
+      logger.error('Update Visit Status Error', err, ErrorCategory.NETWORK);
       return false;
     }
   },
@@ -424,7 +441,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as VisitEvent;
     } catch (err: any) {
-      console.error("Create Visit Event Error:", err.message || JSON.stringify(err));
+      logger.error('Create Visit Event Error', err, ErrorCategory.NETWORK);
       return null;
     }
   },
@@ -439,7 +456,7 @@ export const SupabaseService = {
       if (error) throw error;
       return (data as VisitEvent[]) || [];
     } catch (err: any) {
-      console.error("Get Visit Events Error:", err.message || JSON.stringify(err));
+      logger.error('Get Visit Events Error', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -450,7 +467,7 @@ export const SupabaseService = {
     supabase
       .rpc('create_audit_log', { p_data: entry })
       .then(({ error }) => {
-        if (error) console.error("Audit Log Error:", error.message || JSON.stringify(error));
+        if (error) logger.error('Audit Log Error', error, ErrorCategory.NETWORK);
       });
   },
 
@@ -466,7 +483,7 @@ export const SupabaseService = {
       const incidentTypes = (data as IncidentType[]) || [];
       return incidentTypes.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     } catch (err: any) {
-      console.error("Error fetching incident types:", err.message || JSON.stringify(err));
+      logger.error('Error fetching incident types', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -482,7 +499,7 @@ export const SupabaseService = {
       const incidentStatuses = (data as IncidentStatus[]) || [];
       return incidentStatuses.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
     } catch (err: any) {
-      console.error("Error fetching incident statuses:", err.message || JSON.stringify(err));
+      logger.error('Error fetching incident statuses', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -505,12 +522,12 @@ export const SupabaseService = {
         status_label: inc.incident_statuses?.label
       }));
     } catch (err: any) {
-      console.error("Error fetching incidents:", err.message || JSON.stringify(err));
+      logger.error('Error fetching incidents', err, ErrorCategory.NETWORK);
       return [];
     }
   },
 
-  async acknowledgeIncident(id: number, staffId: number): Promise<boolean> {
+  async acknowledgeIncident(id: string | number, staffId: number): Promise<boolean> {
     if (!supabase) return false;
 
     try {
@@ -527,12 +544,12 @@ export const SupabaseService = {
 
       return true;
     } catch (err: any) {
-      console.error("Error acknowledging incident:", err.message || JSON.stringify(err));
+      logger.error('Error acknowledging incident', err, ErrorCategory.NETWORK);
       return false;
     }
   },
 
-  async reportIncidentAction(id: number, guardNotes: string, newStatus: string): Promise<boolean> {
+  async reportIncidentAction(id: string | number, guardNotes: string, newStatus: string): Promise<boolean> {
     if (!supabase) return false;
 
     try {
@@ -557,7 +574,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("Error reporting incident action:", err.message || JSON.stringify(err));
+      logger.error('Error reporting incident action', err, ErrorCategory.NETWORK);
       return false;
     }
   },
@@ -583,7 +600,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("Device registration error:", err.message || JSON.stringify(err));
+      logger.error('Device registration error', err, ErrorCategory.DEVICE);
       return false;
     }
   },
@@ -597,7 +614,7 @@ export const SupabaseService = {
 
       if (error) throw error;
     } catch (err: any) {
-      console.error("Heartbeat update error:", err.message || JSON.stringify(err));
+      logger.error('Heartbeat update error', err, ErrorCategory.DEVICE);
     }
   },
 
@@ -624,10 +641,10 @@ export const SupabaseService = {
         });
 
       if (error) throw error;
-      console.log('[Supabase] Device decommissioned:', deviceIdentifier);
+      logger.info('Device decommissioned', { data: deviceIdentifier });
       return true;
     } catch (err: any) {
-      console.error("Decommission device error:", err.message || JSON.stringify(err));
+      logger.error('Decommission device error', err, ErrorCategory.DEVICE);
       return false;
     }
   },
@@ -642,7 +659,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("Deactivate devices error:", err.message || JSON.stringify(err));
+      logger.error('Deactivate devices error', err, ErrorCategory.DEVICE);
       return false;
     }
   },
@@ -657,12 +674,12 @@ export const SupabaseService = {
    */
   async uploadVisitorPhoto(photoDataUrl: string, condoId: number, visitorName: string): Promise<string | null> {
     if (!supabase) {
-      console.error('[SupabaseService] Supabase client not initialized');
+      logger.error('Supabase client not initialized', null, ErrorCategory.NETWORK);
       return null;
     }
 
     try {
-      console.log('[SupabaseService] Starting photo upload for visitor:', visitorName);
+      logger.info('Starting photo upload for visitor', { data: visitorName });
 
       // Convert base64 data URL to Blob
       const base64Data = photoDataUrl.split(',')[1];
@@ -678,14 +695,14 @@ export const SupabaseService = {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-      console.log('[SupabaseService] Photo blob created:', blob.size, 'bytes');
+      logger.debug('Photo blob created', { sizeBytes: blob.size });
 
       // Generate unique filename: condo_id/timestamp_visitorname.jpg
       const timestamp = Date.now();
       const sanitizedName = visitorName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
       const fileName = `${condoId}/${timestamp}_${sanitizedName}.jpg`;
 
-      console.log('[SupabaseService] Uploading to path:', fileName);
+      logger.info('Uploading to path', { data: fileName });
 
       // Upload to Supabase Storage bucket 'visitor-photos'
       const { data, error } = await supabase.storage
@@ -697,7 +714,7 @@ export const SupabaseService = {
         });
 
       if (error) {
-        console.error('[SupabaseService] Upload error details:', {
+        logger.error('Upload error details:', {
           message: error.message,
           statusCode: (error as any).statusCode,
           error: error
@@ -705,18 +722,18 @@ export const SupabaseService = {
         throw error;
       }
 
-      console.log('[SupabaseService] Upload successful, getting public URL...');
+      logger.info('Upload successful, getting public URL...');
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('visitor-photos')
         .getPublicUrl(fileName);
 
-      console.log('[SupabaseService] Photo uploaded successfully:', publicUrl);
+      logger.info('Photo uploaded successfully', { data: publicUrl });
       return publicUrl;
 
     } catch (err: any) {
-      console.error('[SupabaseService] Photo upload error:', {
+      logger.error('Photo upload error:', {
         message: err.message,
         error: err,
         stack: err.stack
@@ -732,7 +749,7 @@ export const SupabaseService = {
    */
   async uploadCondoLogo(file: File, condoName?: string): Promise<string | null> {
     if (!supabase) {
-      console.error('[SupabaseService] Supabase client not initialized');
+      logger.error('Supabase client not initialized', null, ErrorCategory.NETWORK);
       return null;
     }
 
@@ -766,7 +783,7 @@ export const SupabaseService = {
 
       return publicUrl;
     } catch (err: any) {
-      console.error('[SupabaseService] Logo upload error:', err.message || JSON.stringify(err));
+      logger.error('Logo upload error', err, ErrorCategory.NETWORK);
       return null;
     }
   },
@@ -780,12 +797,12 @@ export const SupabaseService = {
    */
   async uploadStaffPhoto(photoDataUrl: string, staffName: string, condoId?: number): Promise<string | null> {
     if (!supabase) {
-      console.error('[SupabaseService] Supabase client not initialized');
+      logger.error('Supabase client not initialized', null, ErrorCategory.NETWORK);
       return null;
     }
 
     try {
-      console.log('[SupabaseService] Starting photo upload for staff:', staffName);
+      logger.info('Starting photo upload for staff', { data: staffName });
 
       // Convert base64 data URL to Blob
       const base64Data = photoDataUrl.split(',')[1];
@@ -801,7 +818,7 @@ export const SupabaseService = {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-      console.log('[SupabaseService] Staff photo blob created:', blob.size, 'bytes');
+      logger.debug('Staff photo blob created', { sizeBytes: blob.size });
 
       // Generate unique filename: condo_id/timestamp_staffname.jpg or global/timestamp_staffname.jpg
       const timestamp = Date.now();
@@ -809,7 +826,7 @@ export const SupabaseService = {
       const folder = condoId ? condoId.toString() : 'global';
       const fileName = `${folder}/${timestamp}_${sanitizedName}.jpg`;
 
-      console.log('[SupabaseService] Uploading staff photo to path:', fileName);
+      logger.info('Uploading staff photo to path', { data: fileName });
 
       // Upload to Supabase Storage bucket 'staff-photos'
       const { data, error } = await supabase.storage
@@ -821,7 +838,7 @@ export const SupabaseService = {
         });
 
       if (error) {
-        console.error('[SupabaseService] Staff photo upload error details:', {
+        logger.error('Staff photo upload error details:', {
           message: error.message,
           statusCode: (error as any).statusCode,
           error: error
@@ -829,18 +846,18 @@ export const SupabaseService = {
         throw error;
       }
 
-      console.log('[SupabaseService] Staff photo upload successful, getting public URL...');
+      logger.info('Staff photo upload successful, getting public URL...');
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('staff-photos')
         .getPublicUrl(fileName);
 
-      console.log('[SupabaseService] Staff photo uploaded successfully:', publicUrl);
+      logger.info('Staff photo uploaded successfully', { data: publicUrl });
       return publicUrl;
 
     } catch (err: any) {
-      console.error('[SupabaseService] Staff photo upload error:', {
+      logger.error('Staff photo upload error:', {
         message: err.message,
         error: err,
         stack: err.stack
@@ -879,7 +896,7 @@ export const SupabaseService = {
     try {
       const storagePath = getStoragePathFromPublicUrl(photoUrl, 'staff-photos');
       if (!storagePath) {
-        console.error('[SupabaseService] Unable to resolve staff photo path from URL');
+        logger.error('Unable to resolve staff photo path from URL', null, ErrorCategory.NETWORK);
         return false;
       }
 
@@ -890,7 +907,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error('[SupabaseService] Staff photo delete error:', err.message || JSON.stringify(err));
+      logger.error('Staff photo delete error', err, ErrorCategory.NETWORK);
       return false;
     }
   },
@@ -907,7 +924,7 @@ export const SupabaseService = {
       const device = Array.isArray(data) ? data[0] : data;
       return (device as Device) || null;
     } catch (err: any) {
-      console.error("Get device error:", err.message || JSON.stringify(err));
+      logger.error('Get device error', err, ErrorCategory.DEVICE);
       return null;
     }
   },
@@ -934,7 +951,7 @@ export const SupabaseService = {
         return device.device_identifier !== excludeDeviceIdentifier;
       });
     } catch (err: any) {
-      console.error("Get devices by condominium error:", err.message || JSON.stringify(err));
+      logger.error('Get devices by condominium error', err, ErrorCategory.DEVICE);
       return [];
     }
   },
@@ -973,7 +990,7 @@ export const SupabaseService = {
         condominium_name: device.condominium_id ? condoMap.get(device.condominium_id) : undefined
       }));
     } catch (err: any) {
-      console.error("Get all active devices error:", err.message || JSON.stringify(err));
+      logger.error('Get all active devices error', err, ErrorCategory.DEVICE);
       return [];
     }
   },
@@ -1032,12 +1049,12 @@ export const SupabaseService = {
    */
   async adminGetAllVisits(startDate?: string, endDate?: string, condominiumId?: number): Promise<Visit[]> {
     if (!supabase) {
-      console.error('[SupabaseService] Supabase client not initialized');
+      logger.error('Supabase client not initialized', null, ErrorCategory.NETWORK);
       return [];
     }
 
     try {
-      console.log('[SupabaseService] Calling admin_get_all_visits RPC with params:', {
+      logger.info('Calling admin_get_all_visits RPC with params:', {
         p_start_date: startDate || null,
         p_end_date: endDate || null,
         p_condominium_id: condominiumId || null
@@ -1050,18 +1067,18 @@ export const SupabaseService = {
       });
 
       if (error) {
-        console.error('[SupabaseService] RPC error:', error);
+        logger.error('RPC error', error, ErrorCategory.NETWORK);
         throw error;
       }
 
-      console.log('[SupabaseService] RPC returned:', data?.length || 0, 'visits');
+      logger.info('RPC returned visits', { count: data?.length || 0 });
       if (data && data.length > 0) {
-        console.log('[SupabaseService] Sample visit:', data[0]);
+        logger.info('Sample visit', { detail: String(data[0]) });
       }
 
       return (data || []) as Visit[];
     } catch (err: any) {
-      console.error("[SupabaseService] Error fetching visits via RPC:", {
+      logger.error("Error fetching visits via RPC:", {
         message: err.message,
         details: err.details,
         hint: err.hint,
@@ -1091,12 +1108,12 @@ export const SupabaseService = {
     status?: string
   ): Promise<Visit[]> {
     if (!supabase) {
-      console.error('[SupabaseService] Supabase client not initialized');
+      logger.error('Supabase client not initialized', null, ErrorCategory.NETWORK);
       return [];
     }
 
     try {
-      console.log('[SupabaseService] Calling admin_get_all_visits_filtered RPC with params:', {
+      logger.info('Calling admin_get_all_visits_filtered RPC with params:', {
         p_start_date: startDate || null,
         p_end_date: endDate || null,
         p_condominium_id: condominiumId || null,
@@ -1115,14 +1132,14 @@ export const SupabaseService = {
       });
 
       if (error) {
-        console.error('[SupabaseService] RPC error:', error);
+        logger.error('RPC error', error, ErrorCategory.NETWORK);
         throw error;
       }
 
-      console.log('[SupabaseService] RPC returned:', data?.length || 0, 'filtered visits');
+      logger.info('RPC returned filtered visits', { count: data?.length || 0 });
       return (data || []) as Visit[];
     } catch (err: any) {
-      console.error('[SupabaseService] Error fetching filtered visits via RPC:', {
+      logger.error('Error fetching filtered visits via RPC:', {
         message: err.message,
         details: err.details,
         hint: err.hint,
@@ -1149,15 +1166,15 @@ export const SupabaseService = {
 
       // Debug: Log first incident to see actual structure
       if (data && data.length > 0) {
-        console.log('[Admin] Sample incident from RPC:', JSON.stringify(data[0], null, 2));
-        console.log('[Admin] All keys:', Object.keys(data[0]));
+        logger.debug('Sample incident from RPC', { sample: JSON.stringify(data[0], null, 2) });
+        logger.debug('All keys', { keys: Object.keys(data[0]) });
       }
 
       // Try direct cast first (like adminGetAllVisits does)
       // The RPC should return the correct structure with nested objects
       return (data || []) as Incident[];
     } catch (err: any) {
-      console.error("[Admin] Error fetching incidents via RPC:", err.message || JSON.stringify(err));
+      logger.error('Error fetching incidents via RPC', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -1183,7 +1200,7 @@ export const SupabaseService = {
         residents: unit.residents || []
       })) as Unit[];
     } catch (err: any) {
-      console.error("[Admin] Error fetching units via RPC:", err.message || JSON.stringify(err));
+      logger.error('Error fetching units via RPC', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -1204,7 +1221,7 @@ export const SupabaseService = {
       if (error) throw error;
       return (data as Staff[]) || [];
     } catch (err: any) {
-      console.error("[Admin] Error fetching staff via RPC:", err.message || JSON.stringify(err));
+      logger.error('Error fetching staff via RPC', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -1254,7 +1271,7 @@ export const SupabaseService = {
         resolvedIncidents: stats.resolved_incidents
       };
     } catch (err: any) {
-      console.error("[Admin] Error fetching dashboard stats via RPC:", err.message || JSON.stringify(err));
+      logger.error('Error fetching dashboard stats via RPC', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1284,7 +1301,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Condominium;
     } catch (err: any) {
-      console.error("[Admin] Error creating condominium:", err.message || JSON.stringify(err));
+      logger.error('Error creating condominium', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1305,7 +1322,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Condominium;
     } catch (err: any) {
-      console.error("[Admin] Error updating condominium:", err.message || JSON.stringify(err));
+      logger.error('Error updating condominium', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1326,7 +1343,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("[Admin] Error toggling condominium status:", err.message || JSON.stringify(err));
+      logger.error('Error toggling condominium status', err, ErrorCategory.ADMIN);
       return false;
     }
   },
@@ -1347,7 +1364,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Device;
     } catch (err: any) {
-      console.error("[Admin] Error updating device:", err.message || JSON.stringify(err));
+      logger.error('Error updating device', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1365,7 +1382,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("[Admin] Error decommissioning device:", err.message || JSON.stringify(err));
+      logger.error('Error decommissioning device', err, ErrorCategory.ADMIN);
       return false;
     }
   },
@@ -1385,7 +1402,7 @@ export const SupabaseService = {
       if (!condominiumId) return devices;
       return devices.filter((device) => device.condominium_id === condominiumId);
     } catch (err: any) {
-      console.error("[Admin] Error fetching devices:", err.message || JSON.stringify(err));
+      logger.error('Error fetching devices', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -1412,7 +1429,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Staff;
     } catch (err: any) {
-      console.error("[Admin] Error creating staff:", err.message || JSON.stringify(err));
+      logger.error('Error creating staff', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1446,7 +1463,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Staff;
     } catch (err: any) {
-      console.error("[Admin] Error creating staff:", err.message || JSON.stringify(err));
+      logger.error('Error creating staff', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1469,7 +1486,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Staff;
     } catch (err: any) {
-      console.error("[Admin] Error updating staff PIN:", err.message || JSON.stringify(err));
+      logger.error('Error updating staff PIN', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1487,7 +1504,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Staff;
     } catch (err: any) {
-      console.error("[Admin] Error updating staff:", err.message || JSON.stringify(err));
+      logger.error('Error updating staff', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1515,7 +1532,7 @@ export const SupabaseService = {
       }
       return { success: true };
     } catch (err: any) {
-      console.error("[Admin] Error deleting staff:", err.message || JSON.stringify(err));
+      logger.error('Error deleting staff', err, ErrorCategory.ADMIN);
       return {
         success: false,
         error: {
@@ -1548,7 +1565,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Unit;
     } catch (err: any) {
-      console.error("[Admin] Error creating unit:", err.message || JSON.stringify(err));
+      logger.error('Error creating unit', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1566,7 +1583,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Unit;
     } catch (err: any) {
-      console.error("[Admin] Error updating unit:", err.message || JSON.stringify(err));
+      logger.error('Error updating unit', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1584,7 +1601,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("[Admin] Error deleting unit:", err.message || JSON.stringify(err));
+      logger.error('Error deleting unit', err, ErrorCategory.ADMIN);
       return false;
     }
   },
@@ -1616,7 +1633,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data || [];
     } catch (err: any) {
-      console.error("[Admin] Error fetching residents:", err.message || JSON.stringify(err));
+      logger.error('Error fetching residents', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -1642,7 +1659,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data;
     } catch (err: any) {
-      console.error("[Admin] Error creating resident:", err.message || JSON.stringify(err));
+      logger.error('Error creating resident', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1660,7 +1677,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data;
     } catch (err: any) {
-      console.error("[Admin] Error updating resident:", err.message || JSON.stringify(err));
+      logger.error('Error updating resident', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1678,8 +1695,27 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("[Admin] Error deleting resident:", err.message || JSON.stringify(err));
+      logger.error('Error deleting resident', err, ErrorCategory.ADMIN);
       return false;
+    }
+  },
+
+  /**
+   * Admin: Get all QR codes for a resident
+   * Uses existing RPC function get_active_qr_codes
+   */
+  async adminGetResidentQrCodes(residentId: number): Promise<ResidentQrCode[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .rpc('get_active_qr_codes', { p_resident_id: residentId });
+
+      if (error) throw error;
+      return (data as ResidentQrCode[]) || [];
+    } catch (err: any) {
+      logger.error('Error fetching resident QR codes', err, ErrorCategory.ADMIN);
+      return [];
     }
   },
 
@@ -1701,7 +1737,7 @@ export const SupabaseService = {
         .filter((restaurant) => !condominiumId || restaurant.condominium_id === condominiumId)
         .sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
-      console.error("[Admin] Error fetching restaurants:", err.message || JSON.stringify(err));
+      logger.error('Error fetching restaurants', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -1726,7 +1762,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Restaurant;
     } catch (err: any) {
-      console.error("[Admin] Error creating restaurant:", err.message || JSON.stringify(err));
+      logger.error('Error creating restaurant', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1744,7 +1780,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Restaurant;
     } catch (err: any) {
-      console.error("[Admin] Error updating restaurant:", err.message || JSON.stringify(err));
+      logger.error('Error updating restaurant', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1762,7 +1798,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("[Admin] Error deleting restaurant:", err.message || JSON.stringify(err));
+      logger.error('Error deleting restaurant', err, ErrorCategory.ADMIN);
       return false;
     }
   },
@@ -1785,7 +1821,7 @@ export const SupabaseService = {
         .filter((sport) => !condominiumId || sport.condominium_id === condominiumId)
         .sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
-      console.error("[Admin] Error fetching sports:", err.message || JSON.stringify(err));
+      logger.error('Error fetching sports', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -1810,7 +1846,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Sport;
     } catch (err: any) {
-      console.error("[Admin] Error creating sport:", err.message || JSON.stringify(err));
+      logger.error('Error creating sport', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1828,7 +1864,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Sport;
     } catch (err: any) {
-      console.error("[Admin] Error updating sport:", err.message || JSON.stringify(err));
+      logger.error('Error updating sport', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1846,7 +1882,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("[Admin] Error deleting sport:", err.message || JSON.stringify(err));
+      logger.error('Error deleting sport', err, ErrorCategory.ADMIN);
       return false;
     }
   },
@@ -1891,7 +1927,7 @@ export const SupabaseService = {
 
       return visit;
     } catch (err: any) {
-      console.error("[Admin] Error updating visit status:", err.message || JSON.stringify(err));
+      logger.error('Error updating visit status', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1920,7 +1956,7 @@ export const SupabaseService = {
 
       return (Array.isArray(data) ? data[0] : data) as Incident;
     } catch (err: any) {
-      console.error("[Admin] Error acknowledging incident:", err.message || JSON.stringify(err));
+      logger.error('Error acknowledging incident', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1952,7 +1988,7 @@ export const SupabaseService = {
       if (error) throw error;
       return (Array.isArray(data) ? data[0] : data) as Incident;
     } catch (err: any) {
-      console.error("[Admin] Error resolving incident:", err.message || JSON.stringify(err));
+      logger.error('Error resolving incident', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1970,7 +2006,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as Incident;
     } catch (err: any) {
-      console.error("[Admin] Error updating incident notes:", err.message || JSON.stringify(err));
+      logger.error('Error updating incident notes', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -1991,7 +2027,7 @@ export const SupabaseService = {
       const visitTypes = (data as VisitTypeConfig[]) || [];
       return visitTypes.sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
-      console.error("[Admin] Error fetching visit types:", err.message || JSON.stringify(err));
+      logger.error('Error fetching visit types', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -2017,7 +2053,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as VisitTypeConfig;
     } catch (err: any) {
-      console.error("[Admin] Error creating visit type:", err.message || JSON.stringify(err));
+      logger.error('Error creating visit type', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -2035,7 +2071,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as VisitTypeConfig;
     } catch (err: any) {
-      console.error("[Admin] Error updating visit type:", err.message || JSON.stringify(err));
+      logger.error('Error updating visit type', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -2053,7 +2089,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("[Admin] Error deleting visit type:", err.message || JSON.stringify(err));
+      logger.error('Error deleting visit type', err, ErrorCategory.ADMIN);
       return false;
     }
   },
@@ -2074,7 +2110,7 @@ export const SupabaseService = {
       const serviceTypes = (data as ServiceTypeConfig[]) || [];
       return serviceTypes.sort((a, b) => a.name.localeCompare(b.name));
     } catch (err: any) {
-      console.error("[Admin] Error fetching service types:", err.message || JSON.stringify(err));
+      logger.error('Error fetching service types', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -2096,7 +2132,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as ServiceTypeConfig;
     } catch (err: any) {
-      console.error("[Admin] Error creating service type:", err.message || JSON.stringify(err));
+      logger.error('Error creating service type', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -2114,7 +2150,7 @@ export const SupabaseService = {
       if (error) throw error;
       return data as ServiceTypeConfig;
     } catch (err: any) {
-      console.error("[Admin] Error updating service type:", err.message || JSON.stringify(err));
+      logger.error('Error updating service type', err, ErrorCategory.ADMIN);
       return null;
     }
   },
@@ -2132,7 +2168,7 @@ export const SupabaseService = {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.error("[Admin] Error deleting service type:", err.message || JSON.stringify(err));
+      logger.error('Error deleting service type', err, ErrorCategory.ADMIN);
       return false;
     }
   },
@@ -2152,7 +2188,7 @@ export const SupabaseService = {
       if (error) throw error;
       return (data as CondominiumStats[]) || [];
     } catch (err: any) {
-      console.error("[Admin] Error fetching condominium stats:", err.message || JSON.stringify(err));
+      logger.error('Error fetching condominium stats', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -2213,7 +2249,7 @@ export const SupabaseService = {
       const total = data && data.length > 0 ? data[0].total_count : 0;
       return { logs, total };
     } catch (err: any) {
-      console.error("[Admin] Error fetching audit logs:", err.message || JSON.stringify(err));
+      logger.error('Error fetching audit logs', err, ErrorCategory.ADMIN);
       return { logs: [], total: 0 };
     }
   },
@@ -2253,7 +2289,7 @@ export const SupabaseService = {
         total: count || 0
       };
     } catch (err: any) {
-      console.error("[Admin] Error fetching device registration errors:", err.message || JSON.stringify(err));
+      logger.error('Error fetching device registration errors', err, ErrorCategory.ADMIN);
       return { errors: [], total: 0 };
     }
   },
@@ -2273,7 +2309,7 @@ export const SupabaseService = {
       const sorted = (data as Condominium[] || []).sort((a, b) => a.name.localeCompare(b.name));
       return sorted;
     } catch (err: any) {
-      console.error("[Admin] Error fetching all condominiums:", err.message || JSON.stringify(err));
+      logger.error('Error fetching all condominiums', err, ErrorCategory.ADMIN);
       return [];
     }
   },
@@ -2322,7 +2358,7 @@ export const SupabaseService = {
       }
       return true;
     } catch (err: any) {
-      console.error('[Notifications] Error creating visitor entered notification:', err.message);
+      logger.error('Error creating visitor entered notification:', err.message);
       return false;
     }
   },
@@ -2368,7 +2404,7 @@ export const SupabaseService = {
       }
       return true;
     } catch (err: any) {
-      console.error('[Notifications] Error creating visitor left notification:', err.message);
+      logger.error('Error creating visitor left notification:', err.message);
       return false;
     }
   },
@@ -2410,7 +2446,7 @@ export const SupabaseService = {
 
       return true;
     } catch (err: any) {
-      console.error('[Notifications] Error creating incident read notification:', err.message);
+      logger.error('Error creating incident read notification:', err.message);
       return false;
     }
   }

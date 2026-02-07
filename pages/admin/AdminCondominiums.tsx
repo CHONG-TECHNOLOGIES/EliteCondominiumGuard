@@ -56,7 +56,7 @@ export default function AdminCondominiums() {
       const data = await api.adminGetAllCondominiums();
       setCondominiums(data);
     } catch (error) {
-      console.error('Error loading condominiums:', error);
+      logger.error('Error loading condominiums', error, ErrorCategory.NETWORK);
     } finally {
       setLoading(false);
     }
@@ -90,7 +90,7 @@ export default function AdminCondominiums() {
         showToast('error', 'Erro ao criar condomínio');
       }
     } catch (error) {
-      console.error('Error creating condominium:', error);
+      logger.error('Error creating condominium', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao criar condomínio');
     }
   };
@@ -116,7 +116,7 @@ export default function AdminCondominiums() {
         showToast('error', 'Erro ao atualizar condomínio');
       }
     } catch (error) {
-      console.error('Error updating condominium:', error);
+      logger.error('Error updating condominium', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao atualizar condomínio');
     }
   };
@@ -148,7 +148,7 @@ export default function AdminCondominiums() {
             showToast('error', `Erro ao ${action} condominio`);
           }
         } catch (error) {
-          console.error('Error toggling status:', error);
+          logger.error('Error toggling status', error, ErrorCategory.NETWORK);
           showToast('error', `Erro ao ${action} condominio`);
         }
       }
@@ -178,7 +178,7 @@ export default function AdminCondominiums() {
       const data = await api.adminGetStreets(condoId);
       setStreets(data);
     } catch (error) {
-      console.error('Error loading streets:', error);
+      logger.error('Error loading streets', error, ErrorCategory.NETWORK);
     } finally {
       setLoadingStreets(false);
     }
@@ -197,7 +197,7 @@ export default function AdminCondominiums() {
         showToast('error', 'Erro ao adicionar rua');
       }
     } catch (error) {
-      console.error('Error adding street:', error);
+      logger.error('Error adding street', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao adicionar rua');
     }
   };
@@ -212,7 +212,7 @@ export default function AdminCondominiums() {
         showToast('error', 'Erro ao remover rua');
       }
     } catch (error) {
-      console.error('Error removing street:', error);
+      logger.error('Error removing street', error, ErrorCategory.NETWORK);
       showToast('error', 'Erro ao remover rua');
     }
   };
@@ -280,7 +280,7 @@ export default function AdminCondominiums() {
         showToast('error', 'Erro ao carregar logo');
       }
     } catch (error) {
-      console.error('Error uploading logo:', error);
+      logger.error('Error uploading logo', error, ErrorCategory.NETWORK);
       setLogoPreviewUrl(null);
       showToast('error', 'Erro ao carregar logo');
     } finally {

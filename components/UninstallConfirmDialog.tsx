@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, Trash2, X, Loader2 } from 'lucide-react';
+import { logger, ErrorCategory } from '@/services/logger';
 
 interface UninstallConfirmDialogProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ export const UninstallConfirmDialog: React.FC<UninstallConfirmDialogProps> = ({
     try {
       await onConfirm();
     } catch (error) {
-      console.error('Error during uninstall:', error);
+      logger.error('Error during uninstall', error, ErrorCategory.NETWORK);
       alert('Erro ao desinstalar o dispositivo. Por favor, tente novamente.');
     } finally {
       setIsProcessing(false);

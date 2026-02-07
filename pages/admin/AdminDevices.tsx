@@ -4,6 +4,7 @@ import { api } from '../../services/dataService';
 import { Device, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
+import { logger, ErrorCategory } from '@/services/logger';
 
 interface DeviceStorageInfo {
   used: number;
@@ -43,7 +44,7 @@ export default function AdminDevices() {
       setDevices(devicesData);
       setCondominiums(condosData);
     } catch (error) {
-      console.error('Error loading data:', error);
+      logger.error('Error loading data', error, ErrorCategory.NETWORK);
     } finally {
       setLoading(false);
     }
@@ -69,7 +70,7 @@ export default function AdminDevices() {
         showToast('error', 'Erro ao atualizar dispositivo');
       }
     } catch (error) {
-      console.error('Error updating device:', error);
+      logger.error('Error updating device', error, ErrorCategory.DEVICE);
       showToast('error', 'Erro ao atualizar dispositivo');
     }
   };
@@ -89,7 +90,7 @@ export default function AdminDevices() {
             showToast('error', 'Erro ao desativar dispositivo');
           }
         } catch (error) {
-          console.error('Error decommissioning device:', error);
+          logger.error('Error decommissioning device', error, ErrorCategory.DEVICE);
           showToast('error', 'Erro ao desativar dispositivo');
         }
       }

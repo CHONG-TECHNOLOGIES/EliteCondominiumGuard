@@ -105,6 +105,36 @@ export interface Resident {
   photo_url?: string;                // URL for resident photo
 }
 
+export interface ResidentQrCode {
+  id: string;                  // UUID
+  resident_id: number;
+  condominium_id: number;
+  unit_id: number;
+  purpose?: string;
+  visitor_name?: string;
+  visitor_phone?: string;
+  notes?: string;
+  qr_code: string;             // Unique QR code string
+  is_recurring?: boolean;
+  recurrence_pattern?: string;
+  recurrence_days?: string[];
+  start_date?: string;
+  end_date?: string;
+  expires_at?: string;
+  status?: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface QrValidationResult {
+  is_valid: boolean;
+  resident_id: number | null;
+  unit_id: number | null;
+  visitor_name: string | null;
+  purpose: string | null;
+  message: string;
+}
+
 export interface Unit {
   id: number;
   condominium_id: number;

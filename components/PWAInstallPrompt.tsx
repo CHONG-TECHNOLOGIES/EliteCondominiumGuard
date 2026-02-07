@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, X } from 'lucide-react';
+import { logger } from '@/services/logger';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -12,21 +13,21 @@ export const PWAInstallPrompt: React.FC = () => {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    console.log('[PWA Install] Initializing install prompt component...');
+    logger.info('Initializing install prompt component...');
 
     // Debug helper - expose reset function globally
     (window as any).resetPWAInstall = () => {
       localStorage.removeItem('pwa-install-dismissed');
-      console.log('[PWA Install] Reset complete! Reload page to see install prompt.');
+      logger.info('Reset complete! Reload page to see install prompt.');
     };
 
     // Check if already installed
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    console.log('[PWA Install] Running in standalone mode:', isStandalone);
+    logger.info('Running in standalone mode', { data: isStandalone });
 
     if (isStandalone) {
       setIsInstalled(true);
-      console.log('[PWA Install] App already installed, hiding prompt');
+      logger.info('App already installed, hiding prompt');
       return;
     }
 
@@ -35,27 +36,27 @@ export const PWAInstallPrompt: React.FC = () => {
     if (dismissed) {
       const dismissedTime = parseInt(dismissed);
       const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
-      console.log('[PWA Install] Days since dismissed:', daysSinceDismissed.toFixed(1));
+      logger.info('Days since dismissed', { detail: String(daysSinceDismissed.toFixed(1)) });
 
       // Show again after 7 days
       if (daysSinceDismissed < 7) {
-        console.log('[PWA Install] Recently dismissed, not showing prompt yet');
+        logger.info('Recently dismissed, not showing prompt yet');
         return;
       }
     }
 
-    console.log('[PWA Install] Waiting for beforeinstallprompt event...');
+    logger.info('Waiting for beforeinstallprompt event...');
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       const promptEvent = e as BeforeInstallPromptEvent;
       setDeferredPrompt(promptEvent);
 
-      console.log('[PWA Install] beforeinstallprompt event fired!');
+      logger.info('beforeinstallprompt event fired!');
 
       // Show prompt after 10 seconds
       setTimeout(() => {
-        console.log('[PWA Install] Showing install prompt');
+        logger.info('Showing install prompt');
         setShowPrompt(true);
       }, 10000);
     };
@@ -83,9 +84,9 @@ export const PWAInstallPrompt: React.FC = () => {
     const { outcome } = await deferredPrompt.userChoice;
 
     if (outcome === 'accepted') {
-      console.log('PWA installation accepted');
+      logger.info('PWA installation accepted');
     } else {
-      console.log('PWA installation dismissed');
+      logger.info('PWA installation dismissed');
       localStorage.setItem('pwa-install-dismissed', Date.now().toString());
     }
 
