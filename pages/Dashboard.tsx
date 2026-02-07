@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { UserPlus, List, AlertTriangle, RefreshCw, MessageSquare, Send, X, Clock, CheckCircle, LogOut, User, MapPin, ShieldCheck, ChevronRight, Phone, Search, Newspaper } from 'lucide-react';
 import { api } from '../services/dataService';
 import { askConcierge } from '../services/geminiService';
-import { Visit, VisitStatus } from '../types';
+import { CondominiumNews, Visit, VisitStatus } from '../types';
 import { AuthContext } from '../App';
 import { useToast } from '../components/Toast';
 import { audioService } from '../services/audioService';
@@ -28,6 +28,8 @@ export default function Dashboard() {
   const [incidentsCount, setIncidentsCount] = useState(0);
   const previousIncidentCountRef = useRef<number>(0);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [latestNews, setLatestNews] = useState<CondominiumNews[]>([]);
+  const [newsLoading, setNewsLoading] = useState(true);
 
   const loadQuickActions = async () => {
     const data = await api.getTodaysVisits();
@@ -93,6 +95,33 @@ export default function Dashboard() {
     }
   };
 
+  const loadLatestNews = async () => {
+    try {
+      setNewsLoading(true);
+      const data = await api.getNews();
+      setLatestNews(data.slice(0, 3));
+    } catch (error) {
+      logger.error('Error loading latest news', error, ErrorCategory.NETWORK);
+    } finally {
+      setNewsLoading(false);
+    }
+  };
+
+  const formatRelativeTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'agora';
+    if (diffMins < 60) return `há ${diffMins} min`;
+    if (diffHours < 24) return `há ${diffHours}h`;
+    if (diffDays === 1) return 'ontem';
+    return `há ${diffDays} dias`;
+  };
+
   useEffect(() => {
     const checkStatus = () => setIsOnline(api.checkOnline());
     window.addEventListener('online', checkStatus);
@@ -106,16 +135,24 @@ export default function Dashboard() {
 
     loadQuickActions();
     loadIncidentsCount();
+    loadLatestNews();
     const interval = setInterval(() => {
       loadQuickActions();
       loadIncidentsCount();
       checkAudio(); // Check audio status
     }, 10000); // Refresh every 10s
 
+    const newsInterval = setInterval(() => {
+      if (api.checkOnline()) {
+        loadLatestNews();
+      }
+    }, 60000);
+
     return () => {
       window.removeEventListener('online', checkStatus);
       window.removeEventListener('offline', checkStatus);
       clearInterval(interval);
+      clearInterval(newsInterval);
     };
   }, []);
 
@@ -127,6 +164,7 @@ export default function Dashboard() {
     // Refresh data after sync
     loadQuickActions();
     loadIncidentsCount();
+    loadLatestNews();
   };
 
   const handleAskAI = async (e: React.FormEvent) => {
@@ -317,7 +355,67 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* 2. Active Visits Section (Modern Feed) */}
+        {/* 2. Latest News Preview */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <Newspaper size={22} className="text-slate-400" />
+              Últimas Notícias
+            </h3>
+            <button
+              onClick={() => navigate('/news')}
+              className="text-sm font-bold text-emerald-600 hover:text-emerald-700"
+            >
+              Ver todas →
+            </button>
+          </div>
+
+          {newsLoading ? (
+            <div className="flex items-center justify-center py-10 bg-white rounded-3xl border border-slate-200 border-dashed text-slate-400">
+              <RefreshCw size={24} className="animate-spin mr-2" />
+              Carregando notícias...
+            </div>
+          ) : latestNews.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 bg-white rounded-3xl border border-slate-200 border-dashed text-slate-400">
+              <Newspaper size={48} className="mb-2 opacity-20" />
+              <p className="font-medium">Sem notícias nos últimos 7 dias.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {latestNews.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => navigate('/news')}
+                  className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 text-left transition-all hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    {item.category_label ? (
+                      <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                        {item.category_label}
+                      </span>
+                    ) : (
+                      <span />
+                    )}
+                    <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <Clock size={12} />
+                      {item.created_at && formatRelativeTime(item.created_at)}
+                    </span>
+                  </div>
+                  <h4 className="text-base font-bold text-slate-800 mb-1">
+                    {item.title}
+                  </h4>
+                  {item.description && (
+                    <p className="text-sm text-slate-600 line-clamp-2">
+                      {item.description}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 3. Active Visits Section (Modern Feed) */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
