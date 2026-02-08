@@ -543,11 +543,11 @@ ApprovalMode: APP | PHONE | INTERCOM | GUARD_MANUAL | QR_SCAN
 ### 8. Backend Integration (Supabase)
 
 **RPC Migration Status**: ✅ 99% Complete (February 2026)
-- 79 RPC functions implemented and in use
+- 87 RPC functions implemented and in use
 - 1 remaining `.from()` call (`device_registration_errors` table)
 - 10 storage bucket `.from()` calls (correct - Supabase Storage API)
 
-**RPC Functions** (services/Supabase.ts - 2,316 lines) — 79+ functions total, grouped by domain:
+**RPC Functions** (services/Supabase.ts - 2,500+ lines) — 87+ functions total, grouped by domain:
 
 **Authentication (3)**:
 | Function | Parameters | Description |
@@ -657,10 +657,18 @@ ApprovalMode: APP | PHONE | INTERCOM | GUARD_MANUAL | QR_SCAN
 | `admin_update_sport` | p_id (INT), p_data (JSONB) | Update sport |
 | `admin_delete_sport` | p_id (INT) | Delete sport |
 
-**News (1)**:
+**News (9)**:
 | Function | Parameters | Description |
 |----------|-----------|-------------|
 | `get_news` | p_condominium_id (INT), p_days (INT DEFAULT 7) | Get news from last N days for a condo |
+| `admin_get_all_news` | p_condominium_id, p_limit, p_search, p_category_id, p_date_from, p_date_to, p_after_created_at, p_after_id | Paginated/filtered news for admin |
+| `admin_create_news` | p_data (JSONB) | Create news article |
+| `admin_update_news` | p_id (INT), p_data (JSONB) | Update news article |
+| `admin_delete_news` | p_id (INT) | Delete news article |
+| `get_news_categories` | (none) | Get all news categories |
+| `admin_create_news_category` | p_data (JSONB) | Create news category |
+| `admin_update_news_category` | p_id (INT), p_data (JSONB) | Update news category |
+| `admin_delete_news_category` | p_id (INT) | Delete news category |
 
 **QR Codes (5)**:
 | Function | Parameters | Description |
@@ -719,6 +727,7 @@ ApprovalMode: APP | PHONE | INTERCOM | GUARD_MANUAL | QR_SCAN
 visitor-photos     // Visitor photos taken during check-in
 staff-photos       // Staff profile photos
 logo_condominio    // Condominium logos
+news-images        // News article images (5MB limit, public read)
 ```
 
 All buckets are public for read access. Setup via `setup_storage_buckets.sql`.
@@ -817,6 +826,7 @@ src/
 │       ├── AdminResidents.tsx
 │       ├── AdminRestaurants.tsx
 │       ├── AdminSports.tsx
+│       ├── AdminNews.tsx           # News management with categories and image upload
 │       ├── AdminVisits.tsx
 │       ├── AdminIncidents.tsx
 │       ├── AdminVisitTypes.tsx
@@ -930,6 +940,34 @@ downloadCSV(csv, 'visits-report.csv');
 - Browser download trigger
 - Supports visits, incidents, and other data exports
 
+### Resident App Status Filter (AdminResidents.tsx)
+
+Filter and select residents by app installation status for future bulk SMS/email invitations:
+
+```typescript
+// Filter types
+type AppStatusFilter = 'ALL' | 'WITH_APP' | 'WITHOUT_APP';
+
+// Client-side filtering using useMemo
+const filteredResidents = useMemo(() => {
+  if (filterAppStatus === 'ALL') return residents;
+  return residents.filter(r =>
+    filterAppStatus === 'WITH_APP' ? r.has_app_installed === true : r.has_app_installed !== true
+  );
+}, [residents, filterAppStatus]);
+```
+
+**Features**:
+- 3-column filter layout (search, condominium, app status)
+- Client-side filtering on `has_app_installed` field
+- Bulk selection with "Select All" when filtering "Sem App"
+- Disabled "Enviar Convite" button (future SMS/email integration)
+- Selection state cleared on filter/data changes
+
+**Future Work**:
+- SMS/email invitation sending to selected residents without app
+- Backend integration for bulk messaging
+
 ---
 
 ## Routing Structure
@@ -956,6 +994,7 @@ HashRouter (# based URLs for compatibility)
         ├── /admin/residents    - Manage residents
         ├── /admin/restaurants  - Manage restaurants
         ├── /admin/sports       - Manage sports
+        ├── /admin/news         - Manage news articles and categories
         ├── /admin/visits       - View all visits
         ├── /admin/incidents    - Manage incidents
         ├── /admin/config/visit-types    - Configure visit types
@@ -1490,7 +1529,7 @@ interface NewsCategory {
 
 ### Admin Pages (/admin/*)
 
-15 pages for full administrative management:
+16 pages for full administrative management:
 
 | Page | Purpose |
 |------|---------|
@@ -1500,9 +1539,10 @@ interface NewsCategory {
 | AdminDeviceRegistrationErrors | View and troubleshoot device registration errors |
 | AdminStaff | Staff management with PIN reset |
 | AdminUnits | Unit/Block management |
-| AdminResidents | Resident directory with QR codes viewer |
+| AdminResidents | Resident directory with QR codes viewer, app status filter, bulk selection for future SMS/email invitations |
 | AdminRestaurants | Restaurant configuration |
 | AdminSports | Sports facility configuration |
+| AdminNews | News article management with categories, image upload, pagination, and filters |
 | AdminVisits | Visit history and management |
 | AdminIncidents | Incident oversight |
 | AdminVisitTypes | Visit type configuration |
@@ -1705,4 +1745,4 @@ This enables Claude to:
 **Project**: Elite AccessControl
 **Version**: 0.0.0 (Alpha)
 **License**: Proprietary - All rights reserved
-**Last Updated**: 2026-01
+**Last Updated**: 2026-02

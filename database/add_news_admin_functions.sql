@@ -8,25 +8,38 @@
 -- NEWS FUNCTIONS
 -- =============================================
 
--- Get all news (optionally filtered by condominium)
-CREATE OR REPLACE FUNCTION admin_get_all_news(p_condominium_id INT4 DEFAULT NULL)
+-- Get all news with pagination, search, category, and date range filters
+CREATE OR REPLACE FUNCTION admin_get_all_news(
+  p_condominium_id INT4 DEFAULT NULL,
+  p_limit INT4 DEFAULT NULL,
+  p_search TEXT DEFAULT NULL,
+  p_category_id INT4 DEFAULT NULL,
+  p_date_from DATE DEFAULT NULL,
+  p_date_to DATE DEFAULT NULL,
+  p_after_created_at TIMESTAMPTZ DEFAULT NULL,
+  p_after_id INT4 DEFAULT NULL
+)
 RETURNS SETOF condominium_news
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  IF p_condominium_id IS NOT NULL THEN
-    RETURN QUERY
-    SELECT cn.*
-    FROM condominium_news cn
-    WHERE cn.condominium_id = p_condominium_id
-    ORDER BY cn.created_at DESC;
-  ELSE
-    RETURN QUERY
-    SELECT cn.*
-    FROM condominium_news cn
-    ORDER BY cn.created_at DESC;
-  END IF;
+  RETURN QUERY
+  SELECT cn.*
+  FROM condominium_news cn
+  WHERE
+    (p_condominium_id IS NULL OR cn.condominium_id = p_condominium_id)
+    AND (p_search IS NULL OR cn.title ILIKE '%' || p_search || '%'
+      OR cn.description ILIKE '%' || p_search || '%'
+      OR cn.content ILIKE '%' || p_search || '%')
+    AND (p_category_id IS NULL OR cn.category_id = p_category_id)
+    AND (p_date_from IS NULL OR cn.created_at::date >= p_date_from)
+    AND (p_date_to IS NULL OR cn.created_at::date <= p_date_to)
+    AND (p_after_created_at IS NULL
+      OR cn.created_at < p_after_created_at
+      OR (cn.created_at = p_after_created_at AND cn.id < p_after_id))
+  ORDER BY cn.created_at DESC, cn.id DESC
+  LIMIT COALESCE(p_limit, 1000);
 END;
 $$;
 
@@ -185,7 +198,7 @@ $$;
 -- =============================================
 
 -- Grant execute permissions to authenticated users
-GRANT EXECUTE ON FUNCTION admin_get_all_news(INT4) TO authenticated;
+GRANT EXECUTE ON FUNCTION admin_get_all_news(INT4, INT4, TEXT, INT4, DATE, DATE, TIMESTAMPTZ, INT4) TO authenticated;
 GRANT EXECUTE ON FUNCTION admin_create_news(JSONB) TO authenticated;
 GRANT EXECUTE ON FUNCTION admin_update_news(INT4, JSONB) TO authenticated;
 GRANT EXECUTE ON FUNCTION admin_delete_news(INT4) TO authenticated;

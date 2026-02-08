@@ -288,12 +288,30 @@ export const SupabaseService = {
     }
   },
 
-  async adminGetAllNews(condominiumId?: number): Promise<CondominiumNews[]> {
+  async adminGetAllNews(
+    condominiumId?: number,
+    limit?: number | null,
+    search?: string | null,
+    categoryId?: number | null,
+    dateFrom?: string | null,
+    dateTo?: string | null,
+    afterCreatedAt?: string | null,
+    afterId?: number | null
+  ): Promise<CondominiumNews[]> {
     if (!supabase) return [];
 
     try {
       const { data, error } = await supabase
-        .rpc('admin_get_all_news', { p_condominium_id: condominiumId || null });
+        .rpc('admin_get_all_news', {
+          p_condominium_id: condominiumId ?? null,
+          p_limit: limit ?? null,
+          p_search: search ?? null,
+          p_category_id: categoryId ?? null,
+          p_date_from: dateFrom ?? null,
+          p_date_to: dateTo ?? null,
+          p_after_created_at: afterCreatedAt ?? null,
+          p_after_id: afterId ?? null
+        });
 
       if (error) throw error;
       return (data as CondominiumNews[]) || [];
@@ -447,7 +465,7 @@ export const SupabaseService = {
       const fileName = `${condominiumId}/${newsId}_${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('news-images')
+        .from('news')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: false
@@ -456,7 +474,7 @@ export const SupabaseService = {
       if (uploadError) throw uploadError;
 
       const { data: urlData } = supabase.storage
-        .from('news-images')
+        .from('news')
         .getPublicUrl(fileName);
 
       return urlData.publicUrl;
@@ -470,11 +488,11 @@ export const SupabaseService = {
     if (!supabase || !imageUrl) return false;
 
     try {
-      const storagePath = getStoragePathFromPublicUrl(imageUrl, 'news-images');
+      const storagePath = getStoragePathFromPublicUrl(imageUrl, 'news');
       if (!storagePath) return false;
 
       const { error } = await supabase.storage
-        .from('news-images')
+        .from('news')
         .remove([storagePath]);
 
       if (error) throw error;

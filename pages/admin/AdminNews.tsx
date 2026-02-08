@@ -145,7 +145,13 @@ export default function AdminNews() {
   const [condominiums, setCondominiums] = useState<Condominium[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterCondoId, setFilterCondoId] = useState<number | null>(null);
+  const [filterCategoryId, setFilterCategoryId] = useState<number | null>(null);
+  const [filterDateFrom, setFilterDateFrom] = useState<string>('');
+  const [filterDateTo, setFilterDateTo] = useState<string>('');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -173,20 +179,39 @@ export default function AdminNews() {
     label: ''
   });
 
+  const PAGE_SIZE = 50;
+
+  // Debounce search
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
   useEffect(() => {
     loadData();
-  }, [filterCondoId]);
+  }, [filterCondoId, debouncedSearch, filterCategoryId, filterDateFrom, filterDateTo]);
 
   const loadData = async () => {
     setLoading(true);
+    setHasMore(true);
     try {
       const effectiveCondoId = isSuperAdmin ? filterCondoId : user?.condominium_id;
       const [newsData, categoriesData, condosData] = await Promise.all([
-        api.adminGetAllNews(effectiveCondoId || undefined),
+        api.adminGetAllNews(
+          effectiveCondoId || undefined,
+          PAGE_SIZE,
+          debouncedSearch || undefined,
+          filterCategoryId || undefined,
+          filterDateFrom || undefined,
+          filterDateTo || undefined
+        ),
         api.getNewsCategories(),
         api.adminGetAllCondominiums()
       ]);
       setNews(newsData);
+      setHasMore(newsData.length === PAGE_SIZE);
       setCategories(categoriesData);
       setCondominiums(condosData);
     } catch (error) {
@@ -194,6 +219,33 @@ export default function AdminNews() {
       showToast('error', 'Erro ao carregar dados');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore || news.length === 0) return;
+
+    const lastNews = news[news.length - 1];
+    setLoadingMore(true);
+    try {
+      const effectiveCondoId = isSuperAdmin ? filterCondoId : user?.condominium_id;
+      const moreNews = await api.adminGetAllNews(
+        effectiveCondoId || undefined,
+        PAGE_SIZE,
+        debouncedSearch || undefined,
+        filterCategoryId || undefined,
+        filterDateFrom || undefined,
+        filterDateTo || undefined,
+        lastNews.created_at,
+        lastNews.id
+      );
+      setNews([...news, ...moreNews]);
+      setHasMore(moreNews.length === PAGE_SIZE);
+    } catch (error) {
+      logger.error('Error loading more news', error, ErrorCategory.NETWORK);
+      showToast('error', 'Erro ao carregar mais notícias');
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -475,12 +527,6 @@ export default function AdminNews() {
     return category?.label || category?.name || null;
   };
 
-  const filteredNews = news.filter(item =>
-    item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.content?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('pt-PT', {
@@ -512,17 +558,20 @@ export default function AdminNews() {
       </div>
 
       {/* Filters */}
-      <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-3 text-slate-400" size={20} />
           <input
             type="text"
-            placeholder="Buscar por título, descrição ou conteúdo..."
+            placeholder="Buscar por título, descrição..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+
+        {/* Condominium filter (SuperAdmin only) */}
         {isSuperAdmin && (
           <SearchableSelect
             options={[
@@ -537,6 +586,42 @@ export default function AdminNews() {
             alwaysVisibleValues={['ALL']}
           />
         )}
+
+        {/* Category filter */}
+        <SearchableSelect
+          options={[
+            { value: 'ALL', label: 'Todas as Categorias' },
+            ...categories.map(cat => ({ value: cat.id, label: cat.label || cat.name }))
+          ]}
+          value={filterCategoryId}
+          onChange={(val) => setFilterCategoryId(val === 'ALL' ? null : val as number | null)}
+          placeholder="Todas as categorias"
+          searchPlaceholder="Pesquisar categoria..."
+          emptyMessage="Nenhuma categoria encontrada"
+          alwaysVisibleValues={['ALL']}
+        />
+
+        {/* Date From */}
+        <div>
+          <input
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+            className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            title="Data início"
+          />
+        </div>
+
+        {/* Date To */}
+        <div>
+          <input
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+            className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            title="Data fim"
+          />
+        </div>
       </div>
 
       {/* News List */}
@@ -545,21 +630,21 @@ export default function AdminNews() {
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
           <p className="text-text-dim">Carregando notícias...</p>
         </div>
-      ) : filteredNews.length === 0 ? (
+      ) : news.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Newspaper size={64} className="text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
-            {searchTerm ? 'Nenhum resultado encontrado' : 'Nenhuma notícia cadastrada'}
+            {debouncedSearch || filterCategoryId || filterDateFrom || filterDateTo ? 'Nenhum resultado encontrado' : 'Nenhuma notícia cadastrada'}
           </h3>
           <p className="text-text-dim">
-            {searchTerm
-              ? 'Tente buscar com outros termos'
+            {debouncedSearch || filterCategoryId || filterDateFrom || filterDateTo
+              ? 'Tente buscar com outros termos ou filtros'
               : 'Clique em "Nova Notícia" para começar'}
           </p>
         </div>
       ) : (
         <div className="grid gap-4">
-          {filteredNews.map((item) => (
+          {news.map((item) => (
             <div
               key={item.id}
               className="bg-white rounded-xl shadow-sm border border-border-main p-4 hover:shadow-md transition-shadow"
@@ -625,6 +710,20 @@ export default function AdminNews() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Load More Button */}
+      {!loading && news.length > 0 && hasMore && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {loadingMore && <Loader2 size={18} className="animate-spin" />}
+            {loadingMore ? 'Carregando...' : 'Mostrar mais'}
+          </button>
         </div>
       )}
 

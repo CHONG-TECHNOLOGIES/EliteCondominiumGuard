@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Users, Plus, Edit2, Trash2, Loader2, Search, X, Building2, Home, ChevronDown, Check, Smartphone, QrCode, Calendar, Clock, User } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Users, Plus, Edit2, Trash2, Loader2, Search, X, Building2, Home, ChevronDown, Check, Smartphone, QrCode, Calendar, Clock, User, Mail } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { Resident, Condominium, Unit, ResidentQrCode } from '../../types';
 import { useToast } from '../../components/Toast';
@@ -157,6 +157,11 @@ export default function AdminResidents() {
   const [qrCodes, setQrCodes] = useState<ResidentQrCode[]>([]);
   const [loadingQrCodes, setLoadingQrCodes] = useState(false);
 
+  // App status filter
+  type AppStatusFilter = 'ALL' | 'WITH_APP' | 'WITHOUT_APP';
+  const [filterAppStatus, setFilterAppStatus] = useState<AppStatusFilter>('ALL');
+  const [selectedResidents, setSelectedResidents] = useState<Set<number>>(new Set());
+
   // Form state
   const [formData, setFormData] = useState({
     condominium_id: null as number | null,
@@ -166,6 +171,14 @@ export default function AdminResidents() {
     phone: '',
     type: 'OWNER' as 'OWNER' | 'TENANT'
   });
+
+  // Filter residents based on app status (client-side)
+  const filteredResidents = useMemo(() => {
+    if (filterAppStatus === 'ALL') return residents;
+    return residents.filter(r =>
+      filterAppStatus === 'WITH_APP' ? r.has_app_installed === true : r.has_app_installed !== true
+    );
+  }, [residents, filterAppStatus]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -193,6 +206,7 @@ export default function AdminResidents() {
 
   const loadData = async () => {
     setLoading(true);
+    setSelectedResidents(new Set()); // Clear selection on data reload
     try {
       const residentsData = await api.adminGetAllResidents(
         filterCondoId || undefined,
@@ -469,8 +483,8 @@ export default function AdminResidents() {
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-3xl font-bold text-text-main">Gestão de Residentes</h1>
             <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">
-              {searchQuery
-                ? `${residents.length} encontrados`
+              {filterAppStatus !== 'ALL' || searchQuery
+                ? `${filteredResidents.length} encontrados`
                 : `${residents.length} carregados`
               }
             </span>
@@ -490,7 +504,7 @@ export default function AdminResidents() {
       </div>
 
       {/* Filters */}
-      <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="relative">
           <Search className="absolute left-3 top-3 text-slate-400" size={20} />
           <input
@@ -513,7 +527,57 @@ export default function AdminResidents() {
           emptyMessage="Nenhum condomínio encontrado"
           alwaysVisibleValues={['ALL']}
         />
+        <select
+          value={filterAppStatus}
+          onChange={(e) => {
+            setFilterAppStatus(e.target.value as AppStatusFilter);
+            setSelectedResidents(new Set());
+          }}
+          className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="ALL">Todos (App)</option>
+          <option value="WITH_APP">Com App Instalado</option>
+          <option value="WITHOUT_APP">Sem App</option>
+        </select>
       </div>
+
+      {/* Bulk Action Bar - Only show when filtering residents without app */}
+      {filterAppStatus === 'WITHOUT_APP' && filteredResidents.length > 0 && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedResidents.size === filteredResidents.length && filteredResidents.length > 0}
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedResidents(new Set(filteredResidents.map(r => r.id)));
+                  } else {
+                    setSelectedResidents(new Set());
+                  }
+                }}
+                className="w-4 h-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+              />
+              <span className="text-sm font-medium text-amber-800">
+                Selecionar todos ({filteredResidents.length})
+              </span>
+            </label>
+            {selectedResidents.size > 0 && (
+              <span className="text-sm text-amber-700">
+                {selectedResidents.size} selecionado{selectedResidents.size !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <button
+            disabled
+            className="px-4 py-2 bg-amber-600 text-white rounded-lg opacity-50 cursor-not-allowed flex items-center gap-2"
+            title="Funcionalidade em desenvolvimento - em breve poderá enviar convites por SMS/Email"
+          >
+            <Mail size={18} />
+            Enviar Convite (Em Breve)
+          </button>
+        </div>
+      )}
 
       {/* Residents List */}
       {loading ? (
@@ -521,28 +585,56 @@ export default function AdminResidents() {
           <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
           <p className="text-text-dim">Carregando residentes...</p>
         </div>
-      ) : residents.length === 0 ? (
+      ) : filteredResidents.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-border-main p-8 text-center">
           <Users size={64} className="text-slate-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
-            {searchQuery ? 'Nenhum resultado encontrado' : 'Nenhum residente cadastrado'}
+            {searchQuery || filterAppStatus !== 'ALL' ? 'Nenhum resultado encontrado' : 'Nenhum residente cadastrado'}
           </h3>
           <p className="text-text-dim">
-            {searchQuery
-              ? 'Tente buscar com outros termos'
+            {searchQuery || filterAppStatus !== 'ALL'
+              ? 'Tente buscar com outros termos ou ajuste os filtros'
               : 'Clique em "Novo Residente" para começar'}
           </p>
         </div>
       ) : (
         <div className="grid gap-3">
-          {residents.map((resident) => (
+          {filteredResidents.map((resident) => (
             <div
               key={resident.id}
               className="bg-white rounded-xl shadow-sm border border-border-main p-4 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3 flex-1">
-                  <div className="p-2 bg-blue-50 rounded-lg">
+                  {/* Selection checkbox - only when filtering WITHOUT_APP */}
+                  {filterAppStatus === 'WITHOUT_APP' && (
+                    <input
+                      type="checkbox"
+                      checked={selectedResidents.has(resident.id)}
+                      onChange={(e) => {
+                        const newSelected = new Set(selectedResidents);
+                        if (e.target.checked) {
+                          newSelected.add(resident.id);
+                        } else {
+                          newSelected.delete(resident.id);
+                        }
+                        setSelectedResidents(newSelected);
+                      }}
+                      className="mt-3 w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  )}
+                  {resident.avatar_url ? (
+                    <img
+                      src={resident.avatar_url}
+                      alt={resident.name}
+                      className="w-12 h-12 rounded-lg object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div className={`p-2 bg-blue-50 rounded-lg ${resident.avatar_url ? 'hidden' : ''}`}>
                     <Users className="text-blue-600" size={24} />
                   </div>
                   <div className="flex-1">
@@ -620,7 +712,7 @@ export default function AdminResidents() {
         </div>
       )}
 
-      {!loading && residents.length > 0 && hasMore && (
+      {!loading && filteredResidents.length > 0 && hasMore && (
         <div className="mt-4 flex justify-center">
           <button
             onClick={handleLoadMore}

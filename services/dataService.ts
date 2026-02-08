@@ -1283,10 +1283,28 @@ class DataService {
   }
 
   // --- Admin News Management ---
-  async adminGetAllNews(condominiumId?: number): Promise<CondominiumNews[]> {
+  async adminGetAllNews(
+    condominiumId?: number,
+    limit?: number | null,
+    search?: string | null,
+    categoryId?: number | null,
+    dateFrom?: string | null,
+    dateTo?: string | null,
+    afterCreatedAt?: string | null,
+    afterId?: number | null
+  ): Promise<CondominiumNews[]> {
     const scopedCondoId = this.getAdminScopeCondoId();
     const effectiveCondoId = scopedCondoId ?? condominiumId;
-    return await SupabaseService.adminGetAllNews(effectiveCondoId);
+    return await SupabaseService.adminGetAllNews(
+      effectiveCondoId,
+      limit ?? null,
+      search ?? null,
+      categoryId ?? null,
+      dateFrom ?? null,
+      dateTo ?? null,
+      afterCreatedAt ?? null,
+      afterId ?? null
+    );
   }
 
   async adminCreateNews(news: Partial<CondominiumNews>): Promise<CondominiumNews | null> {
