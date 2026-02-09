@@ -261,7 +261,31 @@ Component → DataService → IndexedDB (primary) + Supabase (sync)
 - Device fingerprinting and heartbeat
 - Multi-layer storage sync (central DB → IndexedDB → localStorage)
 - Persistent storage requests for PWA
-- Allways use sentru for log
+- **Device tracking for visits** (see below)
+- Always use Sentry for logging
+
+### 1.1 Device Tracking for Visits
+
+Every visit records `device_id` (UUID) to track which tablet registered it:
+
+```typescript
+// DataService tracks current device
+private currentDeviceId: string | null = null;
+
+// Automatically included when creating visits
+device_id: this.currentDeviceId || undefined
+```
+
+**Benefits**:
+- Audit trail: Know which device registered each visit
+- Historical queries: Works even after device reassignment between condominiums
+- Analytics: Device usage patterns and performance
+
+**Example Query** (after device reassigned from Condo 1 to Condo 2):
+```sql
+-- All visits from Device X while at Condo 1
+SELECT * FROM visits WHERE device_id = 'uuid' AND condominium_id = 1;
+```
 
 ### 2. Data Synchronization Strategies
 
@@ -859,7 +883,7 @@ The app includes an audio alert system for incident notifications:
 // Initialize audio (requests permission)
 AudioService.initialize()
 
-// Play alert sound (plays 4 times with delays)
+// Play alert sound (4 cycles of BIP-bip-BIP, ~6 seconds)
 AudioService.playAlertSound()
 
 // Test sound manually
@@ -869,10 +893,44 @@ AudioService.testSound()
 **Features**:
 - AudioContext singleton with HTML5 Audio fallback
 - Data URI beep tone (no external files needed)
-- Device vibration integration (200ms pattern)
-- Permission storage in localStorage
+- **4 cycles of BIP-bip-BIP** pattern (~6 seconds total)
+- **Volume: 60%** for audibility
+- Device vibration integration (200ms, pause, 200ms pattern)
+- Permission storage in localStorage (`audio_permission_enabled` key)
 - Auto-initialization on login if previously granted
 
+**"Testar Som" Button States**:
+- 🟠 **Orange (pulsing)**: Sound not yet activated - guard must click once
+- 🟢 **Green**: Sound activated - alerts will play automatically
+
+**Console Log Prefixes** (for debugging):
+- `[AudioService]` - Audio system logs
+- `[Incidents]` - Realtime subscription and incident detection logs
+
+### Incident Realtime Alerts (Incidents.tsx)
+
+Real-time incident detection via Supabase Realtime:
+
+**How it works**:
+1. Subscribes to `incidents` table INSERT events via WebSocket
+2. Client-side filtering by `resident.condominium_id` (matches guard's condo)
+3. On new incident from same condominium:
+   - 🔊 Plays alert sound (4 cycles)
+   - 📳 Vibrates device (if mobile)
+   - 🎨 Shows red banner (auto-dismisses after 10 seconds)
+   - 📋 Refreshes incident list
+
+**Realtime Subscription Logs**:
+```
+[Incidents] 📡 Setting up realtime subscription for condo: X
+[Incidents] Subscription status: SUBSCRIBED
+[Incidents] 🆕 New incident received via realtime
+[Incidents] ✅ Incident belongs to this condominium - triggering alert
+```
+
+**Troubleshooting**:
+- If `CHANNEL_ERROR` appears: Realtime not enabled in Supabase Dashboard → Database → Replication
+- If sound doesn't play: Guard must click "Testar Som" button once (browser autoplay policy)
 
 ### PWA Lifecycle Tracking (pwaLifecycleService.ts)
 
@@ -967,6 +1025,46 @@ const filteredResidents = useMemo(() => {
 **Future Work**:
 - SMS/email invitation sending to selected residents without app
 - Backend integration for bulk messaging
+
+### Resident App Integration
+
+The Guard App integrates with the external Resident App for visit approval via push notifications.
+
+**How it works**:
+1. Guard registers visit and selects "Aplicativo" approval mode
+2. System checks if unit has residents with `has_app_installed = true`
+3. Push notification sent to resident's device
+4. Resident approves/denies in their app
+5. Visit status updated in real-time
+
+**Available RPCs for Resident App**:
+| Function | Purpose |
+|----------|---------|
+| `register_resident_app_login(p_resident_id, p_device_token, p_platform)` | First login - marks `has_app_installed = true` |
+| `update_resident_app_activity(p_resident_id)` | Heartbeat - updates `app_last_seen_at` |
+| `check_unit_has_app(p_unit_id)` | Check if any resident in unit has app |
+
+**Push Notification Payload** (sent to Resident App):
+```typescript
+interface VisitApprovalNotification {
+  type: 'VISIT_APPROVAL_REQUEST';
+  visit_id: number;
+  visitor_name: string;
+  visitor_photo_url?: string;
+  visit_type: string;
+  guard_name: string;
+}
+```
+
+**App Adoption Statistics**:
+```sql
+SELECT * FROM v_app_adoption_stats;
+-- Returns: condominium_name, total_residents, residents_with_app, adoption_percent
+```
+
+**Auto-selection Logic** (approvalModes.ts):
+- If `has_app_installed = true` → "Aplicativo" mode available
+- If no app → Falls back to "Telefone" or "Interfone"
 
 ---
 
