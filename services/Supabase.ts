@@ -778,11 +778,11 @@ export const SupabaseService = {
 
       if (error) throw error;
 
-      // Create notification for resident
+      // Create notification for resident (best-effort, doesn't affect success)
       const incident = Array.isArray(data) ? data[0] : data;
-      if (!incident) return false;
-
-      await this.createIncidentReadNotification(incident);
+      if (incident) {
+        await this.createIncidentReadNotification(incident);
+      }
 
       return true;
     } catch (err: any) {
@@ -2179,7 +2179,7 @@ export const SupabaseService = {
   /**
    * Admin: Acknowledge an incident
    */
-  async adminAcknowledgeIncident(id: number, guardId: number, notes?: string): Promise<Incident | null> {
+  async adminAcknowledgeIncident(id: string, guardId: number, notes?: string): Promise<Incident | null> {
     if (!supabase) return null;
 
     try {
@@ -2206,7 +2206,7 @@ export const SupabaseService = {
   /**
    * Admin: Resolve an incident
    */
-  async adminResolveIncident(id: number, guardId: number, notes?: string): Promise<Incident | null> {
+  async adminResolveIncident(id: string, guardId: number, notes?: string): Promise<Incident | null> {
     if (!supabase) return null;
 
     try {

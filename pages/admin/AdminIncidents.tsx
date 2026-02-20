@@ -145,9 +145,10 @@ export default function AdminIncidents() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCondoId, setFilterCondoId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
-  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showActionModal, setShowActionModal] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
-  const [notes, setNotes] = useState('');
+  const [actionNotes, setActionNotes] = useState('');
+  const [actionStatus, setActionStatus] = useState<'inprogress' | 'resolved'>('resolved');
 
   useEffect(() => {
     loadData();
@@ -192,69 +193,49 @@ export default function AdminIncidents() {
     }
   };
 
-  const handleResolve = async (incident: Incident, withNotes?: boolean) => {
-    if (!user?.id) {
-      showToast('error', 'Utilizador não autenticado');
-      return;
-    }
-
-    if (withNotes) {
-      setSelectedIncident(incident);
-      setNotes(incident.guard_notes || '');
-      setShowNotesModal(true);
-      return;
-    }
-
-    try {
-      const updates = { status: 'RESOLVED' };
-      const changes = buildAuditChanges(incident, updates, { exclude: ['pin', 'pin_hash'] });
-      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
-      const result = await api.adminResolveIncident(incident.id, user.id, undefined, auditDetails);
-      if (result) {
-        await loadData();
-        showToast('success', 'Incidente resolvido com sucesso!');
-      } else {
-        showToast('error', 'Erro ao resolver incidente');
-      }
-    } catch (error) {
-      logger.error('Error resolving incident', error, ErrorCategory.NETWORK);
-      showToast('error', 'Erro ao resolver incidente');
-    }
+  const handleOpenActionModal = (incident: Incident) => {
+    setSelectedIncident(incident);
+    setActionNotes('');
+    setActionStatus('resolved');
+    setShowActionModal(true);
   };
 
-  const handleSaveNotes = async () => {
+  const handleCloseActionModal = () => {
+    setShowActionModal(false);
+    setSelectedIncident(null);
+    setActionNotes('');
+  };
+
+  const handleSubmitAction = async () => {
     if (!selectedIncident || !user?.id) return;
+    if (!actionNotes.trim()) {
+      showToast('error', 'Por favor, descreva a ação tomada');
+      return;
+    }
 
     try {
-      const updates = { status: 'RESOLVED', guard_notes: notes };
-      const changes = buildAuditChanges(selectedIncident, updates, { exclude: ['pin', 'pin_hash'] });
-      const auditDetails = hasAuditChanges(changes) ? { changes } : undefined;
-      const result = await api.adminResolveIncident(selectedIncident.id, user.id, notes, auditDetails);
-      if (result) {
-        await loadData();
-        setShowNotesModal(false);
-        setSelectedIncident(null);
-        setNotes('');
-        showToast('success', 'Incidente resolvido com notas!');
-      } else {
-        showToast('error', 'Erro ao resolver incidente');
-      }
+      await api.adminReportIncidentAction(selectedIncident.id, actionNotes, actionStatus, user.id);
+      await loadData();
+      handleCloseActionModal();
+      showToast('success', actionStatus === 'resolved' ? 'Incidente resolvido com sucesso!' : 'Incidente atualizado com sucesso!');
     } catch (error) {
-      logger.error('Error saving notes', error, ErrorCategory.NETWORK);
-      showToast('error', 'Erro ao resolver incidente');
+      logger.error('Error submitting incident action', error, ErrorCategory.NETWORK);
+      showToast('error', 'Erro ao reportar ação');
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'PENDING':
-        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">PENDENTE</span>;
-      case 'ACKNOWLEDGED':
-        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">RECONHECIDO</span>;
-      case 'RESOLVED':
-        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">RESOLVIDO</span>;
+  const getStatusBadge = (status: string, statusLabel?: string) => {
+    switch (status.toLowerCase()) {
+      case 'new':
+        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">{statusLabel || 'NOVO'}</span>;
+      case 'acknowledged':
+        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">{statusLabel || 'VISTO PELO GUARDA'}</span>;
+      case 'inprogress':
+        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-800">{statusLabel || 'EM PROGRESSO'}</span>;
+      case 'resolved':
+        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">{statusLabel || 'RESOLVIDO'}</span>;
       default:
-        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800">{status}</span>;
+        return <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800">{statusLabel || status}</span>;
     }
   };
 
@@ -274,7 +255,7 @@ export default function AdminIncidents() {
       incident.resident?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       incident.type_label?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = !filterStatus || incident.status.toUpperCase() === filterStatus.toUpperCase();
+    const matchesStatus = !filterStatus || incident.status.toLowerCase() === filterStatus.toLowerCase();
 
     return matchesSearch && matchesStatus;
   });
@@ -351,9 +332,10 @@ export default function AdminIncidents() {
           className="px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">Todos os Estados</option>
-          <option value="PENDING">Pendente</option>
-          <option value="ACKNOWLEDGED">Reconhecido</option>
-          <option value="RESOLVED">Resolvido</option>
+          <option value="new">Novo</option>
+          <option value="acknowledged">Visto pelo guarda</option>
+          <option value="inprogress">Em Progresso</option>
+          <option value="resolved">Resolvido</option>
         </select>
       </div>
 
@@ -383,13 +365,13 @@ export default function AdminIncidents() {
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
                   <div className={`p-3 rounded-lg ${
-                    incident.status.toUpperCase() === 'RESOLVED' ? 'bg-green-50' :
-                    incident.status.toUpperCase() === 'ACKNOWLEDGED' ? 'bg-blue-50' :
+                    incident.status.toLowerCase() === 'resolved' ? 'bg-green-50' :
+                    incident.status.toLowerCase() === 'acknowledged' ? 'bg-blue-50' :
                     'bg-orange-50'
                   }`}>
                     <AlertTriangle className={
-                      incident.status.toUpperCase() === 'RESOLVED' ? 'text-green-600' :
-                      incident.status.toUpperCase() === 'ACKNOWLEDGED' ? 'text-blue-600' :
+                      incident.status.toLowerCase() === 'resolved' ? 'text-green-600' :
+                      incident.status.toLowerCase() === 'acknowledged' ? 'text-blue-600' :
                       'text-orange-600'
                     } size={32} />
                   </div>
@@ -398,7 +380,7 @@ export default function AdminIncidents() {
                       <h3 className="text-xl font-bold text-text-main">
                         {incident.type_label || incident.type}
                       </h3>
-                      {getStatusBadge(incident.status)}
+                      {getStatusBadge(incident.status, incident.status_label)}
                     </div>
                     <p className="text-text-main mb-3">{incident.description}</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-text-dim mb-2">
@@ -434,7 +416,7 @@ export default function AdminIncidents() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  {incident.status.toUpperCase() === 'PENDING' && (
+                  {incident.status.toLowerCase() === 'new' && (
                     <>
                       <button
                         onClick={() => handleAcknowledge(incident)}
@@ -444,34 +426,30 @@ export default function AdminIncidents() {
                         Reconhecer
                       </button>
                       <button
-                        onClick={() => handleResolve(incident, true)}
+                        onClick={() => handleOpenActionModal(incident)}
                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
                       >
                         <CheckCircle2 size={16} />
-                        Resolver
+                        Reportar Ação
                       </button>
                     </>
                   )}
-                  {incident.status.toUpperCase() === 'ACKNOWLEDGED' && (
+                  {incident.status.toLowerCase() === 'acknowledged' && (
                     <button
-                      onClick={() => handleResolve(incident, true)}
+                      onClick={() => handleOpenActionModal(incident)}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
                     >
                       <CheckCircle2 size={16} />
-                      Resolver
+                      Reportar Ação
                     </button>
                   )}
-                  {incident.status.toUpperCase() !== 'RESOLVED' && (
+                  {incident.status.toLowerCase() === 'inprogress' && (
                     <button
-                      onClick={() => {
-                        setSelectedIncident(incident);
-                        setNotes(incident.guard_notes || '');
-                        setShowNotesModal(true);
-                      }}
-                      className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium flex items-center gap-2"
+                      onClick={() => handleOpenActionModal(incident)}
+                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium flex items-center gap-2"
                     >
                       <MessageSquare size={16} />
-                      Notas
+                      Fechar Incidente
                     </button>
                   )}
                 </div>
@@ -481,65 +459,81 @@ export default function AdminIncidents() {
         </div>
       )}
 
-      {/* Notes Modal */}
-      {showNotesModal && selectedIncident && (
+      {/* Action Report Modal */}
+      {showActionModal && selectedIncident && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-bg-surface rounded-xl shadow-xl w-full max-w-[95vw] md:max-w-lg lg:max-w-2xl">
             <div className="p-6 border-b border-border-main flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-text-main">
-                {selectedIncident.status.toUpperCase() === 'RESOLVED' ? 'Ver Notas' : 'Resolver com Notas'}
-              </h2>
+              <h2 className="text-2xl font-bold text-text-main">Reportar Ação do Guarda</h2>
               <button
-                onClick={() => {
-                  setShowNotesModal(false);
-                  setSelectedIncident(null);
-                  setNotes('');
-                }}
+                onClick={handleCloseActionModal}
                 className="p-2 hover:bg-bg-root rounded-lg transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             <div className="p-6">
-              <div className="mb-4">
-                <p className="text-sm text-text-dim mb-2">
+              <div className="mb-4 p-4 bg-slate-50 rounded-lg">
+                <p className="text-sm text-text-dim mb-1">
                   <span className="font-medium">Incidente:</span> {selectedIncident.type_label || selectedIncident.type}
                 </p>
-                <p className="text-sm text-text-main">{selectedIncident.description}</p>
+                <p className="text-sm text-text-main">
+                  <span className="font-medium">Descrição:</span> {selectedIncident.description}
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-text-main mb-2">
-                  Notas do Guarda
+              <div className="mb-4">
+                <label className="block text-sm font-bold text-text-main mb-2">Estado Final:</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      value="inprogress"
+                      checked={actionStatus === 'inprogress'}
+                      onChange={(e) => setActionStatus(e.target.value as 'inprogress' | 'resolved')}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">Em Progresso</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      value="resolved"
+                      checked={actionStatus === 'resolved'}
+                      onChange={(e) => setActionStatus(e.target.value as 'inprogress' | 'resolved')}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm">Resolvido</span>
+                  </label>
+                </div>
+              </div>
+              <div className="mb-2">
+                <label className="block text-sm font-bold text-text-main mb-2">
+                  Descreva a ação tomada: *
                 </label>
                 <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  disabled={selectedIncident.status.toUpperCase() === 'RESOLVED'}
-                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:cursor-not-allowed"
-                  rows={5}
-                  placeholder="Descreva as ações tomadas para resolver o incidente..."
+                  value={actionNotes}
+                  onChange={(e) => setActionNotes(e.target.value)}
+                  placeholder="Ex: Contactei o residente por telefone. Confirmou que verificou as câmeras e não encontrou nada suspeito. Situação resolvida."
+                  className="w-full h-32 px-4 py-3 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <p className="text-xs text-text-dim mt-1">
+                  Descreva as ações tomadas, como contactou o residente, e o resultado.
+                </p>
               </div>
             </div>
             <div className="p-6 border-t border-border-main flex justify-end gap-3">
               <button
-                onClick={() => {
-                  setShowNotesModal(false);
-                  setSelectedIncident(null);
-                  setNotes('');
-                }}
+                onClick={handleCloseActionModal}
                 className="px-6 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg hover:bg-slate-50 transition-colors"
               >
-                {selectedIncident.status.toUpperCase() === 'RESOLVED' ? 'Fechar' : 'Cancelar'}
+                Cancelar
               </button>
-              {selectedIncident.status.toUpperCase() !== 'RESOLVED' && (
-                <button
-                  onClick={handleSaveNotes}
-                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Resolver Incidente
-                </button>
-              )}
+              <button
+                onClick={handleSubmitAction}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Submeter Ação
+              </button>
             </div>
           </div>
         </div>

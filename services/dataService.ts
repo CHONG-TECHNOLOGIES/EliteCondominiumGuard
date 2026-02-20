@@ -2159,7 +2159,7 @@ class DataService {
     });
   }
 
-  async acknowledgeIncident(id: number, staffId: number): Promise<void> {
+  async acknowledgeIncident(id: string, staffId: number): Promise<void> {
     const incident = await db.incidents.get(id);
     if (!incident) throw new Error("Incident not found");
 
@@ -2202,7 +2202,7 @@ class DataService {
     }
   }
 
-  async reportIncidentAction(id: number, guardNotes: string, newStatus: string): Promise<void> {
+  async reportIncidentAction(id: string, guardNotes: string, newStatus: string): Promise<void> {
     const incident = await db.incidents.get(id);
     if (!incident) throw new Error("Incident not found");
 
@@ -3398,7 +3398,7 @@ class DataService {
    * Admin: Acknowledge an incident
    */
   async adminAcknowledgeIncident(
-    id: number,
+    id: string,
     guardId: number,
     notes?: string,
     auditDetails?: any
@@ -3409,11 +3409,12 @@ class DataService {
         await this.logAudit({
           action: 'UPDATE',
           target_table: 'incidents',
-          target_id: id,
+          target_id: null,
           actor_id: guardId,
           details: auditDetails ?? {
             field: 'status',
             new_value: incident.status,
+            incident_id: id,
             note: notes || null,
             source: 'AdminIncidents'
           }
@@ -3430,7 +3431,7 @@ class DataService {
    * Admin: Resolve an incident
    */
   async adminResolveIncident(
-    id: number,
+    id: string,
     guardId: number,
     notes?: string,
     auditDetails?: any
@@ -3456,6 +3457,28 @@ class DataService {
       logger.error('Failed to resolve incident (online required)', e, ErrorCategory.ADMIN);
       return null;
     }
+  }
+
+  /**
+   * Admin: Report incident action (goes directly to Supabase, no IndexedDB)
+   */
+  async adminReportIncidentAction(id: string, guardNotes: string, newStatus: string, actorId: number): Promise<void> {
+    const success = await SupabaseService.reportIncidentAction(id, guardNotes, newStatus);
+    if (!success) throw new Error('Failed to update incident');
+
+    await this.logAudit({
+      action: 'UPDATE',
+      target_table: 'incidents',
+      target_id: id,
+      actor_id: actorId,
+      details: {
+        changes: {
+          status: { to: newStatus },
+          guard_notes: { to: guardNotes }
+        },
+        source: 'AdminIncidents'
+      }
+    });
   }
 
   /**

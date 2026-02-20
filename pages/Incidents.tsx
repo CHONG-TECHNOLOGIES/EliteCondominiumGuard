@@ -204,7 +204,7 @@ export default function Incidents() {
     }
   }, [user?.condominium_id]);
 
-  const handleAcknowledge = async (id: number) => {
+  const handleAcknowledge = async (id: string) => {
     if (!user?.id) {
       alert('Erro: Utilizador não autenticado');
       return;
@@ -277,13 +277,12 @@ export default function Incidents() {
   };
 
   const getStatusBadge = (status: string, statusLabel?: string) => {
-    const label = statusLabel || status;
     switch (status) {
-      case 'new': return <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-bold">{label}</span>;
-      case 'acknowledged': return <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-bold">{label}</span>;
-      case 'inprogress': return <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-bold">{label}</span>;
-      case 'resolved': return <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-bold">{label}</span>;
-      default: return <span className="bg-slate-100 text-slate-800 text-xs px-2 py-1 rounded font-bold">{label}</span>;
+      case 'new': return <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded font-bold">NOVO</span>;
+      case 'acknowledged': return <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-bold">VISTO PELO GUARDA</span>;
+      case 'inprogress': return <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded font-bold">EM PROGRESSO</span>;
+      case 'resolved': return <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded font-bold">RESOLVIDO</span>;
+      default: return <span className="bg-slate-100 text-slate-800 text-xs px-2 py-1 rounded font-bold">{statusLabel || status}</span>;
     }
   };
 

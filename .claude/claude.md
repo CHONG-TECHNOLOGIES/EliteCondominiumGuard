@@ -647,10 +647,10 @@ ApprovalMode: APP | PHONE | INTERCOM | GUARD_MANUAL | QR_SCAN
 | `create_incident` | p_resident_id (INT), p_description, p_type, p_photo_path (TEXT) | Create incident |
 | `get_incidents` | p_condominium_id (INT) | Incidents per condo |
 | `get_resident_incidents` | p_resident_id (INT) | Incidents per resident |
-| `acknowledge_incident` | p_id (INT), p_guard_id (INT) | Guard acknowledges incident |
+| `acknowledge_incident` | p_id (UUID), p_guard_id (INT) | Guard acknowledges incident |
 | `admin_get_all_incidents` | p_condominium_id (INT) | All incidents for admin |
-| `admin_update_incident` | p_id (INT), p_data (JSONB) | Update incident |
-| `admin_delete_incident` | p_id (INT) | Delete incident |
+| `admin_update_incident` | p_id (UUID), p_data (JSONB) | Update incident |
+| `admin_delete_incident` | p_id (UUID) | Delete incident |
 
 **Configuration (11)**:
 | Function | Parameters | Description |
