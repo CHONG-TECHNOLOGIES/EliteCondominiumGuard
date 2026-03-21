@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory } from '../types';
+import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment } from '../types';
 import { logger, ErrorCategory } from '@/services/logger';
 
 logger.setContext({ service: 'Supabase' });
@@ -1536,7 +1536,11 @@ export const SupabaseService = {
             latitude: condo.latitude,
             longitude: condo.longitude,
             gps_radius_meters: condo.gps_radius_meters,
-            status: condo.status || 'ACTIVE'
+            status: condo.status || 'ACTIVE',
+            phone_number: condo.phone_number,
+            contact_person: condo.contact_person,
+            contact_email: condo.contact_email,
+            manager_name: condo.manager_name
           }
         });
 
@@ -2548,7 +2552,20 @@ export const SupabaseService = {
 
       if (error) throw error;
 
-      const sorted = (data as Condominium[] || []).sort((a, b) => a.name.localeCompare(b.name));
+      let condos = data as Condominium[] || [];
+
+      const promises = condos.map(async (condo) => {
+        const residents = await this.adminGetAllResidents(condo.id);
+        
+        return {
+          ...condo,
+          total_residents: residents.length || 0
+        };
+      });
+
+      condos = await Promise.all(promises);
+
+      const sorted = condos.sort((a, b) => a.name.localeCompare(b.name));
       return sorted;
     } catch (err: any) {
       logger.error('Error fetching all condominiums', err, ErrorCategory.ADMIN);
@@ -2690,6 +2707,152 @@ export const SupabaseService = {
     } catch (err: any) {
       logger.error('Error creating incident read notification:', err.message);
       return false;
+    }
+  },
+
+  // --- Subscriptions & Pricing ---
+  async getAppPricingRules(): Promise<AppPricingRule[]> {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase.rpc('admin_get_app_pricing_rules');
+      if (error) throw error;
+      return (data as AppPricingRule[]) || [];
+    } catch (err: any) {
+      logger.error('Error fetching pricing rules', err.message);
+      return [];
+    }
+  },
+
+  async adminCreatePricingRule(rule: Partial<AppPricingRule>): Promise<AppPricingRule | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.rpc('admin_create_app_pricing_rule', {
+        p_min_residents: rule.min_residents,
+        p_max_residents: rule.max_residents ?? null,
+        p_price_per_resident: rule.price_per_resident,
+        p_currency: rule.currency || 'AOA'
+      });
+      if (error) throw error;
+      return data as AppPricingRule;
+    } catch (err: any) {
+      logger.error('Error creating pricing rule', err.message);
+      return null;
+    }
+  },
+
+  async adminUpdatePricingRule(id: number, rule: Partial<AppPricingRule>): Promise<AppPricingRule | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.rpc('admin_update_app_pricing_rule', {
+        p_id: id,
+        p_min_residents: rule.min_residents ?? null,
+        p_max_residents: rule.max_residents ?? null,
+        p_price_per_resident: rule.price_per_resident ?? null,
+        p_currency: rule.currency ?? null
+      });
+      if (error) throw error;
+      return data as AppPricingRule;
+    } catch (err: any) {
+      logger.error('Error updating pricing rule', err.message);
+      return null;
+    }
+  },
+
+  async adminDeletePricingRule(id: number): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { data, error } = await supabase.rpc('admin_delete_app_pricing_rule', { p_id: id });
+      if (error) throw error;
+      return data === true;
+    } catch (err: any) {
+      logger.error('Error deleting pricing rule', err.message);
+      return false;
+    }
+  },
+
+  async adminGetCondominiumSubscriptions(): Promise<CondominiumSubscription[]> {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase.rpc('admin_get_condominium_subscriptions');
+      if (error) throw error;
+      return (data as CondominiumSubscription[]) || [];
+    } catch (err: any) {
+      logger.error('Error fetching enhanced subscriptions', err.message);
+      return [];
+    }
+  },
+
+  async adminUpdateSubscriptionStatus(id: number, condominium_id: number, status: string): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { data, error } = await supabase.rpc('admin_update_subscription_status', {
+        p_id: id,
+        p_condominium_id: condominium_id,
+        p_status: status
+      });
+      if (error) throw error;
+      return data === true;
+    } catch (err: any) {
+      logger.error('Error updating subscription status', err.message);
+      return false;
+    }
+  },
+
+  async adminUpdateSubscriptionDetails(
+    id: number, 
+    condominium_id: number, 
+    updates: { status?: 'ACTIVE' | 'INACTIVE' | 'TRIAL', custom_price_per_resident?: number | null, discount_percentage?: number }
+  ): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { data, error } = await supabase.rpc('admin_update_subscription_details', {
+        p_id: id,
+        p_condominium_id: condominium_id,
+        p_status: updates.status ?? null,
+        p_custom_price_per_resident: updates.custom_price_per_resident ?? null,
+        p_discount_percentage: updates.discount_percentage ?? null
+      });
+      if (error) throw error;
+      return data === true;
+    } catch (err: any) {
+      logger.error('Error updating subscription details', err.message);
+      return false;
+    }
+  },
+
+  async adminGetSubscriptionPayments(filters?: { condominium_id?: number, year?: number, month?: number }): Promise<SubscriptionPayment[]> {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase.rpc('admin_get_subscription_payments', {
+        p_condominium_id: filters?.condominium_id ?? null,
+        p_year: filters?.year ?? null,
+        p_month: filters?.month ?? null
+      });
+      if (error) throw error;
+      return (data as SubscriptionPayment[]) || [];
+    } catch (err: any) {
+      logger.error('Error fetching subscription payments', err.message);
+      return [];
+    }
+  },
+
+  async adminCreateSubscriptionPayment(payment: Partial<SubscriptionPayment>): Promise<SubscriptionPayment | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.rpc('admin_create_subscription_payment', {
+        p_condominium_id: payment.condominium_id,
+        p_amount: payment.amount,
+        p_currency: payment.currency || 'AOA',
+        p_payment_date: payment.payment_date,
+        p_reference_period: payment.reference_period ?? null,
+        p_status: payment.status || 'PAID',
+        p_notes: payment.notes ?? null
+      });
+      if (error) throw error;
+      return data as SubscriptionPayment;
+    } catch (err: any) {
+      logger.error('Error creating subscription payment', err.message);
+      return null;
     }
   }
 };

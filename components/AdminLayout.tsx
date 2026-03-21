@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../App';
+import { UserRole } from '../types';
 import { useToast } from './Toast';
 import { api } from '../services/dataService';
 import { useTheme } from '../context/ThemeContext';
@@ -133,7 +134,22 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           label: 'Notícias',
           path: '/admin/news',
           icon: <Newspaper size={18} />
-        }
+        },
+        {
+          label: 'Tipos de Visita',
+          path: '/admin/config/visit-types',
+          icon: <Settings size={18} />
+        },
+        {
+          label: 'Tipos de Serviço',
+          path: '/admin/config/service-types',
+          icon: <Settings size={18} />
+        },
+        ...(user?.role === UserRole.SUPER_ADMIN ? [{
+          label: 'Assinaturas',
+          path: '/admin/subscriptions',
+          icon: <ClipboardList size={18} />
+        }] : [])
       ]
     },
     {
@@ -150,23 +166,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           label: 'Incidentes',
           path: '/admin/incidents',
           icon: <AlertTriangle size={18} />
-        }
-      ]
-    },
-    {
-      label: 'Configuração',
-      path: '/admin/config',
-      icon: <Settings size={20} />,
-      children: [
-        {
-          label: 'Tipos de Visita',
-          path: '/admin/config/visit-types',
-          icon: <Settings size={18} />
-        },
-        {
-          label: 'Tipos de Serviço',
-          path: '/admin/config/service-types',
-          icon: <Settings size={18} />
         }
       ]
     },

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Users, Plus, Edit2, Trash2, Loader2, Search, X, Building2, Home, ChevronDown, Check, Smartphone, QrCode, Calendar, Clock, User, Mail } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Loader2, Search, X, Building2, Home, ChevronDown, Check, Smartphone, QrCode, Calendar, Clock, User, Mail, FileStack } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { Resident, Condominium, Unit, ResidentQrCode } from '../../types';
 import { useToast } from '../../components/Toast';
+import ImportResidentsModal from '../../components/ImportResidentsModal';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 import { logger, ErrorCategory } from '@/services/logger';
 
@@ -156,6 +157,7 @@ export default function AdminResidents() {
   const [selectedResidentForQr, setSelectedResidentForQr] = useState<Resident | null>(null);
   const [qrCodes, setQrCodes] = useState<ResidentQrCode[]>([]);
   const [loadingQrCodes, setLoadingQrCodes] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // App status filter
   type AppStatusFilter = 'ALL' | 'WITH_APP' | 'WITHOUT_APP';
@@ -491,16 +493,25 @@ export default function AdminResidents() {
           </div>
           <p className="text-text-dim">Gerir residentes e proprietários das unidades</p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowCreateModal(true);
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-colors"
-        >
-          <Plus size={20} />
-          Novo Residente
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-sm transition-colors"
+          >
+            <FileStack size={20} className="text-blue-600" />
+            Importar
+          </button>
+          <button
+            onClick={() => {
+              resetForm();
+              setShowCreateModal(true);
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg transition-colors"
+          >
+            <Plus size={20} />
+            Novo Residente
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -723,6 +734,16 @@ export default function AdminResidents() {
             {loadingMore ? 'Carregando...' : 'Mostrar mais'}
           </button>
         </div>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <ImportResidentsModal
+          onClose={() => setShowImportModal(false)}
+          onSuccess={() => loadData()}
+          initialCondoId={filterCondoId}
+          condominiums={condominiums}
+        />
       )}
 
       {/* Create Modal */}

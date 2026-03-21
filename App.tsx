@@ -43,6 +43,7 @@ const AdminAnalytics = React.lazy(() => import('./pages/admin/AdminAnalytics'));
 const AdminAuditLogs = React.lazy(() => import('./pages/admin/AdminAuditLogs'));
 const AdminDeviceRegistrationErrors = React.lazy(() => import('./pages/admin/AdminDeviceRegistrationErrors'));
 const AdminNews = React.lazy(() => import('./pages/admin/AdminNews'));
+const AdminSubscriptions = React.lazy(() => import('./pages/admin/AdminSubscriptions'));
 
 const PageLoader: React.FC = () => (
   <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white">
@@ -580,6 +581,15 @@ export default function App() {
                 <Route path="/admin/audit-logs" element={<ConfigGuard><AdminRoute><AdminLayout><AdminAuditLogs /></AdminLayout></AdminRoute></ConfigGuard>} />
                 <Route path="/admin/device-registration-errors" element={<ConfigGuard><AdminRoute><AdminLayout><AdminDeviceRegistrationErrors /></AdminLayout></AdminRoute></ConfigGuard>} />
                 <Route path="/admin/news" element={<ConfigGuard><AdminRoute><AdminLayout><AdminNews /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/subscriptions" element={
+                  <ConfigGuard>
+                    <AdminRoute>
+                      <AdminLayout>
+                        <AdminSubscriptions />
+                      </AdminLayout>
+                    </AdminRoute>
+                  </ConfigGuard>
+                } />
 
                 {/* Guard Routes */}
                 <Route path="/" element={<ConfigGuard><ProtectedRoute><Dashboard /></ProtectedRoute></ConfigGuard>} />

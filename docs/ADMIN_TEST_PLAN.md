@@ -46,4 +46,10 @@ Adicionar botões de ação na listagem de dispositivos:
 - [ ] **Exportar CSV**:
     - [ ] Testar o botão de exportação e verificar se o arquivo é baixado corretamente.
 
+## Offline
+### testar offline
+
+## Kafka
+### testar click
+
 

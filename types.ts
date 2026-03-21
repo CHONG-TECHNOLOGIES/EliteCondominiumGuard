@@ -54,6 +54,10 @@ export interface Condominium {
   gps_radius_meters?: number;
   status?: 'ACTIVE' | 'INACTIVE';
   phone_number?: string;
+  contact_person?: string;
+  contact_email?: string;
+  manager_name?: string;
+  total_residents?: number;  // Fetched dynamically for Admin Panel
 }
 
 export interface Street {
@@ -324,3 +328,46 @@ export enum PhotoQuality {
   MEDIUM = 'MEDIUM',   // 0.50 scale, 0.70 JPEG quality (~150KB)
   LOW = 'LOW'          // 0.25 scale, 0.50 JPEG quality (~50KB)
 }
+
+export interface AppPricingRule {
+  id: number;
+  min_residents: number;
+  max_residents: number | null;
+  price_per_resident: number;
+  currency: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CondominiumSubscription {
+  id: number;
+  condominium_id: number;
+  condominium_name?: string; // Optional for joins
+  current_residents_count?: number; // Fetched dynamically
+  status: 'ACTIVE' | 'INACTIVE' | 'TRIAL';
+  custom_price_per_resident?: number | null;
+  discount_percentage?: number;
+  last_payment_date?: string;
+  next_due_date?: string;
+  payment_status?: 'PAID' | 'PARTIAL' | 'PENDING';
+  months_in_arrears?: number;
+  missing_months_list?: string;
+  arrears_details?: any[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SubscriptionPayment {
+  id: number;
+  condominium_id: number;
+  condominium_name?: string; // Optional for joins
+  amount: number;
+  currency: string;
+  payment_date: string;
+  reference_period?: string;
+  status: 'PAID' | 'PENDING' | 'FAILED' | 'PARTIAL';
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+

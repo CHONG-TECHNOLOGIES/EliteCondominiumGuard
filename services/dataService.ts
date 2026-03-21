@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory } from '../types';
+import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 import { logger, ErrorCategory } from '@/services/logger';
@@ -3750,6 +3750,159 @@ class DataService {
       return pendingVisits + pendingIncidents;
     } catch (e) {
       return 0;
+    }
+  }
+
+  // --- SUBSCRIPTIONS & PRICING ---
+  
+  async getAppPricingRules(): Promise<AppPricingRule[]> {
+    try {
+      return await SupabaseService.getAppPricingRules();
+    } catch (e) {
+      logger.error('Failed to fetch pricing rules', e, ErrorCategory.ADMIN);
+      return [];
+    }
+  }
+
+  async adminCreatePricingRule(rule: Partial<AppPricingRule>): Promise<AppPricingRule | null> {
+    try {
+      const res = await SupabaseService.adminCreatePricingRule(rule);
+      if (res) {
+        await this.logAudit({
+          action: 'CREATE',
+          target_table: 'app_pricing_rules',
+          target_id: res.id,
+          details: { rule }
+        });
+      }
+      return res;
+    } catch (e) {
+      logger.error('Failed to create pricing rule', e, ErrorCategory.ADMIN);
+      return null;
+    }
+  }
+
+  async adminUpdatePricingRule(id: number, rule: Partial<AppPricingRule>): Promise<AppPricingRule | null> {
+    try {
+      const res = await SupabaseService.adminUpdatePricingRule(id, rule);
+      if (res) {
+        await this.logAudit({
+          action: 'UPDATE',
+          target_table: 'app_pricing_rules',
+          target_id: id,
+          details: { rule_updates: rule }
+        });
+      }
+      return res;
+    } catch (e) {
+      logger.error('Failed to update pricing rule', e, ErrorCategory.ADMIN);
+      return null;
+    }
+  }
+
+  async adminDeletePricingRule(id: number): Promise<boolean> {
+    try {
+      const res = await SupabaseService.adminDeletePricingRule(id);
+      if (res) {
+        await this.logAudit({
+          action: 'DELETE',
+          target_table: 'app_pricing_rules',
+          target_id: id
+        });
+      }
+      return res;
+    } catch (e) {
+      logger.error('Failed to delete pricing rule', e, ErrorCategory.ADMIN);
+      return false;
+    }
+  }
+
+  async adminGetCondominiumSubscriptions(): Promise<CondominiumSubscription[]> {
+    try {
+      // Apply admin scoping if needed (Super Admins see all by default if getAdminScopeCondoId returns null)
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const subscriptions = await SupabaseService.adminGetCondominiumSubscriptions();
+      if (scopedCondoId) {
+        return subscriptions.filter(s => s.condominium_id === scopedCondoId);
+      }
+      return subscriptions;
+    } catch (e) {
+      logger.error('Failed to fetch subscriptions', e, ErrorCategory.ADMIN);
+      return [];
+    }
+  }
+
+  async adminUpdateSubscriptionStatus(id: number, condominium_id: number, status: string): Promise<boolean> {
+    try {
+      const res = await SupabaseService.adminUpdateSubscriptionStatus(id, condominium_id, status);
+      if (res) {
+        await this.logAudit({
+          condominium_id,
+          action: 'UPDATE',
+          target_table: 'condominium_subscriptions',
+          target_id: id,
+          details: { status }
+        });
+      }
+      return res;
+    } catch (e) {
+      logger.error('Failed to update subscription status', e, ErrorCategory.ADMIN);
+      return false;
+    }
+  }
+
+  async adminUpdateSubscriptionDetails(
+    id: number, 
+    condominium_id: number, 
+    updates: { status?: 'ACTIVE' | 'INACTIVE' | 'TRIAL', custom_price_per_resident?: number | null, discount_percentage?: number }
+  ): Promise<boolean> {
+    try {
+      const res = await SupabaseService.adminUpdateSubscriptionDetails(id, condominium_id, updates);
+      if (res) {
+        await this.logAudit({
+          condominium_id,
+          action: 'UPDATE',
+          target_table: 'condominium_subscriptions',
+          target_id: id,
+          details: updates
+        });
+      }
+      return res;
+    } catch (e) {
+      logger.error('Failed to update subscription details', e, ErrorCategory.ADMIN);
+      return false;
+    }
+  }
+
+  async adminGetSubscriptionPayments(filters?: { condominium_id?: number, year?: number, month?: number }): Promise<SubscriptionPayment[]> {
+    try {
+      const scopedCondoId = this.getAdminScopeCondoId();
+      const effectiveFilters = scopedCondoId 
+        ? { ...filters, condominium_id: scopedCondoId } 
+        : filters;
+      return await SupabaseService.adminGetSubscriptionPayments(effectiveFilters);
+    } catch (e) {
+      logger.error('Failed to fetch subscription payments', e, ErrorCategory.ADMIN);
+      return [];
+    }
+  }
+
+  async adminCreateSubscriptionPayment(payment: Partial<SubscriptionPayment>): Promise<SubscriptionPayment | null> {
+    try {
+      const res = await SupabaseService.adminCreateSubscriptionPayment(payment);
+      if (res) {
+        await this.logAudit({
+          condominium_id: payment.condominium_id,
+          action: 'CREATE',
+          target_table: 'subscription_payments',
+          target_id: res.id,
+          details: { amount: payment.amount, currency: payment.currency, reference_period: payment.reference_period }
+        });
+      }
+      return res;
+    } catch (e) {
+      logger.error('Failed to create subscription payment', e, ErrorCategory.ADMIN);
+      return null;
     }
   }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Power, MapPin, Loader2, Search, X } from 'lucide-react';
+import { Building2, Plus, Edit2, Power, MapPin, Loader2, Search, X, Users } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { Condominium, Street } from '../../types';
 import { useToast } from '../../components/Toast';
@@ -26,7 +26,10 @@ export default function AdminCondominiums() {
     longitude: undefined as number | undefined,
     gps_radius_meters: 100,
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
-    phone_number: ''
+    phone_number: '',
+    contact_person: '',
+    contact_email: '',
+    manager_name: ''
   });
 
   // Street management state
@@ -165,7 +168,10 @@ export default function AdminCondominiums() {
       longitude: condo.longitude,
       gps_radius_meters: condo.gps_radius_meters || 100,
       status: condo.status || 'ACTIVE',
-      phone_number: condo.phone_number || ''
+      phone_number: condo.phone_number || '',
+      contact_person: condo.contact_person || '',
+      contact_email: condo.contact_email || '',
+      manager_name: condo.manager_name || ''
     });
     setLogoPreviewUrl(condo.logo_url || null);
     setShowEditModal(true);
@@ -298,7 +304,10 @@ export default function AdminCondominiums() {
       longitude: undefined,
       gps_radius_meters: 100,
       status: 'ACTIVE',
-      phone_number: ''
+      phone_number: '',
+      contact_person: '',
+      contact_email: '',
+      manager_name: ''
     });
     setPendingStreets([]);
     setPendingStreetName('');
@@ -416,11 +425,15 @@ export default function AdminCondominiums() {
                       </div>
                     )}
                     {(condo.latitude && condo.longitude) && (
-                      <p className="text-sm text-text-dim">
+                      <p className="text-sm text-text-dim mb-2">
                         GPS: {condo.latitude.toFixed(6)}, {condo.longitude.toFixed(6)}
                         {condo.gps_radius_meters && ` (Raio: ${condo.gps_radius_meters}m)`}
                       </p>
                     )}
+                    <div className="flex items-center gap-2 text-sm text-text-dim">
+                      <Users size={16} />
+                      <span className="font-medium">{condo.total_residents || 0} residentes</span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
