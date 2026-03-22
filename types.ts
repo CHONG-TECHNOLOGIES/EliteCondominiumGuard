@@ -353,6 +353,7 @@ export interface CondominiumSubscription {
   months_in_arrears?: number;
   missing_months_list?: string;
   arrears_details?: any[];
+  alerts_sent?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -370,4 +371,14 @@ export interface SubscriptionPayment {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface SubscriptionAlert {
+  id: number;
+  condominium_id: number;
+  alert_date: string;
+  reference_month: string;
+  sent_by: number;
+  created_at?: string;
+}
+
 

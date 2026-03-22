@@ -2770,10 +2770,13 @@ export const SupabaseService = {
     }
   },
 
-  async adminGetCondominiumSubscriptions(): Promise<CondominiumSubscription[]> {
+  async adminGetCondominiumSubscriptions(filters?: { year?: number, month?: number }): Promise<CondominiumSubscription[]> {
     if (!supabase) return [];
     try {
-      const { data, error } = await supabase.rpc('admin_get_condominium_subscriptions');
+      const { data, error } = await supabase.rpc('admin_get_condominium_subscriptions', {
+        p_year: filters?.year ?? null,
+        p_month: filters?.month ?? null
+      });
       if (error) throw error;
       return (data as CondominiumSubscription[]) || [];
     } catch (err: any) {
@@ -2853,6 +2856,21 @@ export const SupabaseService = {
     } catch (err: any) {
       logger.error('Error creating subscription payment', err.message);
       return null;
+    }
+  },
+
+  async adminSendSubscriptionAlert(condominiumId: number, staffId: number): Promise<{ success: boolean; message: string; total_alerts?: number; blocked?: boolean }> {
+    if (!supabase) return { success: false, message: 'Sem conexão com banco de dados' };
+    try {
+      const { data, error } = await supabase.rpc('admin_send_subscription_alert', {
+        p_condominium_id: condominiumId,
+        p_staff_id: staffId
+      });
+      if (error) throw error;
+      return data as { success: boolean; message: string; total_alerts?: number; blocked?: boolean };
+    } catch (err: any) {
+      logger.error('Error sending subscription alert', err.message);
+      return { success: false, message: err.message || 'Erro ao enviar alerta' };
     }
   }
 };

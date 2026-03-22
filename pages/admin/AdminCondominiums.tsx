@@ -430,6 +430,18 @@ export default function AdminCondominiums() {
                         {condo.gps_radius_meters && ` (Raio: ${condo.gps_radius_meters}m)`}
                       </p>
                     )}
+                    {(condo.manager_name || condo.contact_person || condo.contact_email || condo.phone_number) && (
+                      <div className="text-sm text-text-dim mb-2 p-2 bg-bg-root rounded-md border border-border-subtle inline-block min-w-[50%]">
+                        {condo.manager_name && <p className="mb-1"><span className="font-medium text-text-main">Gestor:</span> {condo.manager_name}</p>}
+                        {condo.contact_person && <p className="mb-1"><span className="font-medium text-text-main">Responsável:</span> {condo.contact_person}</p>}
+                        {(condo.contact_email || condo.phone_number) && (
+                          <p className="flex gap-3 mt-1 text-xs">
+                            {condo.contact_email && <span>📧 {condo.contact_email}</span>}
+                            {condo.phone_number && <span>📱 {condo.phone_number}</span>}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 text-sm text-text-dim">
                       <Users size={16} />
                       <span className="font-medium">{condo.total_residents || 0} residentes</span>
@@ -510,6 +522,38 @@ export default function AdminCondominiums() {
                   placeholder="(00) 00000-0000"
                 />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-text-main mb-2">Responsável</label>
+                  <input
+                    type="text"
+                    value={formData.contact_person}
+                    onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nome do responsável"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-main mb-2">E-mail de Contato</label>
+                  <input
+                    type="email"
+                    value={formData.contact_email}
+                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-main mb-2">Gestor do Condomínio</label>
+                <input
+                  type="text"
+                  value={formData.manager_name}
+                  onChange={(e) => setFormData({ ...formData, manager_name: e.target.value })}
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nome do gestor"
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-text-main mb-2">Logo do Condomínio</label>
                 <input
@@ -530,16 +574,7 @@ export default function AdminCondominiums() {
                   </div>
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-text-main mb-2">Logo URL (opcional)</label>
-                <input
-                  type="text"
-                  value={formData.logo_url}
-                  onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://..."
-                />
-              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-text-main mb-2">Latitude</label>
@@ -706,6 +741,38 @@ export default function AdminCondominiums() {
                   placeholder="(00) 00000-0000"
                 />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-text-main mb-2">Responsável</label>
+                  <input
+                    type="text"
+                    value={formData.contact_person}
+                    onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nome do responsável"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-text-main mb-2">E-mail de Contato</label>
+                  <input
+                    type="email"
+                    value={formData.contact_email}
+                    onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                    className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-main mb-2">Gestor do Condomínio</label>
+                <input
+                  type="text"
+                  value={formData.manager_name}
+                  onChange={(e) => setFormData({ ...formData, manager_name: e.target.value })}
+                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Nome do gestor"
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium text-text-main mb-2">Logo do Condomínio</label>
                 <input
@@ -726,16 +793,7 @@ export default function AdminCondominiums() {
                   </div>
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-text-main mb-2">Logo URL (opcional)</label>
-                <input
-                  type="text"
-                  value={formData.logo_url}
-                  onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                  className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://..."
-                />
-              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-text-main mb-2">Latitude</label>

@@ -286,7 +286,7 @@ class DataService {
 
   private getStoredUser(): Staff | null {
     try {
-      const raw = localStorage.getItem('auth_user');
+      const raw = sessionStorage.getItem('auth_user') || localStorage.getItem('auth_user');
       if (!raw) return null;
       return JSON.parse(raw) as Staff;
     } catch {
@@ -2359,13 +2359,32 @@ class DataService {
   async adminGetAllCondominiums(): Promise<Condominium[]> {
     try {
       const scopedCondoId = this.getAdminScopeCondoId();
-      if (scopedCondoId) {
-        const condo = await SupabaseService.getCondominium(scopedCondoId);
-        return condo ? [condo] : [];
+      
+      if (this.isBackendHealthy) {
+        if (scopedCondoId) {
+          const condo = await SupabaseService.getCondominium(scopedCondoId);
+          if (condo) {
+            await db.condominiums.put(condo);
+          }
+          return condo ? [condo] : [];
+        }
+        
+        const condos = await SupabaseService.adminGetAllCondominiums();
+        if (condos && condos.length > 0) {
+          await db.condominiums.bulkPut(condos);
+        }
+        return condos;
+      } else {
+        // --- OFFLINE FALLBACK ---
+        if (scopedCondoId) {
+          const condo = await db.condominiums.get(scopedCondoId);
+          return condo ? [condo] : [];
+        }
+        const localCondos = await db.condominiums.toArray();
+        return localCondos.sort((a, b) => a.name.localeCompare(b.name));
       }
-      return await SupabaseService.adminGetAllCondominiums();
     } catch (e) {
-      logger.error('Failed to fetch condominiums (online required)', e, ErrorCategory.ADMIN);
+      logger.error('Failed to fetch condominiums', e, ErrorCategory.ADMIN);
       return [];
     }
   }
@@ -3817,11 +3836,11 @@ class DataService {
     }
   }
 
-  async adminGetCondominiumSubscriptions(): Promise<CondominiumSubscription[]> {
+  async adminGetCondominiumSubscriptions(filters?: { year?: number, month?: number }): Promise<CondominiumSubscription[]> {
     try {
       // Apply admin scoping if needed (Super Admins see all by default if getAdminScopeCondoId returns null)
       const scopedCondoId = this.getAdminScopeCondoId();
-      const subscriptions = await SupabaseService.adminGetCondominiumSubscriptions();
+      const subscriptions = await SupabaseService.adminGetCondominiumSubscriptions(filters);
       if (scopedCondoId) {
         return subscriptions.filter(s => s.condominium_id === scopedCondoId);
       }
@@ -3903,6 +3922,24 @@ class DataService {
     } catch (e) {
       logger.error('Failed to create subscription payment', e, ErrorCategory.ADMIN);
       return null;
+    }
+  }
+
+  async adminSendSubscriptionAlert(condominiumId: number, staffId: number): Promise<{ success: boolean; message: string; total_alerts?: number; blocked?: boolean }> {
+    try {
+      const res = await SupabaseService.adminSendSubscriptionAlert(condominiumId, staffId);
+      if (res.success) {
+        await this.logAudit({
+          condominium_id: condominiumId,
+          action: 'SEND_ALERT',
+          target_table: 'subscription_alerts',
+          details: { message: res.message, total_alerts: res.total_alerts, blocked: res.blocked }
+        });
+      }
+      return res;
+    } catch (e) {
+      logger.error('Failed to send subscription alert', e, ErrorCategory.ADMIN);
+      return { success: false, message: 'Erro interno ao processar alerta' };
     }
   }
 }

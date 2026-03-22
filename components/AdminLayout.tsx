@@ -145,7 +145,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           path: '/admin/config/service-types',
           icon: <Settings size={18} />
         },
-        ...(user?.role === UserRole.SUPER_ADMIN ? [{
+        ...((user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.ADMIN) ? [{
           label: 'Assinaturas',
           path: '/admin/subscriptions',
           icon: <ClipboardList size={18} />

@@ -12,6 +12,7 @@ import {
   CheckCircle2, 
   XCircle, 
   AlertCircle,
+  AlertTriangle,
   Users,
   CreditCard,
   Search,
@@ -149,7 +150,7 @@ export default function AdminSubscriptions() {
   const showSuccess = (msg: string) => showToast('success', msg);
   const showError = (msg: string) => showToast('error', msg);
   
-  const [activeTab, setActiveTab] = useState<'subscriptions'|'rules'|'payments'|'reports'>('subscriptions');
+  const [activeTab, setActiveTab] = useState<'subscriptions'|'rules'|'payments'|'reports'>(user?.role === UserRole.ADMIN ? 'payments' : 'subscriptions');
   const [loading, setLoading] = useState(true);
   
   // Data states
@@ -171,6 +172,9 @@ export default function AdminSubscriptions() {
     status: 'ALL' as string,
     paymentStatus: 'ALL' as string
   });
+  
+  const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
+  const [filterMonth, setFilterMonth] = useState<number>(new Date().getMonth() + 1);
   
   // Rule Form State
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
@@ -207,7 +211,7 @@ export default function AdminSubscriptions() {
   const [selectedArrearsSub, setSelectedArrearsSub] = useState<CondominiumSubscription | null>(null);
 
   // Security Check
-  if (user?.role !== UserRole.SUPER_ADMIN) {
+  if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.ADMIN) {
     return <Navigate to="/admin" replace />;
   }
 
@@ -215,7 +219,7 @@ export default function AdminSubscriptions() {
     setLoading(true);
     try {
       const [subsData, rulesData] = await Promise.all([
-        api.adminGetCondominiumSubscriptions(),
+        api.adminGetCondominiumSubscriptions({ year: filterYear, month: filterMonth }),
         api.getAppPricingRules()
       ]);
       setSubscriptions(subsData);
@@ -248,7 +252,7 @@ export default function AdminSubscriptions() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [filterYear, filterMonth]);
 
   useEffect(() => {
     if (activeTab === 'payments' || activeTab === 'reports') {
@@ -443,6 +447,51 @@ export default function AdminSubscriptions() {
     );
   };
 
+  const handleSendAlert = async (sub: CondominiumSubscription) => {
+    if (!sub.condominium_id) return;
+
+    showConfirm(
+      `Deseja enviar um alerta de pagamento em atraso para o condomínio "${sub.condominium_name}"? 
+      Isso registará o envio no sistema e abrirá o seu cliente de email.`,
+      async () => {
+        try {
+          const res = await api.adminSendSubscriptionAlert(sub.condominium_id, user!.id);
+          
+          if (res.success) {
+            showSuccess(res.message);
+            // Refresh data to show potentially updated status
+            loadData();
+
+            // Attempt to send email via mailto:
+            // We need the manager email. We'll try to find it in the subscription details if added, 
+            // but for now we'll use a generic approach or assume it's in a field we can join.
+            // Since we don't have the email directly in 'sub', we'll notify the user if it's missing or use a placeholder.
+            // Ideally, we'd fetch the condo details.
+            const condoDetails = await api.adminGetAllCondominiums();
+            const condo = condoDetails.find(c => c.id === sub.condominium_id);
+            
+            if (condo?.contact_email) {
+              const subject = encodeURIComponent(`ALERTA DE PAGAMENTO: ${sub.condominium_name}`);
+              const monthsDetail = sub.missing_months_list ? `\n\nMeses pendentes: ${sub.missing_months_list}` : '';
+              const body = encodeURIComponent(`Prezado Gestor do ${sub.condominium_name},\n\nIdentificamos que a subscrição da plataforma APPGUARD apresenta ${sub.months_in_arrears} meses em atraso.${monthsDetail}\n\nSolicitamos a regularização imediata do pagamento para evitar a suspensão dos serviços e o bloqueio do acesso ao condomínio.\n\nNote que após 3 alertas sem regularização, o sistema será bloqueado automaticamente.\n\nAtenciosamente,\nAdministração EliteCondoGuard`);
+              window.location.href = `mailto:${condo.contact_email}?subject=${subject}&body=${body}`;
+            } else {
+              showToast('warning', 'Alerta registado, mas o email do gestor não foi encontrado.');
+            }
+
+            if (res.blocked) {
+              showToast('warning', 'O condomínio foi BLOQUEADO automaticamente após o 3º alerta.', 10000);
+            }
+          } else {
+            showError(res.message);
+          }
+        } catch (error) {
+          showError('Erro ao processar o alerta');
+        }
+      }
+    );
+  };
+
   return (
     <div className="p-4 md:p-8 w-full max-w-[1600px] mx-auto space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -456,52 +505,55 @@ export default function AdminSubscriptions() {
           </p>
         </div>
         
-        <div className="flex bg-white dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm w-fit">
-          <button
-            onClick={() => setActiveTab('subscriptions')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'subscriptions' 
-                ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
-            }`}
-          >
-            <Building2 size={16} />
-            <span className="hidden sm:inline">Condomínios</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('rules')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'rules' 
-                ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
-            }`}
-          >
-            <Settings size={16} />
-            <span className="hidden sm:inline">Regras de Preço</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('payments')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'payments' 
-                ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
-            }`}
-          >
-            <Receipt size={16} />
-            <span className="hidden sm:inline">Pagamentos</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('reports')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === 'reports' 
-                ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
-            }`}
-          >
-            <BarChart size={16} />
-            <span className="hidden sm:inline">Relatórios</span>
-          </button>
-        </div>
+        {/* Tabs */}
+        {user?.role === UserRole.SUPER_ADMIN && (
+          <div className="flex bg-white dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm w-fit">
+            <button
+              onClick={() => setActiveTab('subscriptions')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'subscriptions' 
+                  ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+              }`}
+            >
+              <Building2 size={16} />
+              <span className="hidden sm:inline">Condomínios</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('rules')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'rules' 
+                  ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+              }`}
+            >
+              <Settings size={16} />
+              <span className="hidden sm:inline">Regras de Preço</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'payments' 
+                  ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+              }`}
+            >
+              <Receipt size={16} />
+              <span className="hidden sm:inline">Pagamentos</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('reports')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'reports' 
+                  ? 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' 
+                  : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300'
+              }`}
+            >
+              <BarChart size={16} />
+              <span className="hidden sm:inline">Relatórios</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -525,9 +577,9 @@ export default function AdminSubscriptions() {
           </div>
           
           {/* Dashboard Filters Bar */}
-          <div className="p-4 border-b border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-slate-50/30 dark:bg-slate-800/20">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Filtrar Condomínio</label>
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-4 items-end bg-slate-50/30 dark:bg-slate-800/20">
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Condomínio</label>
               <SearchableSelect
                 options={[
                   { value: 'ALL', label: 'Todos os Condomínios' },
@@ -538,41 +590,79 @@ export default function AdminSubscriptions() {
                 placeholder="Todos os Condomínios"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Estado Subscrição</label>
-                <select
-                  value={subFilters.status}
-                  onChange={(e) => setSubFilters(prev => ({ ...prev, status: e.target.value }))}
-                  className="w-full px-3 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                >
-                  <option value="ALL">Todos os Estados</option>
-                  <option value="ACTIVE">Ativo</option>
-                  <option value="TRIAL">Período de Teste</option>
-                  <option value="INACTIVE">Inativo</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Estado Pagamento</label>
-                <select
-                  value={subFilters.paymentStatus}
-                  onChange={(e) => setSubFilters(prev => ({ ...prev, paymentStatus: e.target.value }))}
-                  className="w-full px-3 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                >
-                  <option value="ALL">Todos</option>
-                  <option value="PAID">Pago</option>
-                  <option value="PARTIAL">Parcial</option>
-                  <option value="PENDING">Pendente</option>
-                </select>
-              </div>
+            
+            <div className="w-32">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Ano</label>
+              <select
+                value={filterYear}
+                onChange={(e) => setFilterYear(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                {Array.from({ length: Math.max(1, new Date().getFullYear() - 2024) }, (_, i) => new Date().getFullYear() - i).map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
             </div>
-            <div className="flex items-center gap-2">
+            
+            <div className="w-36">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Mês</label>
+              <select
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                {[
+                  { value: 1, label: 'Janeiro' }, { value: 2, label: 'Fevereiro' },
+                  { value: 3, label: 'Março' }, { value: 4, label: 'Abril' },
+                  { value: 5, label: 'Maio' }, { value: 6, label: 'Junho' },
+                  { value: 7, label: 'Julho' }, { value: 8, label: 'Agosto' },
+                  { value: 9, label: 'Setembro' }, { value: 10, label: 'Outubro' },
+                  { value: 11, label: 'Novembro' }, { value: 12, label: 'Dezembro' }
+                ].map(m => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="w-40">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Subscrição</label>
+              <select
+                value={subFilters.status}
+                onChange={(e) => setSubFilters(prev => ({ ...prev, status: e.target.value }))}
+                className="w-full px-3 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="ALL">Todos Estados</option>
+                <option value="ACTIVE">Ativo</option>
+                <option value="TRIAL">Teste</option>
+                <option value="INACTIVE">Inativo</option>
+              </select>
+            </div>
+
+            <div className="w-40">
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Pagamento</label>
+              <select
+                value={subFilters.paymentStatus}
+                onChange={(e) => setSubFilters(prev => ({ ...prev, paymentStatus: e.target.value }))}
+                className="w-full px-3 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="ALL">Todos</option>
+                <option value="PAID">Pago</option>
+                <option value="PARTIAL">Parcial</option>
+                <option value="PENDING">Pendente</option>
+              </select>
+            </div>
+
+            <div className="flex items-center">
               <button
-                onClick={() => setSubFilters({ condominium_id: '', status: 'ALL', paymentStatus: 'ALL' })}
-                className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 flex items-center gap-2"
+                onClick={() => { 
+                  setSubFilters({ condominium_id: '', status: 'ALL', paymentStatus: 'ALL' });
+                  setFilterYear(new Date().getFullYear());
+                  setFilterMonth(new Date().getMonth() + 1);
+                }}
+                className="h-[38px] px-4 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors border border-slate-200 dark:border-slate-700 flex items-center gap-2"
               >
                 <Filter size={14} />
-                Limpar Filtros
+                Limpar
               </button>
             </div>
           </div>
@@ -653,7 +743,7 @@ export default function AdminSubscriptions() {
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Preço Total Mensal</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Último Pagamento</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Atraso</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Mês Actual</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Estado ({filterMonth.toString().padStart(2, '0')}/{filterYear})</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Estado Subscrição</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Ações</th>
                 </tr>
@@ -714,16 +804,34 @@ export default function AdminSubscriptions() {
                         </td>
                         <td className="px-6 py-4 text-center">
                           {sub.months_in_arrears && sub.months_in_arrears > 0 ? (
-                            <button 
-                              onClick={() => {
-                                setSelectedArrearsSub(sub);
-                                setIsArrearsModalOpen(true);
-                              }}
-                              className="inline-block px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200 transition-colors shadow-sm"
-                              title="Clique para ver detalhes"
-                            >
-                              {sub.months_in_arrears} {sub.months_in_arrears === 1 ? 'mês' : 'meses'}
-                            </button>
+                            <div className="flex flex-col items-center gap-2">
+                              <button 
+                                onClick={() => {
+                                  setSelectedArrearsSub(sub);
+                                  setIsArrearsModalOpen(true);
+                                }}
+                                className="inline-block px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold hover:bg-red-200 transition-colors shadow-sm"
+                                title="Clique para ver detalhes"
+                              >
+                                {sub.months_in_arrears} {sub.months_in_arrears === 1 ? 'mês' : 'meses'}
+                              </button>
+                              
+                              {sub.months_in_arrears >= 5 && (
+                                <button
+                                  onClick={() => handleSendAlert(sub)}
+                                  disabled={sub.alerts_sent && sub.alerts_sent >= 3}
+                                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-colors shadow-sm ${
+                                    sub.alerts_sent && sub.alerts_sent >= 3
+                                      ? 'bg-red-500 text-white cursor-not-allowed opacity-80'
+                                      : 'bg-amber-500 hover:bg-amber-600 text-white'
+                                  }`}
+                                  title={sub.alerts_sent && sub.alerts_sent >= 3 ? "Limite de alertas atingido (Subscrição Cancelada)" : "Enviar Alerta de Pagamento"}
+                                >
+                                  <AlertTriangle size={12} />
+                                  {sub.alerts_sent && sub.alerts_sent >= 3 ? 'CANCELADA' : `ALERTA (${sub.alerts_sent || 0}/3)`}
+                                </button>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-slate-400 text-xs">-</span>
                           )}
@@ -871,26 +979,41 @@ export default function AdminSubscriptions() {
                 ))}
               </select>
             </div>
-            <div className="flex-[2] min-w-[240px]">
-              <label className="block text-xs font-bold text-text-dim uppercase mb-2">Condomínio</label>
-              <SearchableSelect
-                options={[
-                  { value: 'ALL', label: 'Todos os Condomínios' },
-                  ...subscriptions.map(s => ({ value: s.condominium_id, label: s.condominium_name || `Condomínio ${s.condominium_id}` }))
-                ]}
-                value={paymentFilters.condominium_id ? Number(paymentFilters.condominium_id) : 'ALL'}
-                onChange={(val) => setPaymentFilters(p => ({ ...p, condominium_id: val === 'ALL' ? '' : String(val) }))}
-                placeholder="Todos os Condomínios"
-                searchPlaceholder="Pesquisar condomínio..."
-                alwaysVisibleValues={['ALL']}
-              />
-            </div>
+            {user?.role !== UserRole.ADMIN && (
+              <div className="flex-[2] min-w-[240px]">
+                <label className="block text-xs font-bold text-text-dim uppercase mb-2">Condomínio</label>
+                <SearchableSelect
+                  options={[
+                    { value: 'ALL', label: 'Todos os Condomínios' },
+                    ...subscriptions.map(s => ({ value: s.condominium_id, label: s.condominium_name || `Condomínio ${s.condominium_id}` }))
+                  ]}
+                  value={paymentFilters.condominium_id ? Number(paymentFilters.condominium_id) : 'ALL'}
+                  onChange={(val) => setPaymentFilters(p => ({ ...p, condominium_id: val === 'ALL' ? '' : String(val) }))}
+                  placeholder="Todos os Condomínios"
+                  searchPlaceholder="Pesquisar condomínio..."
+                  alwaysVisibleValues={['ALL']}
+                />
+              </div>
+            )}
             <button
               onClick={() => {
                 const defaultMonth = paymentFilters.month === 'ALL' ? new Date().getMonth() + 1 : paymentFilters.month;
+                const isAdmin = user?.role === UserRole.ADMIN;
+                const defaultCondoId = isAdmin && subscriptions.length === 1 ? String(subscriptions[0].condominium_id) : '';
+                
+                let defaultAmount = 0;
+                let defaultCurrency = 'AOA';
+                if (defaultCondoId) {
+                  const info = calculateSubscriptionPrice(subscriptions[0]);
+                  defaultAmount = info.price;
+                  defaultCurrency = info.currency;
+                }
+
                 setPaymentFormData(prev => ({ 
                   ...prev, 
-                  amount: 0, 
+                  amount: defaultAmount,
+                  currency: defaultCurrency,
+                  condominium_id: defaultCondoId,
                   reference_period: `${paymentFilters.year}-${String(defaultMonth).padStart(2, '0')}`, 
                   notes: '' 
                 }));
@@ -1025,8 +1148,8 @@ export default function AdminSubscriptions() {
                 onChange={(e) => setPaymentFilters(p => ({ ...p, year: Number(e.target.value) }))}
                 className="w-full px-4 py-2 border border-border-main bg-bg-surface text-text-main rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               >
-                {Array.from({ length: (new Date().getFullYear() + 1) - 2025 + 1 }, (_, i) => 2025 + i).map(y => (
-                  <option key={y} value={y}>{y}</option>
+                {Array.from({ length: Math.max(1, new Date().getFullYear() - 2024) }, (_, i) => new Date().getFullYear() - i).map(year => (
+                  <option key={year} value={year}>{year}</option>
                 ))}
               </select>
             </div>
@@ -1255,31 +1378,33 @@ export default function AdminSubscriptions() {
             >
               {/* Scrollable Body */}
               <div className="p-6 space-y-4 overflow-y-auto flex-1 pb-10">
-                <div>
-                  <label className="block text-sm font-medium text-text-main mb-2">Condomínio <span className="text-red-500">*</span></label>
-                  <SearchableSelect
-                    options={subscriptions.map(s => ({ value: s.condominium_id, label: s.condominium_name || String(s.condominium_id) }))}
-                    value={paymentFormData.condominium_id ? Number(paymentFormData.condominium_id) : null}
-                    onChange={(val) => {
-                      const subId = val ? String(val) : '';
-                      const sub = subscriptions.find(s => String(s.condominium_id) === subId);
-                      if (sub) {
-                        const priceInfo = calculateSubscriptionPrice(sub);
-                        setPaymentFormData(prev => ({ 
-                          ...prev, 
-                          condominium_id: subId,
-                          amount: priceInfo.price,
-                          currency: priceInfo.currency
-                        }));
-                      } else {
-                        setPaymentFormData(prev => ({ ...prev, condominium_id: subId }));
-                      }
-                    }}
-                    placeholder="Selecione um condomínio"
-                    searchPlaceholder="Pesquisar condomínio..."
-                    emptyMessage="Nenhum condomínio encontrado"
-                  />
-                </div>
+                {user?.role !== UserRole.ADMIN && (
+                  <div>
+                    <label className="block text-sm font-medium text-text-main mb-2">Condomínio <span className="text-red-500">*</span></label>
+                    <SearchableSelect
+                      options={subscriptions.map(s => ({ value: s.condominium_id, label: s.condominium_name || String(s.condominium_id) }))}
+                      value={paymentFormData.condominium_id ? Number(paymentFormData.condominium_id) : null}
+                      onChange={(val) => {
+                        const subId = val ? String(val) : '';
+                        const sub = subscriptions.find(s => String(s.condominium_id) === subId);
+                        if (sub) {
+                          const priceInfo = calculateSubscriptionPrice(sub);
+                          setPaymentFormData(prev => ({ 
+                            ...prev, 
+                            condominium_id: subId,
+                            amount: priceInfo.price,
+                            currency: priceInfo.currency
+                          }));
+                        } else {
+                          setPaymentFormData(prev => ({ ...prev, condominium_id: subId }));
+                        }
+                      }}
+                      placeholder="Selecione um condomínio"
+                      searchPlaceholder="Pesquisar condomínio..."
+                      emptyMessage="Nenhum condomínio encontrado"
+                    />
+                  </div>
+                )}
 
                 {paymentFormData.condominium_id && (
                   <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 space-y-2">
