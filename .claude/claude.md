@@ -19,9 +19,17 @@ npm run build
 
 # Preview production build
 npm run preview
+
+# Lint TypeScript/TSX files (max-warnings=0)
+npm run lint
+
+# Lint and auto-fix
+npm run lint:fix
 ```
 
 **Important**: The dev server runs on `https://0.0.0.0:3000` with self-signed SSL certificate to enable camera access on tablets.
+
+**ESLint Hook**: ESLint runs automatically after every `Edit`/`Write` on `.ts`/`.tsx` files (PostToolUse hook). Output is prefixed `[ESLint]`. Editing `.env*` files is blocked by a PreToolUse safety hook.
 
 ## Environment Variables
 
@@ -1111,7 +1119,7 @@ HashRouter (# based URLs for compatibility)
 - Avoid adding console.log statements to any files
 - Existing console logs in dataService.ts are for debugging only
 - Use proper error handling instead of console logging
-- Always run `pnpm lint` and `pnpm test` before committing.
+- Always run `npm run lint` before committing (or let the PostToolUse hook catch issues automatically).
 
 ### When Adding Features
 
@@ -1815,25 +1823,29 @@ This project integrates with Claude Code via the Model Context Protocol (MCP) fo
 
 **Configuration**: See `docs/MCP.md` for setup instructions.
 
-**Available Skills**:
-- `/notion-task` - Automated workflow for starting work on Notion tasks
+**Available Skills** (user-invocable slash commands):
+- `/notion-task [task]` - Start work on a Notion task (query, update status, link commits)
+- `/db-migrate [path]` - Apply a SQL migration file to Supabase with confirmation and verification
+- `/deploy-test` - Deploy to Vercel preview environment for testing
+- `/create-new-branch [name]` - Create a new git branch
+- `/create-commit-push-pr [message]` - Commit, push, and open a PR
+- `/simplify` - Review changed code for reuse, quality, and efficiency
+
+**Auto-Triggered Skills** (not user-invocable):
+- `sync-debug` - Automatically triggered when sync/offline issues are reported. Runs SQL diagnostics, checks health score, verifies heartbeat, suggests fixes.
+
+**Available Agents** (use with Agent tool or automatically):
+- `pwa-qa-reviewer` - PWA quality assurance for offline-first patterns, Service Worker config, Dexie schema safety, caching strategies, and tablet UX. Use **proactively** before deployments or after changes to `vite.config.ts`, `dataService.ts`, `db.ts`, or any sync-related code.
+- `code-architect` - Feature architecture design with implementation blueprints
+- `fullstack-developer` - Full-stack feature implementation
+- `frontend-developer` - React UI components and responsive design
+- `security-auditor` - Security reviews, auth flows, OWASP compliance
+- `supabase-realtime-optimizer` - Supabase realtime performance and subscription optimization
 
 **Setup Requirements**:
-1. Notion integration token configured
+1. Notion integration token configured (for `/notion-task`)
 2. MCP server enabled in Claude Code settings
-3. Database connection established
-
-**Usage**:
-```bash
-# In Claude Code
-/notion-task [task-name]
-```
-
-This enables Claude to:
-- Query Notion databases for tasks
-- Update task status automatically
-- Link commits to Notion pages
-- Track work progress
+3. Supabase MCP (`mcp__claude_ai_Supabase__*`) configured for `/db-migrate`
 
 ---
 
@@ -1896,4 +1908,4 @@ This enables Claude to:
 **Project**: Elite AccessControl
 **Version**: 0.0.0 (Alpha)
 **License**: Proprietary - All rights reserved
-**Last Updated**: 2026-02
+**Last Updated**: 2026-03
