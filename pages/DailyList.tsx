@@ -12,6 +12,7 @@ export default function DailyList() {
   const { showToast, showConfirm } = useToast();
   const [visits, setVisits] = useState<Visit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [photoModal, setPhotoModal] = useState<{ url: string; name: string } | null>(null);
   const [eventModal, setEventModal] = useState<{
     isOpen: boolean;
     visit: Visit | null;
@@ -194,7 +195,12 @@ export default function DailyList() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     {visit.photo_url ? (
-                      <img src={visit.photo_url} alt="v" className="w-12 h-12 rounded-full object-cover bg-slate-200" />
+                      <img
+                        src={visit.photo_url}
+                        alt="v"
+                        className="w-12 h-12 rounded-full object-cover bg-slate-200 cursor-pointer ring-2 ring-transparent hover:ring-blue-400 transition-all"
+                        onClick={() => setPhotoModal({ url: visit.photo_url!, name: visit.visitor_name })}
+                      />
                     ) : (
                       <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500">
                         {visit.visitor_name[0]}
@@ -281,7 +287,12 @@ export default function DailyList() {
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         {visit.photo_url ? (
-                          <img src={visit.photo_url} alt="v" className="w-12 h-12 rounded-full object-cover bg-slate-200" />
+                          <img
+                            src={visit.photo_url}
+                            alt="v"
+                            className="w-12 h-12 rounded-full object-cover bg-slate-200 cursor-pointer ring-2 ring-transparent hover:ring-blue-400 transition-all"
+                            onClick={() => setPhotoModal({ url: visit.photo_url!, name: visit.visitor_name })}
+                          />
                         ) : (
                           <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500">
                             {visit.visitor_name[0]}
@@ -359,6 +370,29 @@ export default function DailyList() {
             </table>
           </div>
         </>
+      )}
+
+      {/* Photo Zoom Modal */}
+      {photoModal && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          onClick={() => setPhotoModal(null)}
+        >
+          <div className="relative max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPhotoModal(null)}
+              className="absolute -top-3 -right-3 bg-white rounded-full p-1.5 shadow-lg text-slate-600 hover:text-slate-900 transition-colors z-10"
+            >
+              <X size={20} />
+            </button>
+            <img
+              src={photoModal.url}
+              alt={photoModal.name}
+              className="w-full rounded-xl object-contain max-h-[80vh]"
+            />
+            <p className="text-center text-white font-bold mt-3 text-lg">{photoModal.name}</p>
+          </div>
+        </div>
       )}
 
       {/* Event History Modal */}
