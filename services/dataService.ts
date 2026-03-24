@@ -23,12 +23,13 @@ class DataService {
   private currentDeviceId: string | null = null; // Track device ID (UUID) for visit tracking
   private isSyncing: boolean = false; // Prevent concurrent syncs
   private readonly pendingAuditLogsKey = 'pending_audit_logs';
+  private readonly initPromise: Promise<void>;
 
   constructor() {
     logger.setContext({ service: 'DataService' });
     window.addEventListener('online', () => this.setOnlineStatus(true));
     window.addEventListener('offline', () => this.setOnlineStatus(false));
-    this.init();
+    this.initPromise = this.init();
   }
 
   /**
@@ -57,6 +58,14 @@ class DataService {
 
     this.startHealthCheck();
     this.startHeartbeat();
+  }
+
+  private async ensureCondoContext() {
+    await this.initPromise;
+
+    if (!this.currentCondoId) {
+      await this.getDeviceCondoDetails();
+    }
   }
 
   /**
@@ -1223,6 +1232,8 @@ class DataService {
 
   // --- News ---
   async getNews(): Promise<CondominiumNews[]> {
+    await this.ensureCondoContext();
+
     // Calculate 7 days ago for filtering
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -1271,9 +1282,11 @@ class DataService {
     if (!this.isBackendHealthy) return;
     try {
       const news = await SupabaseService.getNews(condoId, 7);
+
+      // Keep the local cache aligned with the backend, including empty results.
+      await db.news.where('condominium_id').equals(condoId).delete();
+
       if (news.length) {
-        // Clear old news for this condo first, then add fresh
-        await db.news.where('condominium_id').equals(condoId).delete();
         await db.news.bulkPut(news);
       }
     } catch (e) {

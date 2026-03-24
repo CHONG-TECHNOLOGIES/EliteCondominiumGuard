@@ -6,6 +6,37 @@ import { logger, ErrorCategory } from '@/services/logger';
 
 logger.setContext({ service: 'Supabase' });
 
+const VISIT_STATUS_ALIASES: Record<string, VisitStatus> = {
+  PENDING: VisitStatus.PENDING,
+  APPROVED: VisitStatus.APPROVED,
+  DENIED: VisitStatus.DENIED,
+  INSIDE: VisitStatus.INSIDE,
+  LEFT: VisitStatus.LEFT,
+  [VisitStatus.PENDING]: VisitStatus.PENDING,
+  [VisitStatus.APPROVED]: VisitStatus.APPROVED,
+  [VisitStatus.DENIED]: VisitStatus.DENIED,
+  [VisitStatus.INSIDE]: VisitStatus.INSIDE,
+  [VisitStatus.LEFT]: VisitStatus.LEFT
+};
+
+const normalizeVisitStatus = (status: unknown): VisitStatus => {
+  if (typeof status !== 'string') {
+    return VisitStatus.PENDING;
+  }
+
+  return VISIT_STATUS_ALIASES[status] ?? VisitStatus.PENDING;
+};
+
+const normalizeVisit = (visit: Visit): Visit => ({
+  ...visit,
+  status: normalizeVisitStatus(visit.status)
+});
+
+const normalizeVisitEvent = (event: VisitEvent): VisitEvent => ({
+  ...event,
+  status: normalizeVisitStatus(event.status)
+});
+
 const getStoragePathFromPublicUrl = (publicUrl: string, bucket: string): string | null => {
   if (!publicUrl) return null;
 
@@ -580,7 +611,7 @@ export const SupabaseService = {
 
       if (error) throw error;
 
-      return (data || []).map((v: any) => ({
+      return (data || []).map((v: any) => normalizeVisit({
         ...v,
         visit_type: v.visit_type_name || 'Desconhecido',
         service_type: v.service_type_name,
@@ -696,7 +727,7 @@ export const SupabaseService = {
         .rpc('get_visit_events', { p_visit_id: visitId });
 
       if (error) throw error;
-      return (data as VisitEvent[]) || [];
+      return ((data as VisitEvent[]) || []).map(normalizeVisitEvent);
     } catch (err: any) {
       logger.error('Get Visit Events Error', err, ErrorCategory.NETWORK);
       return [];
@@ -1318,7 +1349,7 @@ export const SupabaseService = {
         logger.info('Sample visit', { detail: String(data[0]) });
       }
 
-      return (data || []) as Visit[];
+      return ((data || []) as Visit[]).map(normalizeVisit);
     } catch (err: any) {
       logger.error("Error fetching visits via RPC:", {
         message: err.message,
@@ -1379,7 +1410,7 @@ export const SupabaseService = {
       }
 
       logger.info('RPC returned filtered visits', { count: data?.length || 0 });
-      return (data || []) as Visit[];
+      return ((data || []) as Visit[]).map(normalizeVisit);
     } catch (err: any) {
       logger.error('Error fetching filtered visits via RPC:', {
         message: err.message,
@@ -2160,7 +2191,7 @@ export const SupabaseService = {
 
       if (error) throw error;
 
-      const visit = data as Visit;
+      const visit = normalizeVisit(data as Visit);
 
       // Create notifications based on status change
       if (status === VisitStatus.INSIDE) {
