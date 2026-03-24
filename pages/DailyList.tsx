@@ -1,16 +1,17 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/dataService';
 import { Visit, VisitEvent, VisitStatus, SyncStatus } from '../types';
 import { initiatePhoneCall } from '@/utils/approvalModes';
-import { CheckCircle, LogOut, Clock, AlertCircle, User, MapPin, ArrowLeft, Phone, History, X } from 'lucide-react';
+import { CheckCircle, LogOut, Clock, AlertCircle, User, MapPin, ArrowLeft, Phone, History, X, Search } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
 export default function DailyList() {
   const navigate = useNavigate();
   const { showToast, showConfirm } = useToast();
   const [visits, setVisits] = useState<Visit[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [eventModal, setEventModal] = useState<{
     isOpen: boolean;
     visit: Visit | null;
@@ -28,6 +29,16 @@ export default function DailyList() {
     const interval = setInterval(loadVisits, 30000); // Auto refresh list
     return () => clearInterval(interval);
   }, []);
+
+  const filteredVisits = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return visits;
+    const digitsOnly = term.replace(/\D/g, '');
+    return visits.filter(v =>
+      v.visitor_name.toLowerCase().includes(term) ||
+      (digitsOnly && v.visitor_phone?.replace(/\D/g, '').includes(digitsOnly))
+    );
+  }, [visits, searchTerm]);
 
   const handleCheckout = async (id: number) => {
     showConfirm(
@@ -131,15 +142,54 @@ export default function DailyList() {
         <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Atividade de Hoje</h2>
       </div>
 
+      {/* Search Bar */}
+      {visits.length > 0 && (
+        <div className="relative mb-4">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Pesquisar por nome ou telefone..."
+            className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Result count when searching */}
+      {searchTerm.trim() && visits.length > 0 && (
+        <p className="text-sm text-slate-500 mb-3">
+          {filteredVisits.length} de {visits.length} visitas
+        </p>
+      )}
+
       {visits.length === 0 ? (
         <div className="p-8 text-center text-slate-400 font-medium bg-white rounded-2xl border border-slate-200">
           Nenhuma visita registada hoje.
+        </div>
+      ) : filteredVisits.length === 0 ? (
+        <div className="p-8 text-center bg-white rounded-2xl border border-slate-200">
+          <p className="text-slate-400 font-medium">Nenhum resultado para &ldquo;{searchTerm.trim()}&rdquo;</p>
+          <button
+            onClick={() => setSearchTerm('')}
+            className="mt-3 text-blue-600 font-medium text-sm hover:underline"
+          >
+            Limpar pesquisa
+          </button>
         </div>
       ) : (
         <>
           {/* Mobile Card View (< 768px) */}
           <div className="grid grid-cols-1 gap-4 md:hidden">
-            {visits.map(visit => (
+            {filteredVisits.map(visit => (
               <div key={visit.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col gap-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -226,7 +276,7 @@ export default function DailyList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {visits.map(visit => (
+                {filteredVisits.map(visit => (
                   <tr key={visit.id} className="hover:bg-slate-50 transition-colors">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
