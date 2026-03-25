@@ -229,6 +229,7 @@ export interface VisitEvent {
   status: VisitStatus;
   event_at: string;              // timestamptz
   actor_id?: number;             // INT4 (references staff)
+  actor_name?: string;           // Resolved display name for the acting guard
   device_id?: string;            // UUID (references devices)
   sync_status: SyncStatus;       // 'SINCRONIZADO' or 'PENDENTE_ENVIO'
 }

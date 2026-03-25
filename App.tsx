@@ -107,10 +107,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </div>
             <div className="flex flex-col justify-center">
               <span className="text-[10px] text-accent/80 font-bold uppercase tracking-widest leading-none hidden md:block mb-0.5">
-                Elite AccesControl
+                Entryflow
               </span>
               <h1 className="text-base md:text-xl font-bold tracking-tight text-white leading-tight truncate max-w-[180px] md:max-w-md">
-                {condoName || 'Elite AccesControl'}
+                {condoName || 'Entryflow'}
               </h1>
             </div>
           </div>

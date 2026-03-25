@@ -280,7 +280,7 @@ export function exportVisitsToPDF(visits: Visit[], filename?: string): void {
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.text(
-      `Página ${i} de ${pageCount} - Elite AccessControl`,
+      `Página ${i} de ${pageCount} - Entryflow`,
       doc.internal.pageSize.width / 2,
       doc.internal.pageSize.height - 10,
       { align: 'center' }

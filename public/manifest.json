@@ -1,6 +1,6 @@
 {
-  "name": "Elite AccesControl",
-  "short_name": "AccesControl",
+  "name": "Entryflow",
+  "short_name": "Entryflow",
   "description": "Sistema de gestão de portaria para condomínios e Edifícios - Modo offline-first",
   "start_url": "/#/",
   "display": "standalone",

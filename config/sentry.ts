@@ -4,7 +4,7 @@ export function initSentry() {
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
     environment: import.meta.env.DEV ? 'development' : 'production',
-    release: `eliteaccesscontrol@${import.meta.env.VITE_APP_VERSION || '1.0.0'}`,
+    release: `entryflow@${import.meta.env.VITE_APP_VERSION || '1.0.0'}`,
 
     // Send default PII data (e.g., automatic IP address collection)
     sendDefaultPii: true,

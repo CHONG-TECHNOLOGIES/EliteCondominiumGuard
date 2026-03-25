@@ -1622,7 +1622,8 @@ class DataService {
       if (this.isBackendHealthy && visitId > 0) {
         this.refreshVisitEvents(visitId);
       }
-      return localEvents.sort((a, b) =>
+      const enrichedLocalEvents = await this.populateVisitEventActorNames(localEvents);
+      return enrichedLocalEvents.sort((a, b) =>
         new Date(a.event_at).getTime() - new Date(b.event_at).getTime()
       );
     }
@@ -1640,19 +1641,66 @@ class DataService {
     try {
       const events = await SupabaseService.getVisitEvents(visitId);
       if (events.length) {
-        const normalized = events.map((event) => ({
+        const normalized = await this.populateVisitEventActorNames(events.map((event) => ({
           ...event,
           sync_status: SyncStatus.SYNCED
-        }));
+        })));
         await db.visitEvents.bulkPut(normalized);
+        return normalized.sort((a, b) =>
+          new Date(a.event_at).getTime() - new Date(b.event_at).getTime()
+        );
       }
-      return events.sort((a, b) =>
-        new Date(a.event_at).getTime() - new Date(b.event_at).getTime()
-      );
+      return [];
     } catch (e) {
       this.backendHealthScore--;
       return [];
     }
+  }
+
+  private getStaffDisplayName(staff?: Pick<Staff, 'first_name' | 'last_name'> | null): string | undefined {
+    if (!staff) return undefined;
+
+    const fullName = [staff.first_name, staff.last_name]
+      .map((value) => value?.trim())
+      .filter(Boolean)
+      .join(' ');
+
+    return fullName || undefined;
+  }
+
+  private async populateVisitEventActorNames(events: VisitEvent[]): Promise<VisitEvent[]> {
+    if (!events.length) return events;
+
+    const actorIds = Array.from(
+      new Set(
+        events
+          .map((event) => event.actor_id)
+          .filter((actorId): actorId is number => typeof actorId === 'number' && actorId > 0)
+      )
+    );
+
+    if (!actorIds.length) return events;
+
+    const staffRecords = await db.staff.bulkGet(actorIds);
+    const actorNames = new Map<number, string>();
+
+    staffRecords.forEach((staff) => {
+      const name = this.getStaffDisplayName(staff);
+      if (staff?.id && name) {
+        actorNames.set(staff.id, name);
+      }
+    });
+
+    const currentUser = this.getStoredUser();
+    const currentUserName = this.getStaffDisplayName(currentUser);
+    if (currentUser?.id && currentUserName && !actorNames.has(currentUser.id)) {
+      actorNames.set(currentUser.id, currentUserName);
+    }
+
+    return events.map((event) => ({
+      ...event,
+      actor_name: event.actor_name || (event.actor_id ? actorNames.get(event.actor_id) : undefined)
+    }));
   }
 
   private getVisitEventActorId(explicitActorId?: number): number | undefined {
@@ -1666,11 +1714,14 @@ class DataService {
     eventAt: string,
     actorId?: number
   ): Promise<void> {
+    const currentUser = this.getStoredUser();
+    const resolvedActorId = this.getVisitEventActorId(actorId);
     const event: VisitEvent = {
       visit_id: visitId,
       status,
       event_at: eventAt,
-      actor_id: this.getVisitEventActorId(actorId),
+      actor_id: resolvedActorId,
+      actor_name: resolvedActorId === currentUser?.id ? this.getStaffDisplayName(currentUser) : undefined,
       device_id: this.currentDeviceId || undefined,
       sync_status: SyncStatus.PENDING_SYNC
     };

@@ -749,8 +749,10 @@ export default function AdminVisits() {
                             {formatDateTime(event.event_at)}
                           </span>
                         </div>
-                        {event.actor_id && (
-                          <span className="text-xs text-text-dim">ID Guard: {event.actor_id}</span>
+                        {(event.actor_name || event.actor_id) && (
+                          <span className="text-xs text-text-dim">
+                            Guarda: {event.actor_name || event.actor_id}
+                          </span>
                         )}
                       </div>
                     </div>

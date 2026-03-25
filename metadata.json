@@ -1,5 +1,5 @@
 {
-  "name": "Elite AccesControl",
+  "name": "Entryflow",
   "description": "High-performance PWA for Condominium and Buildings Access Control in Kiosk Mode.",
   "requestFramePermissions": [
     "camera",
