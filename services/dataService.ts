@@ -1612,7 +1612,12 @@ class DataService {
     );
   }
 
-  async getVisitEvents(visitId: number): Promise<VisitEvent[]> {
+  async getVisitEvents(visitId: number, forceRefresh = false): Promise<VisitEvent[]> {
+    if (forceRefresh && this.isBackendHealthy && visitId > 0) {
+      const freshEvents = await this.refreshVisitEvents(visitId);
+      if (freshEvents.length > 0) return freshEvents;
+    }
+
     const localEvents = await db.visitEvents
       .where('visit_id')
       .equals(visitId)

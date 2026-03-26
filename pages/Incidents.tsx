@@ -116,28 +116,29 @@ export default function Incidents() {
           async (payload) => {
             logger.info('New incident received via realtime', { payload: payload.new });
 
-            // Verify if incident belongs to this condominium
-            // Get resident_id from payload and check condominium
+            // Verify if incident belongs to this condominium via RPC
             const newIncident = payload.new as any;
 
-            // Fetch resident info to check condominium
             if (newIncident.resident_id) {
               try {
-                const { data: resident } = await supabase
-                  .from('residents')
-                  .select('condominium_id')
-                  .eq('id', newIncident.resident_id)
-                  .single();
+                const { data, error } = await supabase
+                  .rpc('get_resident', { p_id: newIncident.resident_id });
+
+                if (error) throw error;
+                const resident = data && data.length > 0 ? data[0] : null;
 
                 if (resident?.condominium_id === condoId) {
                   logger.info('Incident belongs to this condominium - triggering alert');
-
-                  // Play alert IMMEDIATELY when new incident arrives
                   playAlertSound();
                   vibrateDevice();
                   showNewIncidentBanner();
-
-                  // Then reload incidents to update the list
+                  loadIncidents();
+                } else if (!resident) {
+                  // Resident not found — alert anyway to be safe
+                  logger.warn('Resident not found via RPC, alerting anyway');
+                  playAlertSound();
+                  vibrateDevice();
+                  showNewIncidentBanner();
                   loadIncidents();
                 } else {
                   logger.debug('Incident from different condominium - ignoring');
@@ -163,19 +164,19 @@ export default function Incidents() {
           async (payload) => {
             logger.info('Incident updated via realtime', { payload: payload.new });
 
-            // Verify if incident belongs to this condominium
+            // Verify if incident belongs to this condominium via RPC
             const updatedIncident = payload.new as any;
 
             if (updatedIncident.resident_id) {
               try {
-                const { data: resident } = await supabase
-                  .from('residents')
-                  .select('condominium_id')
-                  .eq('id', updatedIncident.resident_id)
-                  .single();
+                const { data, error } = await supabase
+                  .rpc('get_resident', { p_id: updatedIncident.resident_id });
 
-                if (resident?.condominium_id === condoId) {
-                  // Reload incidents when one is updated
+                if (error) throw error;
+                const resident = data && data.length > 0 ? data[0] : null;
+
+                if (!resident || resident.condominium_id === condoId) {
+                  // Reload incidents when one is updated (or resident unknown)
                   loadIncidents();
                 }
               } catch (err) {

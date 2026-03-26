@@ -26,7 +26,7 @@ export default function Dashboard() {
   const [activeVisits, setActiveVisits] = useState<Visit[]>([]);
   const [todaysVisitsCount, setTodaysVisitsCount] = useState(0);
   const [incidentsCount, setIncidentsCount] = useState(0);
-  const previousIncidentCountRef = useRef<number>(0);
+  const previousIncidentCountRef = useRef<number>(-1);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [latestNews, setLatestNews] = useState<CondominiumNews[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
@@ -75,8 +75,8 @@ export default function Dashboard() {
       const newIncidents = incidents.filter(inc => inc.status === 'new');
       const currentCount = newIncidents.length;
 
-      // Detect if new incidents appeared (only if we have previous data)
-      if (previousIncidentCountRef.current > 0 && currentCount > previousIncidentCountRef.current) {
+      // Detect if new incidents appeared (only if we have previous data, -1 = not yet loaded)
+      if (previousIncidentCountRef.current >= 0 && currentCount > previousIncidentCountRef.current) {
         const newIncidentCount = currentCount - previousIncidentCountRef.current;
         logger.info('New incident(s) detected', { newIncidentCount: newIncidentCount });
 

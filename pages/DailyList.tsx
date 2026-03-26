@@ -84,7 +84,7 @@ export default function DailyList() {
 
   const openEventModal = async (visit: Visit) => {
     setEventModal({ isOpen: true, visit, events: [], loading: true });
-    const events = await api.getVisitEvents(visit.id);
+    const events = await api.getVisitEvents(visit.id, true);
     setEventModal({ isOpen: true, visit, events, loading: false });
   };
 
@@ -446,11 +446,11 @@ export default function DailyList() {
                             {formatDateTime(event.event_at)}
                           </span>
                         </div>
-                        {(event.actor_name || event.actor_id) && (
-                          <span className="text-xs text-slate-400">
-                            Guarda: {event.actor_name || event.actor_id}
-                          </span>
-                        )}
+                        <span className="text-xs text-slate-400">
+                          {event.actor_name || event.actor_id
+                            ? `Guarda: ${event.actor_name || event.actor_id}`
+                            : 'Sistema'}
+                        </span>
                       </div>
                     </div>
                   ))}
