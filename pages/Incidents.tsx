@@ -9,6 +9,26 @@ import { supabase } from '../services/supabaseClient';
 import { audioService } from '../services/audioService';
 import { logger, ErrorCategory } from '@/services/logger';
 
+function renderGuardActionHistory(guardNotes: string) {
+  const entries = guardNotes
+    .split('\n---\n')
+    .map(entry => entry.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="space-y-2">
+      {entries.map((entry, index) => (
+        <div
+          key={`${index}-${entry.slice(0, 20)}`}
+          className="text-sm text-slate-700 whitespace-pre-wrap break-words"
+        >
+          {entry}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Incidents() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -408,7 +428,7 @@ export default function Incidents() {
                 {inc.guard_notes && (
                   <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm font-bold text-blue-800 mb-1">Ação do Guarda:</p>
-                    <p className="text-sm text-slate-700">{inc.guard_notes}</p>
+                    {renderGuardActionHistory(inc.guard_notes)}
                     {inc.resolved_at && (
                       <p className="text-xs text-slate-400 mt-1">
                         Fechado em: {new Date(inc.resolved_at).toLocaleString('pt-PT')}

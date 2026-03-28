@@ -4318,16 +4318,35 @@ $function$
 -- ----------------------------------------
 CREATE OR REPLACE FUNCTION public.update_incident_status(p_id uuid, p_status text, p_notes text DEFAULT NULL::text)
  RETURNS incidents
- LANGUAGE plpgsql
- SECURITY DEFINER
+  LANGUAGE plpgsql
+  SECURITY DEFINER
 AS $function$
 DECLARE
   v_row public.incidents;
+  v_existing_notes text;
+  v_next_notes text;
 BEGIN
+  SELECT guard_notes
+  INTO v_existing_notes
+  FROM public.incidents
+  WHERE id = p_id;
+
+  IF p_notes IS NULL OR btrim(p_notes) = '' THEN
+    v_next_notes := v_existing_notes;
+  ELSIF v_existing_notes IS NULL OR btrim(v_existing_notes) = '' THEN
+    v_next_notes := p_notes;
+  ELSE
+    v_next_notes := v_existing_notes || E'\n---\n' || p_notes;
+  END IF;
+
   UPDATE public.incidents
   SET
     status = p_status,
-    guard_notes = p_notes
+    guard_notes = v_next_notes,
+    resolved_at = CASE
+      WHEN p_status = 'resolved' AND resolved_at IS NULL THEN now()
+      ELSE resolved_at
+    END
   WHERE id = p_id
   RETURNING * INTO v_row;
 

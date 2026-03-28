@@ -239,6 +239,26 @@ export default function AdminIncidents() {
     }
   };
 
+  const renderGuardActionHistory = (guardNotes: string) => {
+    const entries = guardNotes
+      .split('\n---\n')
+      .map(entry => entry.trim())
+      .filter(Boolean);
+
+    return (
+      <div className="space-y-2">
+        {entries.map((entry, index) => (
+          <div
+            key={`${index}-${entry.slice(0, 20)}`}
+            className="text-sm text-text-main whitespace-pre-wrap break-words"
+          >
+            {entry}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const formatDateTime = (dateTime: string) => {
     return new Date(dateTime).toLocaleString('pt-PT', {
       day: '2-digit',
@@ -401,7 +421,7 @@ export default function AdminIncidents() {
                     {incident.guard_notes && (
                       <div className="mt-3 p-3 bg-slate-50 rounded-lg">
                         <p className="text-xs font-medium text-text-dim mb-1">Notas do Guarda:</p>
-                        <p className="text-sm text-text-main">{incident.guard_notes}</p>
+                        {renderGuardActionHistory(incident.guard_notes)}
                       </div>
                     )}
                     {incident.photo_path && (
