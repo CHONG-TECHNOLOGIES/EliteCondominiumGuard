@@ -1,6 +1,6 @@
 {
-  "name": "Entryflow",
-  "short_name": "Entryflow",
+  "name": "EntryFlow Guard",
+  "short_name": "EntryFlow",
   "description": "Sistema de gestão de portaria para condomínios e Edifícios - Modo offline-first",
   "start_url": "/#/",
   "display": "standalone",
