@@ -259,7 +259,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 </div>
                 <div>
                   <h1 className="text-lg font-bold">Admin Panel</h1>
-                  <p className="text-xs text-slate-400">EntryFlow Guard</p>
+                  <p className="text-xs text-slate-400">EntryFlow</p>
                 </div>
               </div>
               {isMobile && (

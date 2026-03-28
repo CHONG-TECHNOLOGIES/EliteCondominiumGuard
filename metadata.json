@@ -1,5 +1,5 @@
 {
-  "name": "EntryFlow Guard",
+  "name": "EntryFlow",
   "description": "High-performance PWA for Condominium and Buildings Access Control in Kiosk Mode.",
   "requestFramePermissions": [
     "camera",

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-**Elite AccessControl** is an Progressive Web App (PWA) for condominium and building security gate management. Guards can register visits, deliveries, and incidents even without internet connectivity, with automatic synchronization when connection is restored.
+**EntryFlow** is an Progressive Web App (PWA) for condominium and building security gate management. Guards can register visits, deliveries, and incidents even without internet connectivity, with automatic synchronization when connection is restored.
 
 **Stack**: React 19 + TypeScript, Vite 6, Dexie.js (IndexedDB), Supabase (PostgreSQL backend), Tailwind CSS, Leaflet (maps)
 
@@ -467,7 +467,7 @@ This project integrates with Claude Code via the Model Context Protocol (MCP) fo
 ## Project Information
 
 **Developer**: Chong Technologies
-**Project**: Elite AccessControl
+**Project**: EntryFlow
 **Version**: 0.0.0 (Alpha)
 **License**: Proprietary - All rights reserved
 **Last Updated**: 2026-03-28

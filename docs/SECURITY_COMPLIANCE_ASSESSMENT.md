@@ -1,5 +1,5 @@
 # Security Compliance Assessment Report
-## Elite AccessControl Application
+## EntryFlow Application
 
 **Assessment Date**: 2026-01-21
 **Assessor**: Claude Security Compliance Specialist
@@ -10,7 +10,7 @@
 
 ## Executive Summary
 
-This security compliance assessment evaluates the Elite AccessControl PWA application against common regulatory frameworks including GDPR, SOC 2, ISO 27001, and OWASP security standards. The application is a building security gate management system handling personal visitor data, staff credentials, and incident reports.
+This security compliance assessment evaluates the EntryFlow PWA application against common regulatory frameworks including GDPR, SOC 2, ISO 27001, and OWASP security standards. The application is a building security gate management system handling personal visitor data, staff credentials, and incident reports.
 
 ### Overall Assessment
 

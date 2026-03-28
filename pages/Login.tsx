@@ -122,7 +122,7 @@ export default function Login() {
           >
             <ShieldCheck className="text-white w-8 h-8 md:w-12 md:h-12" />
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-2 md:mb-4 tracking-tight">EntryFlow Guard</h1>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white mb-2 md:mb-4 tracking-tight">EntryFlow</h1>
           <p className="text-sm sm:text-base md:text-xl text-blue-100 font-light max-w-md">
             Sistema Inteligente de Controlo de Acessos.
           </p>

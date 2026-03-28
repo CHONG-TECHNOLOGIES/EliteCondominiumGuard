@@ -1,15 +1,15 @@
-# ELITE ACCESSCONTROL - PENETRATION TEST REPORT
+# ENTRYFLOW - PENETRATION TEST REPORT
 
 **Assessment Date:** 2026-01-22
 **Assessment Type:** White-box Source Code Review
-**Application:** Elite AccessControl PWA
+**Application:** EntryFlow PWA
 **Version:** 0.0.0 (Alpha)
 
 ---
 
 ## Executive Summary
 
-The Elite AccessControl application is a PWA for condominium gate management with significant security vulnerabilities. The assessment identified **15 security issues** ranging from Critical to Low severity. The most concerning findings involve **hardcoded credentials**, **client-side authentication bypass possibilities**, **sensitive data exposure in client storage**, and **insufficient authorization controls**.
+The EntryFlow application is a PWA for condominium gate management with significant security vulnerabilities. The assessment identified **15 security issues** ranging from Critical to Low severity. The most concerning findings involve **hardcoded credentials**, **client-side authentication bypass possibilities**, **sensitive data exposure in client storage**, and **insufficient authorization controls**.
 
 **Overall Security Posture: MEDIUM-HIGH RISK**
 
@@ -593,7 +593,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 
 ## Conclusion
 
-The Elite AccessControl application has a functional offline-first architecture but contains several security vulnerabilities that should be addressed before production deployment. The most critical issues (hardcoded credentials, exposed PIN hashes) require immediate remediation. The application would benefit significantly from implementing proper backend authorization (Supabase RLS) and removing security-sensitive logic from client-side code.
+The EntryFlow application has a functional offline-first architecture but contains several security vulnerabilities that should be addressed before production deployment. The most critical issues (hardcoded credentials, exposed PIN hashes) require immediate remediation. The application would benefit significantly from implementing proper backend authorization (Supabase RLS) and removing security-sensitive logic from client-side code.
 
 ---
 

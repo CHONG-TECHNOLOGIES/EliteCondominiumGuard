@@ -1,6 +1,6 @@
 ---
 user-invocable: false
-description: Debug offline sync issues in Elite AccessControl — checks health score, pending items, device heartbeat, and Supabase RPC failures. Triggered automatically when user reports sync or offline problems.
+description: Debug offline sync issues in EntryFlow — checks health score, pending items, device heartbeat, and Supabase RPC failures. Triggered automatically when user reports sync or offline problems.
 ---
 
 # Sync Issue Debugger

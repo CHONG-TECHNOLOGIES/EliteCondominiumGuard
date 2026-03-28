@@ -1,6 +1,6 @@
 # Clickstream v3 — Entry Registration Flow (Kafka via HTTP)
 
-**Project**: Elite AccessControl
+**Project**: EntryFlow
 **Date**: 2026-03-24
 **Author**: Claude Code (Chong Technologies)
 **Supersedes**: clickstream1.md, clickstream2.md, clickstream3.md

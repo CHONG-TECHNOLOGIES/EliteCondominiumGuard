@@ -1,6 +1,6 @@
 # Clickstream Final Best - The Ultimate Specification
 
-**Project**: Elite AccessControl
+**Project**: EntryFlow
 **Date**: 2026-03-24
 **Status**: Final Implementation Recommendation
 **Supersedes**: All previous clickstream documents.

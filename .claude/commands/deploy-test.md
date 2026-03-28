@@ -1,16 +1,16 @@
 ---
 allowed-tools: Bash(npm:*, vercel:*, git:*)
-description: Deploy Elite AccessControl app to Vercel preview environment for testing
+description: Deploy EntryFlow app to Vercel preview environment for testing
 argument-hint: [optional-message]
 ---
 
 # Deploy to Test Environment
 
-Deploy the Elite AccessControl PWA to a Vercel preview environment for testing.
+Deploy the EntryFlow PWA to a Vercel preview environment for testing.
 
 ## Context
 
-- **Project**: Elite AccessControl - Offline-first PWA for condominium security gate management
+- **Project**: EntryFlow - Offline-first PWA for condominium security gate management
 - **Stack**: React 19 + TypeScript, Vite 6, Supabase backend
 - **Build command**: `npm run build`
 - **Deploy platform**: Vercel (preview deployment)

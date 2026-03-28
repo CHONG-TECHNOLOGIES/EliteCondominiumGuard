@@ -1,6 +1,6 @@
 # Clickstream Gemini Flash - Final Design Specification
 
-**Project**: Elite AccessControl
+**Project**: EntryFlow
 **Date**: 2026-03-24
 **Author**: Antigravity (Gemini Flash)
 **Status**: Finalized Design (Ready for Implementation)

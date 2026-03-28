@@ -1,6 +1,6 @@
 ---
 name: pwa-qa-reviewer
-description: PWA quality assurance specialist for Elite AccessControl. Reviews Service Worker config, offline-first data flows, Dexie IndexedDB sync patterns, caching strategies, and tablet UX. Use PROACTIVELY before deployments or after changes to vite.config.ts, dataService.ts, db.ts, or any sync-related code.
+description: PWA quality assurance specialist for EntryFlow. Reviews Service Worker config, offline-first data flows, Dexie IndexedDB sync patterns, caching strategies, and tablet UX. Use PROACTIVELY before deployments or after changes to vite.config.ts, dataService.ts, db.ts, or any sync-related code.
 tools: Read, Grep, Glob
 model: sonnet
 ---

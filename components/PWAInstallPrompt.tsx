@@ -112,7 +112,7 @@ export const PWAInstallPrompt: React.FC = () => {
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-bold text-slate-900 mb-1">
-              Instalar EntryFlow Guard
+              Instalar EntryFlow
             </h3>
             <p className="text-sm text-slate-600 mb-3">
               Instale a aplicação no seu dispositivo para acesso rápido e funcionamento offline completo.

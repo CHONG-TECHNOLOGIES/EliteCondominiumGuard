@@ -1,5 +1,5 @@
 -- ============================================================
--- All RPC Functions - Elite AccessControl (Supabase/PostgreSQL)
+-- All RPC Functions - EntryFlow (Supabase/PostgreSQL)
 -- Generated: 2026-03-28
 -- Total functions: 178
 -- Source: public schema function definitions
@@ -4769,4 +4769,3 @@ CREATE OR REPLACE FUNCTION public.word_similarity_op(text, text)
  STABLE PARALLEL SAFE STRICT
 AS '$libdir/pg_trgm', $function$word_similarity_op$function$
 ;
-

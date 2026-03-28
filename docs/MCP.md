@@ -1,6 +1,6 @@
 # MCP - Model Context Protocol
 
-Documentação da configuração de MCP servers no projeto Elite AccessControl.
+Documentação da configuração de MCP servers no projeto EntryFlow.
 
 ---
 
@@ -232,7 +232,7 @@ Utiliza `@playwright/mcp@latest` (versão oficial mais recente). Não requer con
 "Preenche o formulário de nova visita e submete"
 ```
 
-### Casos de Uso para Elite AccessControl
+### Casos de Uso para EntryFlow
 
 1. **Testar Login Flow**: Verificar autenticação com PIN
 2. **Testar Registo de Visitas**: Preencher formulário multi-step

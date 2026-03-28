@@ -1,6 +1,6 @@
 # Security Auditor Assessment
 
-**Project**: Elite AccessControl PWA
+**Project**: EntryFlow PWA
 **Date**: 2026-01-22
 **Auditor**: Claude Code Security Auditor Agent
 **Standard**: OWASP Top 10 (2021)
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-A comprehensive security audit was conducted on the Elite AccessControl application, an offline-first PWA for condominium gate security management. The audit identified **18 security vulnerabilities** across 4 severity levels.
+A comprehensive security audit was conducted on the EntryFlow application, an offline-first PWA for condominium gate security management. The audit identified **18 security vulnerabilities** across 4 severity levels.
 
 | Severity | Count | Status |
 |----------|-------|--------|
@@ -252,7 +252,7 @@ All vulnerabilities have been logged as tasks in the Notion TASKS database linke
 
 ## Conclusion
 
-The Elite AccessControl application has significant security vulnerabilities that require immediate attention before production deployment. The critical issues around authentication and data encryption should be addressed first, followed by access control improvements and security hardening.
+The EntryFlow application has significant security vulnerabilities that require immediate attention before production deployment. The critical issues around authentication and data encryption should be addressed first, followed by access control improvements and security hardening.
 
 The application's offline-first architecture introduces unique security challenges that require careful consideration of data protection at rest and secure synchronization patterns.
 
