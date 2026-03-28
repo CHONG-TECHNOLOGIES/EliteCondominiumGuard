@@ -351,7 +351,7 @@ class DataService {
     }
 
     if (this.isBackendHealthy) {
-      SupabaseService.logAudit(payload);
+      await SupabaseService.logAudit(payload);
       return;
     }
 

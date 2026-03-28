@@ -2,6 +2,7 @@
 
 import { supabase } from './supabaseClient';
 import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment } from '../types';
+import { buildIncidentActionHistoryIndex } from '../utils/incidentHistory';
 import { logger, ErrorCategory } from '@/services/logger';
 
 logger.setContext({ service: 'Supabase' });
@@ -75,6 +76,29 @@ const getStoragePathFromPublicUrl = (publicUrl: string, bucket: string): string 
 
   return normalizePath(trimmed);
 };
+
+const mapAuditLogRows = (rows: any[]): AuditLog[] => (
+  rows || []
+).map((row: any) => ({
+  id: row.id,
+  created_at: row.created_at,
+  condominium_id: row.condominium_id,
+  condominium: row.condominium_name ? {
+    id: row.condominium_id,
+    name: row.condominium_name
+  } : undefined,
+  actor_id: row.actor_id,
+  actor: row.actor_first_name ? {
+    id: row.actor_id,
+    first_name: row.actor_first_name,
+    last_name: row.actor_last_name,
+    role: row.actor_role
+  } : undefined,
+  action: row.action,
+  target_table: row.target_table,
+  target_id: row.target_id,
+  details: row.details
+}));
 
 /**
  * Serviço Real de API Supabase
@@ -786,16 +810,45 @@ export const SupabaseService = {
 
       if (error) throw error;
 
-      // Transform the data to flatten joins
-      return (data || []).map((inc: any) => ({
+      const incidents = (data || []).map((inc: any) => ({
         ...inc,
         resident: inc.residents,
         unit: inc.residents?.units,
         type_label: inc.incident_types?.label,
         status_label: inc.incident_statuses?.label
       }));
+
+      if (incidents.length === 0) {
+        return incidents;
+      }
+
+      const logs = await this.getIncidentAuditLogs(condoId, incidents.map(incident => incident.id));
+      const historyByIncident = buildIncidentActionHistoryIndex(logs);
+
+      return incidents.map(incident => ({
+        ...incident,
+        action_history: historyByIncident[incident.id] || incident.action_history
+      }));
     } catch (err: any) {
       logger.error('Error fetching incidents', err, ErrorCategory.NETWORK);
+      return [];
+    }
+  },
+
+  async getIncidentAuditLogs(condominiumId: number | null, incidentIds: string[]): Promise<AuditLog[]> {
+    if (!supabase || incidentIds.length === 0) return [];
+
+    try {
+      const { data, error } = await supabase.rpc('get_incident_audit_logs', {
+        p_condominium_id: condominiumId,
+        p_incident_ids: incidentIds
+      });
+
+      if (error) throw error;
+
+      return mapAuditLogRows(data || []);
+    } catch (err: any) {
+      logger.error('Error fetching incident audit logs', err, ErrorCategory.NETWORK);
       return [];
     }
   },
@@ -1443,9 +1496,18 @@ export const SupabaseService = {
         logger.debug('All keys', { keys: Object.keys(data[0]) });
       }
 
-      // Try direct cast first (like adminGetAllVisits does)
-      // The RPC should return the correct structure with nested objects
-      return (data || []) as Incident[];
+      const incidents = (data || []) as Incident[];
+      if (incidents.length === 0) {
+        return incidents;
+      }
+
+      const logs = await this.getIncidentAuditLogs(condominiumId ?? null, incidents.map(incident => incident.id));
+      const historyByIncident = buildIncidentActionHistoryIndex(logs);
+
+      return incidents.map(incident => ({
+        ...incident,
+        action_history: historyByIncident[incident.id] || incident.action_history
+      }));
     } catch (err: any) {
       logger.error('Error fetching incidents via RPC', err, ErrorCategory.ADMIN);
       return [];
@@ -2502,26 +2564,7 @@ export const SupabaseService = {
 
       if (error) throw error;
 
-      const logs: AuditLog[] = (data || []).map((row: any) => ({
-        id: row.id,
-        created_at: row.created_at,
-        condominium_id: row.condominium_id,
-        condominium: row.condominium_name ? {
-          id: row.condominium_id,
-          name: row.condominium_name
-        } : undefined,
-        actor_id: row.actor_id,
-        actor: row.actor_first_name ? {
-          id: row.actor_id,
-          first_name: row.actor_first_name,
-          last_name: row.actor_last_name,
-          role: row.actor_role
-        } : undefined,
-        action: row.action,
-        target_table: row.target_table,
-        target_id: row.target_id,
-        details: row.details
-      }));
+      const logs = mapAuditLogRows(data || []);
 
       const total = data && data.length > 0 ? data[0].total_count : 0;
       return { logs, total };

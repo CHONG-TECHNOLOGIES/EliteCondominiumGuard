@@ -262,7 +262,21 @@ export interface Incident {
   acknowledged_by?: number;      // INT4 (references staff)
   guard_notes?: string;          // TEXT - Guard's action report
   resolved_at?: string;          // timestamptz - When guard closed/resolved
+  action_history?: IncidentActionEntry[]; // Structured action timeline with actor info
   sync_status?: SyncStatus;      // For offline support
+}
+
+export interface IncidentActionEntry {
+  id: string;
+  incident_id: string;
+  created_at?: string;
+  actor_id?: number | null;
+  actor_name?: string;
+  action: 'acknowledged' | 'inprogress' | 'resolved' | 'note' | 'updated';
+  status?: string;
+  note?: string;
+  source?: string;
+  is_legacy?: boolean;
 }
 
 export interface AuditLog {
@@ -274,7 +288,7 @@ export interface AuditLog {
   actor?: Staff;                 // Joined staff data (who performed the action)
   action: string;                // CREATE, UPDATE, DELETE, etc.
   target_table: string;          // Table name (condominiums, visits, incidents, etc.)
-  target_id: number | null;      // ID of the affected record
+  target_id: string | number | null; // ID of the affected record
   details: any;                  // JSON details about the change
 }
 

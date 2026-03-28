@@ -7,22 +7,45 @@ import { Incident } from '../types';
 import { CheckSquare, ArrowLeft, AlertTriangle, AlertCircle, Info, FileText, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { audioService } from '../services/audioService';
+import { getIncidentActionHistory, getIncidentActionLabel, getIncidentActorLabel } from '../utils/incidentHistory';
 import { logger, ErrorCategory } from '@/services/logger';
 
-function renderGuardActionHistory(guardNotes: string) {
-  const entries = guardNotes
-    .split('\n---\n')
-    .map(entry => entry.trim())
-    .filter(Boolean);
+function formatActionDate(dateTime?: string) {
+  if (!dateTime) return null;
+  const date = new Date(dateTime);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString('pt-PT');
+}
+
+function renderGuardActionHistory(incident: Incident) {
+  const entries = getIncidentActionHistory(incident);
+  if (entries.length === 0) return null;
 
   return (
     <div className="space-y-2">
-      {entries.map((entry, index) => (
+      {entries.map(entry => (
         <div
-          key={`${index}-${entry.slice(0, 20)}`}
-          className="text-sm text-slate-700 whitespace-pre-wrap break-words"
+          key={entry.id}
+          className="rounded-lg bg-white/70 border border-blue-100 p-3"
         >
-          {entry}
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="text-xs font-bold uppercase tracking-wide text-blue-700">
+              {getIncidentActionLabel(entry)}
+            </span>
+            <span className="text-xs font-medium text-slate-600">
+              {getIncidentActorLabel(entry)}
+            </span>
+            {formatActionDate(entry.created_at) && (
+              <span className="text-xs text-slate-400">
+                {formatActionDate(entry.created_at)}
+              </span>
+            )}
+          </div>
+          {entry.note && (
+            <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">
+              {entry.note}
+            </p>
+          )}
         </div>
       ))}
     </div>
@@ -425,10 +448,10 @@ export default function Incidents() {
                 )}
 
                 {/* Guard action notes if available */}
-                {inc.guard_notes && (
+                {(inc.guard_notes || (inc.action_history && inc.action_history.length > 0) || inc.acknowledged_at) && (
                   <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm font-bold text-blue-800 mb-1">Ação do Guarda:</p>
-                    {renderGuardActionHistory(inc.guard_notes)}
+                    {renderGuardActionHistory(inc)}
                     {inc.resolved_at && (
                       <p className="text-xs text-slate-400 mt-1">
                         Fechado em: {new Date(inc.resolved_at).toLocaleString('pt-PT')}

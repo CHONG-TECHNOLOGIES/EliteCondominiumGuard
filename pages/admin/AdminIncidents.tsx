@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast';
 import { AuthContext } from '../../App';
 import { exportIncidentsToCSV } from '../../utils/csvExport';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
+import { getIncidentActionHistory, getIncidentActionLabel, getIncidentActorLabel } from '../../utils/incidentHistory';
 import { logger, ErrorCategory } from '@/services/logger';
 
 // Searchable Select Component
@@ -239,20 +240,48 @@ export default function AdminIncidents() {
     }
   };
 
-  const renderGuardActionHistory = (guardNotes: string) => {
-    const entries = guardNotes
-      .split('\n---\n')
-      .map(entry => entry.trim())
-      .filter(Boolean);
+  const formatActionDate = (dateTime?: string) => {
+    if (!dateTime) return null;
+    const date = new Date(dateTime);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleString('pt-PT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const renderGuardActionHistory = (incident: Incident) => {
+    const entries = getIncidentActionHistory(incident);
+    if (entries.length === 0) return null;
 
     return (
       <div className="space-y-2">
-        {entries.map((entry, index) => (
+        {entries.map(entry => (
           <div
-            key={`${index}-${entry.slice(0, 20)}`}
-            className="text-sm text-text-main whitespace-pre-wrap break-words"
+            key={entry.id}
+            className="rounded-lg border border-border-main bg-bg-surface p-3"
           >
-            {entry}
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                {getIncidentActionLabel(entry)}
+              </span>
+              <span className="text-xs font-medium text-text-main">
+                {getIncidentActorLabel(entry)}
+              </span>
+              {formatActionDate(entry.created_at) && (
+                <span className="text-xs text-text-dim">
+                  {formatActionDate(entry.created_at)}
+                </span>
+              )}
+            </div>
+            {entry.note && (
+              <p className="text-sm text-text-main whitespace-pre-wrap break-words">
+                {entry.note}
+              </p>
+            )}
           </div>
         ))}
       </div>
@@ -418,10 +447,10 @@ export default function AdminIncidents() {
                         <p><span className="font-medium">Resolvido:</span> {formatDateTime(incident.resolved_at)}</p>
                       )}
                     </div>
-                    {incident.guard_notes && (
+                    {(incident.guard_notes || (incident.action_history && incident.action_history.length > 0) || incident.acknowledged_at) && (
                       <div className="mt-3 p-3 bg-slate-50 rounded-lg">
                         <p className="text-xs font-medium text-text-dim mb-1">Notas do Guarda:</p>
-                        {renderGuardActionHistory(incident.guard_notes)}
+                        {renderGuardActionHistory(incident)}
                       </div>
                     )}
                     {incident.photo_path && (

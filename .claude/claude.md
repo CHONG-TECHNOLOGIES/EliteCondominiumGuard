@@ -200,6 +200,7 @@ src/
 
 > Page-by-page descriptions: **[docs/PAGES.md](../docs/PAGES.md)**
 > Feature deep dives (audio, realtime, PWA, themes, CSV, Sentry): **[docs/FEATURES.md](../docs/FEATURES.md)**
+> Observability & monitoring: **[docs/OBSERVABILITY.md](../docs/OBSERVABILITY.md)**
 
 ---
 
@@ -460,6 +461,7 @@ This project integrates with Claude Code via the Model Context Protocol (MCP) fo
 | [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md) | Vercel/Netlify setup, CI/CD comparison, GitHub Actions, pre-deployment checklist |
 | [docs/FEATURES.md](../docs/FEATURES.md) | Audio alerts, realtime incidents, PWA lifecycle, themes, CSV export, Sentry, resident app integration |
 | [docs/PAGES.md](../docs/PAGES.md) | Guard and admin page descriptions with features |
+| [docs/OBSERVABILITY.md](../docs/OBSERVABILITY.md) | Sentry integration, custom logger, health checks, audit logging, sync tracking, performance monitoring |
 | [docs/TROUBLESHOOTING.md](../docs/TROUBLESHOOTING.md) | Common issues & solutions, PWA debugging, future roadmap |
 
 ---

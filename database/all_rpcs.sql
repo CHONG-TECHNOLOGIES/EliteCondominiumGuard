@@ -980,8 +980,8 @@ $function$
 -- ----------------------------------------
 CREATE OR REPLACE FUNCTION public.admin_get_audit_logs(p_start_date timestamp with time zone, p_end_date timestamp with time zone, p_condominium_id integer, p_actor_id integer, p_action text, p_target_table text, p_limit integer, p_offset integer)
  RETURNS TABLE(id integer, created_at timestamp with time zone, condominium_id integer, condominium_name text, actor_id integer, actor_first_name text, actor_last_name text, actor_role text, action text, target_table text, target_id text, details jsonb, total_count bigint)
- LANGUAGE sql
- SECURITY DEFINER
+  LANGUAGE sql
+  SECURITY DEFINER
 AS $function$
   SELECT
     a.id,
@@ -1009,6 +1009,51 @@ AS $function$
     (p_target_table IS NULL OR a.target_table = p_target_table)
   ORDER BY a.created_at DESC
   LIMIT p_limit OFFSET p_offset;
+$function$
+;
+
+-- ----------------------------------------
+-- Function: get_incident_audit_logs
+-- ----------------------------------------
+CREATE OR REPLACE FUNCTION public.get_incident_audit_logs(p_condominium_id integer DEFAULT NULL::integer, p_incident_ids uuid[] DEFAULT NULL::uuid[])
+ RETURNS TABLE(id integer, created_at timestamp with time zone, condominium_id integer, actor_id integer, actor_first_name text, actor_last_name text, actor_role text, action text, target_table text, target_id text, details jsonb, incident_id text)
+  LANGUAGE sql
+  SECURITY DEFINER
+  SET search_path TO 'public'
+AS $function$
+  WITH incident_logs AS (
+    SELECT
+      a.*,
+      COALESCE(NULLIF(a.target_id, ''), NULLIF(a.details->>'incident_id', '')) AS resolved_incident_id
+    FROM public.audit_logs a
+    WHERE a.target_table = 'incidents'
+      AND (p_condominium_id IS NULL OR a.condominium_id = p_condominium_id)
+  )
+  SELECT
+    a.id,
+    a.created_at,
+    a.condominium_id,
+    a.actor_id,
+    s.first_name AS actor_first_name,
+    s.last_name AS actor_last_name,
+    s.role::text AS actor_role,
+    a.action,
+    a.target_table,
+    a.target_id,
+    a.details,
+    a.resolved_incident_id AS incident_id
+  FROM incident_logs a
+  LEFT JOIN public.staff s ON s.id = a.actor_id
+  WHERE a.resolved_incident_id IS NOT NULL
+    AND (
+      p_incident_ids IS NULL
+      OR EXISTS (
+        SELECT 1
+        FROM unnest(p_incident_ids) AS requested_id
+        WHERE requested_id::text = a.resolved_incident_id
+      )
+    )
+  ORDER BY a.created_at ASC, a.id ASC;
 $function$
 ;
 
