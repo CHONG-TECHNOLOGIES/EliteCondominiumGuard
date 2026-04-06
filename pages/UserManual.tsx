@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useContext, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   BellRing,
@@ -20,6 +20,8 @@ import {
   Users,
   WifiOff
 } from 'lucide-react';
+import { AuthContext } from '../App';
+import { UserRole } from '../types';
 
 interface FeatureCard {
   title: string;
@@ -652,7 +654,9 @@ function StatusGuideGrid() {
 }
 
 export default function UserManual() {
+  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const html = document.documentElement;
@@ -713,6 +717,38 @@ export default function UserManual() {
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  const requestedAudience = new URLSearchParams(location.search).get('audience');
+  const audience =
+    requestedAudience === 'public' || requestedAudience === 'guard' || requestedAudience === 'admin' || requestedAudience === 'super-admin'
+      ? requestedAudience
+      : user?.role === UserRole.SUPER_ADMIN
+        ? 'super-admin'
+        : user?.role === UserRole.ADMIN
+          ? 'admin'
+          : user?.role === UserRole.GUARD
+            ? 'guard'
+            : 'public';
+
+  const isPublic = audience === 'public';
+  const showGuard = audience === 'guard' || audience === 'super-admin';
+  const showAdmin = audience === 'admin' || audience === 'super-admin';
+  const showSuperAdmin = audience === 'super-admin';
+  const visibleProfiles = isPublic
+    ? profileCards
+    : profileCards.filter((card) => {
+        if (showSuperAdmin) return true;
+        if (showAdmin) return card.title === 'Admin';
+        if (showGuard) return card.title === 'Guarda';
+        return false;
+      });
+  const visiblePageNav = pageNav.filter((item) => {
+    if (item.targetId === 'primeiros-passos' || item.targetId === 'perguntas-comuns') return true;
+    if (item.targetId === 'guarda') return showGuard;
+    if (item.targetId === 'admin') return showAdmin;
+    if (item.targetId === 'super-admin') return showSuperAdmin;
+    return !isPublic;
+  });
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <div className="bg-slate-950 text-white">
@@ -746,14 +782,21 @@ export default function UserManual() {
                 Manual do Utilizador EntryFlow
               </div>
               <h1 className="max-w-5xl text-4xl font-black tracking-tight md:text-6xl">
-                Manual pratico para o guarda operar a app passo a passo
+                {isPublic
+                  ? 'Manual publico da aplicacao'
+                  : showGuard
+                    ? 'Manual pratico para o guarda operar a app passo a passo'
+                    : showAdmin
+                      ? 'Manual administrativo do seu perfil'
+                      : 'Manual do utilizador'}
               </h1>
               <p className="mt-5 max-w-4xl text-base leading-7 text-slate-300 md:text-lg">
-                Este guia foi reescrito para servir como apoio real de turno. Em vez de descricao generica,
-                ele explica o que fazer em cada ecran, em cada tipo de entrada e em cada duvida operacional do guarda.
+                {isPublic
+                  ? 'Esta versao publica mostra apenas orientacao geral. Depois do login, cada utilizador abre o manual filtrado para o seu proprio perfil.'
+                  : 'Este guia foi reescrito para servir como apoio real de turno. Em vez de descricao generica, ele explica o que fazer em cada ecran e em cada duvida operacional do perfil autenticado.'}
               </p>
               <div className="mt-6">
-                <QuickNav items={pageNav} onSelect={scrollToSection} />
+                <QuickNav items={visiblePageNav} onSelect={scrollToSection} />
               </div>
             </div>
 
@@ -779,11 +822,11 @@ export default function UserManual() {
               </div>
 
               <div className="mt-5 flex flex-wrap gap-2">
-                {profileCards.map((profile) => (
+                {visibleProfiles.map((profile) => (
                   <button
                     key={profile.title}
                     type="button"
-                    onClick={() => scrollToSection(profile.targetId)}
+                    onClick={() => profile.targetId && scrollToSection(profile.targetId)}
                     className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-200 transition-colors hover:bg-white/10"
                   >
                     {profile.title}
@@ -800,17 +843,23 @@ export default function UserManual() {
           <div>
             <h2 className="text-2xl font-black text-slate-900 md:text-3xl">Perfis da Aplicacao</h2>
             <p className="mt-2 max-w-4xl text-slate-600">
-              Clique num perfil para saltar para a area detalhada. O bloco do guarda foi escrito como manual operacional de consulta rapida.
+              {isPublic
+                ? 'Na pagina publica, os perfis aparecem apenas como referencia. Depois do login, o manual abre filtrado para o papel do utilizador.'
+                : 'Clique no seu perfil para saltar para a area detalhada correspondente.'}
             </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {profileCards.map((card) => (
+            {visibleProfiles.map((card) => (
               <button
                 key={card.title}
                 type="button"
-                onClick={() => scrollToSection(card.targetId)}
-                className="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm shadow-slate-200/50 transition-all hover:-translate-y-1 hover:border-sky-300 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-sky-100"
+                onClick={() => card.targetId && scrollToSection(card.targetId)}
+                className={`rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm shadow-slate-200/50 transition-all focus:outline-none ${
+                  card.targetId
+                    ? 'hover:-translate-y-1 hover:border-sky-300 hover:shadow-lg focus:ring-4 focus:ring-sky-100'
+                    : ''
+                }`}
               >
                 <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
@@ -827,9 +876,11 @@ export default function UserManual() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-5 text-xs font-black uppercase tracking-[0.2em] text-sky-700">
-                  Abrir secao detalhada
-                </div>
+                {card.targetId && (
+                  <div className="mt-5 text-xs font-black uppercase tracking-[0.2em] text-sky-700">
+                    Abrir secao detalhada
+                  </div>
+                )}
               </button>
             ))}
           </div>
@@ -842,6 +893,7 @@ export default function UserManual() {
           cards={gettingStarted}
         />
 
+        {(isPublic || showGuard) && (
         <section id="guarda" className="space-y-8 scroll-mt-24">
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50 md:p-8">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-sky-700">Manual operacional do guarda</p>
@@ -905,7 +957,9 @@ export default function UserManual() {
 
           <StepGuideSection guides={guardOfflineGuides} />
         </section>
+        )}
 
+        {(isPublic || showAdmin) && (
         <section id="admin" className="scroll-mt-24">
           <FeatureGrid
             title="Admin"
@@ -913,7 +967,9 @@ export default function UserManual() {
             cards={adminFeatures}
           />
         </section>
+        )}
 
+        {(isPublic || showSuperAdmin) && (
         <section id="super-admin" className="scroll-mt-24">
           <FeatureGrid
             title="Super Admin"
@@ -921,6 +977,7 @@ export default function UserManual() {
             cards={superAdminFeatures}
           />
         </section>
+        )}
 
         <section className="grid gap-6 lg:grid-cols-2">
           <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/50">

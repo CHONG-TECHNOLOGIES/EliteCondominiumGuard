@@ -126,7 +126,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <span className="hidden sm:inline">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
           </div>
           <button
-            onClick={() => navigate('/manual')}
+            onClick={() => navigate(`/manual?audience=${user?.role === UserRole.SUPER_ADMIN ? 'super-admin' : user?.role === UserRole.ADMIN ? 'admin' : 'guard'}`)}
             className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors text-slate-200"
             title="Manual do Utilizador"
           >
