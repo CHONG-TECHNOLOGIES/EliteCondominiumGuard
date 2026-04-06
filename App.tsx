@@ -5,7 +5,7 @@ import { api } from './services/dataService';
 import { getDeviceIdentifier } from './services/deviceUtils';
 import { audioService } from './services/audioService';
 import { pwaLifecycleService } from './services/pwaLifecycleService';
-import { Wifi, WifiOff, LogOut, ShieldCheck, Loader2, RefreshCw, KeyRound, Copy, Check } from 'lucide-react';
+import { Wifi, WifiOff, LogOut, ShieldCheck, Loader2, RefreshCw, KeyRound, Copy, Check, BookOpen } from 'lucide-react';
 import { AdminRoute } from './components/AdminRoute';
 import { AdminLayout } from './components/AdminLayout';
 import { ToastProvider } from './components/Toast';
@@ -26,6 +26,7 @@ const Incidents = React.lazy(() => import('./pages/Incidents'));
 const ResidentSearch = React.lazy(() => import('./pages/ResidentSearch'));
 const News = React.lazy(() => import('./pages/News'));
 const Setup = React.lazy(() => import('./pages/Setup'));
+const UserManual = React.lazy(() => import('./pages/UserManual'));
 
 const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminCondominiums = React.lazy(() => import('./pages/admin/AdminCondominiums'));
@@ -124,6 +125,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             {isOnline ? <Wifi size={14} className="md:w-[16px] md:h-[16px]" /> : <WifiOff size={14} className="md:w-[16px] md:h-[16px]" />}
             <span className="hidden sm:inline">{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
           </div>
+          <button
+            onClick={() => navigate('/manual')}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors text-slate-200"
+            title="Manual do Utilizador"
+          >
+            <BookOpen size={16} />
+            <span className="hidden lg:inline text-sm font-semibold">Manual</span>
+          </button>
           <div className="flex items-center gap-3 pl-3 border-l border-slate-700">
             <div className="text-right hidden md:block">
               <p className="text-sm font-bold leading-tight text-white">{user?.first_name} {user?.last_name}</p>
@@ -562,6 +571,7 @@ export default function App() {
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/setup" element={<Setup />} />
+                <Route path="/manual" element={<UserManual />} />
                 <Route path="/login" element={<ConfigGuard><Login /></ConfigGuard>} />
 
                 {/* Admin Routes */}

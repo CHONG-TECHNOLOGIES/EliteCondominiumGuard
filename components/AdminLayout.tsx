@@ -32,7 +32,8 @@ import {
   Palette,
   Moon,
   Sparkles,
-  Newspaper
+  Newspaper,
+  BookOpen
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -464,6 +465,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           )}
 
           <div className="flex items-center gap-4 ml-auto">
+            <button
+              onClick={() => navigate('/manual')}
+              className="inline-flex items-center gap-2 rounded-lg border border-border-main bg-bg-surface px-3 py-2 text-sm font-semibold text-text-main transition-colors hover:bg-slate-100"
+              title="Manual do Utilizador"
+            >
+              <BookOpen size={16} />
+              <span className="hidden md:inline">Manual</span>
+            </button>
             {/* Online/Offline Indicator */}
             <div
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border ${isOnline

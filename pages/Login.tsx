@@ -197,6 +197,13 @@ export default function Login() {
             >
               {loading ? <Loader2 className="animate-spin" /> : 'ENTRAR'}
             </button>
+            <button
+              type="button"
+              onClick={() => navigate('/manual')}
+              className="w-full py-3 bg-white border-2 border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-slate-700 rounded-xl font-bold transition-all"
+            >
+              Abrir Manual do Utilizador
+            </button>
           </form>
         </div>
       </div>

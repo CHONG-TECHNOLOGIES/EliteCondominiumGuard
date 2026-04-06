@@ -1,6 +1,6 @@
-# React Native Migration Guide for Elite Condominium Guard
+# React Native Migration Guide for EntryFlow Condominium Guard
 
-This guide provides a comprehensive plan for migrating your Elite Condominium Guard web application to React Native.
+This guide provides a comprehensive plan for migrating your EntryFlow Guard web application to React Native.
 
 ## Overview
 
@@ -59,7 +59,7 @@ The migration to React Native will enable native mobile apps for iOS and Android
 ## Project Structure for React Native
 
 ```
-elite-condo-guard-mobile/
+EntryFlow-guard-mobile/
 ├── app/                          # Expo Router file-based routing
 │   ├── (auth)/
 │   │   ├── login.tsx
@@ -107,9 +107,9 @@ elite-condo-guard-mobile/
 #### 1.1 Create Expo Project
 ```bash
 # Create new Expo app with TypeScript & Expo Router
-npx create-expo-app elite-condo-guard-mobile --template tabs
+npx create-expo-app EntryFlow-guard-mobile --template tabs
 
-cd elite-condo-guard-mobile
+cd EntryFlow-guard-mobile
 ```
 
 #### 1.2 Install Essential Dependencies
