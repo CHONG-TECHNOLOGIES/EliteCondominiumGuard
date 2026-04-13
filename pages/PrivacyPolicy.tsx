@@ -1,283 +1,569 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Camera, Database, Bell, Lock, Trash2, Mail, Users, Smartphone } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Bell, Camera, Database, Globe, Lock, Mail, Shield, Smartphone, Users } from 'lucide-react';
 
-const PrivacyPolicy: React.FC = () => {
-  const navigate = useNavigate();
+type Lang = 'pt' | 'en';
 
-  return (
-    <div className="min-h-screen bg-slate-900 text-slate-200">
-      {/* Header */}
-      <header className="bg-slate-950 border-b border-slate-800 px-4 py-4 md:px-6">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors"
-          >
-            <ArrowLeft size={18} />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="bg-slate-800 p-1.5 rounded-lg border border-slate-700">
-              <Shield className="text-sky-500 w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-white">Política de Privacidade</h1>
-              <p className="text-xs text-slate-500">Última atualização: 11 de abril de 2026</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto px-4 py-8 md:px-6 space-y-6">
-
-        {/* Intro */}
-        <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-5">
-          <p className="text-slate-300 text-sm leading-relaxed">
-            A <strong className="text-white">Chong Technologies</strong> desenvolveu o <strong className="text-white">EntryFlow</strong> como
-            um aplicativo de gestão de portaria para condomínios. Esta Política de Privacidade descreve como recolhemos, usamos,
-            armazenamos e protegemos os seus dados quando utiliza a nossa aplicação.
-          </p>
-          <p className="text-slate-400 text-sm mt-3">
-            Ao utilizar o EntryFlow, você concorda com as práticas descritas neste documento. Se não concordar, pedimos que não utilize a aplicação.
-          </p>
-        </div>
-
-        {/* 1. Responsável */}
-        <Section num={1} title="Responsável pelo Tratamento de Dados" icon={<Users size={18} />}>
-          <p className="text-slate-400 text-sm mb-4">O responsável pelo tratamento dos seus dados pessoais é:</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <InfoCard label="Empresa" value="Chong Technologies" />
-            <InfoCard label="Aplicação" value="EntryFlow" />
-            <InfoCard label="Contacto" value="privacy@chongtechnologies.com" isEmail />
-          </div>
-        </Section>
-
-        {/* 2. Dados recolhidos */}
-        <Section num={2} title="Que Dados Recolhemos" icon={<Database size={18} />}>
-          <p className="text-slate-400 text-sm mb-4">
-            O EntryFlow recolhe apenas os dados necessários para o funcionamento do sistema de controlo de acessos:
-          </p>
-          <div className="space-y-3">
-            <DataRow category="Identificação de pessoal" data="Nome, apelido, cargo, PIN de acesso (hash bcrypt)" purpose="Autenticação de guardas e administradores" />
-            <DataRow category="Fotografias" data="Fotos de visitantes capturadas na entrada; fotos de perfil de funcionários" purpose="Registo visual de acessos; identificação de pessoal" />
-            <DataRow category="Registos de visitas" data="Nome do visitante, documento de identidade (opcional), hora de entrada/saída, unidade visitada, tipo de visita" purpose="Controlo de acessos e histórico de segurança" />
-            <DataRow category="Dados de moradores" data="Nome, unidade, número de contacto (inseridos pelo administrador do condomínio)" purpose="Verificação de visitas e aprovação de acesso" />
-            <DataRow category="Dados do dispositivo" data="Identificador único do dispositivo (fingerprint gerado localmente); modelo, sistema operativo" purpose="Gestão de dispositivos autorizados e auditoria" />
-            <DataRow category="Registos de incidentes" data="Descrição, data/hora, tipo de incidente, fotografias associadas" purpose="Segurança e documentação operacional" />
-            <DataRow category="Dados de diagnóstico" data="Erros da aplicação, stack traces (sem dados pessoais identificáveis)" purpose="Monitorização de qualidade e resolução de bugs" />
-            <DataRow category="Registos de auditoria" data="Ações realizadas na aplicação (ex.: login, edição de registo), com timestamp e utilizador" purpose="Rastreabilidade e conformidade de segurança" />
-          </div>
-          <div className="mt-4 bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
-            <p className="text-amber-300 text-sm flex items-start gap-2">
-              <Lock size={16} className="shrink-0 mt-0.5" />
-              Os PINs de acesso são sempre armazenados como hash criptográfico (bcrypt, 12 rounds). Nenhum PIN em texto simples é armazenado ou transmitido.
-            </p>
-          </div>
-        </Section>
-
-        {/* 3. Como usamos */}
-        <Section num={3} title="Como Utilizamos os Dados" icon={<Shield size={18} />}>
-          <p className="text-slate-400 text-sm mb-3">Utilizamos os dados recolhidos exclusivamente para:</p>
-          <ul className="space-y-2 text-sm text-slate-300">
-            <li className="flex items-start gap-2"><span className="text-sky-500 mt-1">•</span>Autenticar funcionários e controlar o acesso à aplicação;</li>
-            <li className="flex items-start gap-2"><span className="text-sky-500 mt-1">•</span>Registar e gerir entradas e saídas de visitantes e prestadores de serviços;</li>
-            <li className="flex items-start gap-2"><span className="text-sky-500 mt-1">•</span>Permitir que moradores aprovem ou recusem visitas;</li>
-            <li className="flex items-start gap-2"><span className="text-sky-500 mt-1">•</span>Documentar incidentes de segurança no condomínio;</li>
-            <li className="flex items-start gap-2"><span className="text-sky-500 mt-1">•</span>Gerar relatórios e análises de acesso para administradores do condomínio;</li>
-            <li className="flex items-start gap-2"><span className="text-sky-500 mt-1">•</span>Sincronizar dados entre dispositivos offline e o servidor backend;</li>
-            <li className="flex items-start gap-2"><span className="text-sky-500 mt-1">•</span>Monitorizar a saúde técnica da aplicação e corrigir erros.</li>
-          </ul>
-          <p className="text-emerald-400 text-sm font-semibold mt-4">
-            Não utilizamos os seus dados para publicidade, perfis comerciais ou vendas a terceiros.
-          </p>
-        </Section>
-
-        {/* 4. Partilha de dados */}
-        <Section num={4} title="Partilha de Dados com Terceiros" icon={<Users size={18} />}>
-          <p className="text-slate-400 text-sm mb-4">
-            Partilhamos dados apenas com os seguintes fornecedores de serviços, estritamente necessários para o funcionamento da aplicação:
-          </p>
-          <div className="space-y-3">
-            <ThirdPartyRow provider="Supabase Inc." service="Base de dados e armazenamento na nuvem" data="Todos os dados operacionais e fotografias" />
-            <ThirdPartyRow provider="Sentry (Functional Software, Inc.)" service="Monitorização de erros" data="Stack traces, logs de erro (sem dados pessoais)" />
-            <ThirdPartyRow provider="Vercel Inc." service="Hospedagem da aplicação web" data="Metadata de requisições HTTP (IP, user-agent)" />
-          </div>
-          <p className="text-slate-400 text-sm mt-4">
-            Não vendemos, alugamos nem partilhamos dados pessoais com quaisquer outras entidades terceiras para fins comerciais.
-          </p>
-        </Section>
-
-        {/* 5. Armazenamento e segurança */}
-        <Section num={5} title="Armazenamento e Segurança" icon={<Lock size={18} />}>
-          <div className="space-y-4 text-sm text-slate-300">
-            <div>
-              <p className="text-white font-semibold mb-1">Armazenamento local (offline-first):</p>
-              <p className="text-slate-400">O EntryFlow armazena dados localmente no dispositivo através de IndexedDB (Dexie.js) para funcionar sem ligação à internet. Os dados são sincronizados com o servidor quando a ligação é restaurada.</p>
-            </div>
-            <div>
-              <p className="text-white font-semibold mb-1">Armazenamento na nuvem:</p>
-              <p className="text-slate-400">Os dados são armazenados em servidores Supabase com encriptação em repouso e em trânsito (TLS 1.2+).</p>
-            </div>
-            <div>
-              <p className="text-white font-semibold mb-1">Fotografias:</p>
-              <p className="text-slate-400">Armazenadas em buckets privados do Supabase Storage, acessíveis apenas por utilizadores autenticados com as devidas permissões.</p>
-            </div>
-            <div>
-              <p className="text-white font-semibold mb-1">Medidas de segurança implementadas:</p>
-              <ul className="text-slate-400 space-y-1 mt-2">
-                <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span>Autenticação por PIN com hash bcrypt (12 rounds)</li>
-                <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span>Fingerprinting de dispositivo para autorização de acesso</li>
-                <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span>Row Level Security (RLS) na base de dados</li>
-                <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span>Registos de auditoria para todas as ações críticas</li>
-                <li className="flex items-start gap-2"><span className="text-emerald-500 mt-0.5">✓</span>Separação de dados por condomínio (multi-tenant)</li>
-              </ul>
-            </div>
-          </div>
-        </Section>
-
-        {/* 6. Retenção */}
-        <Section num={6} title="Retenção de Dados" icon={<Trash2 size={18} />}>
-          <ul className="space-y-3 text-sm text-slate-300">
-            <li><strong className="text-white">Registos de visitas e incidentes:</strong> <span className="text-slate-400">retidos enquanto o contrato de subscrição do condomínio estiver ativo, e eliminados 90 dias após o encerramento da conta.</span></li>
-            <li><strong className="text-white">Fotografias:</strong> <span className="text-slate-400">associadas ao período de visita; eliminadas com o registo correspondente.</span></li>
-            <li><strong className="text-white">Logs de auditoria:</strong> <span className="text-slate-400">retidos por 12 meses para fins de conformidade e segurança.</span></li>
-            <li><strong className="text-white">Dados de diagnóstico (Sentry):</strong> <span className="text-slate-400">retidos por 90 dias conforme a política da Sentry.</span></li>
-            <li><strong className="text-white">Dados de dispositivo (localStorage/IndexedDB):</strong> <span className="text-slate-400">eliminados ao desinstalar a aplicação ou limpar os dados do navegador.</span></li>
-          </ul>
-        </Section>
-
-        {/* 7. Direitos */}
-        <Section num={7} title="Os Seus Direitos" icon={<Shield size={18} />}>
-          <p className="text-slate-400 text-sm mb-4">
-            Dependendo da sua localização, pode ter os seguintes direitos sobre os seus dados pessoais:
-          </p>
-          <div className="space-y-2">
-            <RightRow right="Acesso" description="Solicitar uma cópia dos seus dados pessoais" />
-            <RightRow right="Retificação" description="Corrigir dados incorretos ou incompletos" />
-            <RightRow right="Eliminação" description='Solicitar a eliminação dos seus dados ("direito ao esquecimento")' />
-            <RightRow right="Portabilidade" description="Receber os seus dados num formato legível por máquina" />
-            <RightRow right="Oposição" description="Opor-se ao tratamento dos seus dados" />
-          </div>
-          <p className="text-slate-400 text-sm mt-4">
-            Para exercer qualquer destes direitos, entre em contacto connosco através de{' '}
-            <a href="mailto:privacy@chongtechnologies.com" className="text-sky-400 hover:underline">privacy@chongtechnologies.com</a>.
-            Responderemos dentro de 30 dias.
-          </p>
-        </Section>
-
-        {/* 8. Permissões */}
-        <Section num={8} title="Permissões da Aplicação" icon={<Smartphone size={18} />}>
-          <ul className="space-y-3 text-sm text-slate-300">
-            <li className="flex items-start gap-3">
-              <Camera size={16} className="text-sky-500 shrink-0 mt-0.5" />
-              <div><strong className="text-white">Câmara:</strong> <span className="text-slate-400">utilizada para capturar fotografias de visitantes no momento do registo de entrada. As fotografias são imediatamente enviadas para o servidor e não são armazenadas na galeria do dispositivo.</span></div>
-            </li>
-            <li className="flex items-start gap-3">
-              <Database size={16} className="text-sky-500 shrink-0 mt-0.5" />
-              <div><strong className="text-white">Armazenamento local (IndexedDB/localStorage):</strong> <span className="text-slate-400">utilizado para funcionamento offline e persistência de configurações do dispositivo.</span></div>
-            </li>
-            <li className="flex items-start gap-3">
-              <Bell size={16} className="text-sky-500 shrink-0 mt-0.5" />
-              <div><strong className="text-white">Ligação à internet:</strong> <span className="text-slate-400">utilizada para sincronização de dados com o servidor backend.</span></div>
-            </li>
-          </ul>
-          <p className="text-slate-400 text-sm mt-4">
-            Nenhuma permissão de localização GPS, contactos, microfone ou outros sensores é solicitada pela aplicação.
-          </p>
-        </Section>
-
-        {/* 9. Menores */}
-        <Section num={9} title="Menores de Idade" icon={<Users size={18} />}>
-          <p className="text-slate-400 text-sm">
-            O EntryFlow é uma aplicação destinada exclusivamente a uso profissional por funcionários de condomínios (guardas, administradores).
-            Não é dirigida a menores de 18 anos. Não recolhemos intencionalmente dados pessoais de menores. Se tomar conhecimento
-            de que recolhemos dados de um menor sem consentimento parental, contacte-nos imediatamente para os eliminarmos.
-          </p>
-        </Section>
-
-        {/* 10. Alterações */}
-        <Section num={10} title="Alterações a Esta Política" icon={<Shield size={18} />}>
-          <p className="text-slate-400 text-sm">
-            Podemos atualizar esta Política de Privacidade periodicamente. Quando o fizermos, atualizaremos a data de
-            "Última atualização" no topo desta página. Para alterações significativas, notificaremos os administradores
-            de conta por e-mail ou através de uma notificação na aplicação.
-          </p>
-          <p className="text-slate-400 text-sm mt-3">
-            Recomendamos que reveja esta política periodicamente. A utilização continuada da aplicação após a publicação
-            de alterações constitui aceitação dessas alterações.
-          </p>
-        </Section>
-
-        {/* 11. Contacto */}
-        <Section num={11} title="Contacto" icon={<Mail size={18} />}>
-          <p className="text-slate-400 text-sm mb-4">
-            Para questões, pedidos ou reclamações relacionadas com privacidade, contacte-nos:
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <InfoCard label="E-mail (Privacidade)" value="privacy@chongtechnologies.com" isEmail />
-            <InfoCard label="Suporte Geral" value="support@chongtechnologies.com" isEmail />
-            <InfoCard label="Empresa" value="Chong Technologies" />
-          </div>
-        </Section>
-
-        {/* Footer */}
-        <div className="text-center text-slate-600 text-xs pt-6 border-t border-slate-800">
-          <p>&copy; 2026 Chong Technologies. Todos os direitos reservados.</p>
-          <p className="mt-1">EntryFlow — Sistema de Gestão de Portaria para Condomínios</p>
-        </div>
-      </div>
-    </div>
-  );
+type Copy = {
+  title: string;
+  updated: string;
+  language: string;
+  intro: React.ReactNode;
+  introNote: string;
+  controllerTitle: string;
+  controllerText: string;
+  company: string;
+  application: string;
+  contact: string;
+  dataTitle: string;
+  dataText: string;
+  dataRows: Array<{ title: string; data: string; purpose: string }>;
+  dataLabel: string;
+  purposeLabel: string;
+  pinNote: string;
+  useTitle: string;
+  useItems: string[];
+  useNote: string;
+  sharingTitle: string;
+  sharingText: string;
+  vendors: Array<{ name: string; service: string; shared: string }>;
+  serviceLabel: string;
+  sharedLabel: string;
+  securityTitle: string;
+  securityItems: string[];
+  retentionTitle: string;
+  retentionItems: string[];
+  rightsTitle: string;
+  rightsItems: string[];
+  permissionsTitle: string;
+  permissionsItems: Array<{ icon: 'camera' | 'database' | 'bell'; label: string; text: string }>;
+  childrenTitle: string;
+  childrenText: string;
+  changesTitle: string;
+  changesText: string;
+  contactTitle: string;
+  contactText: string;
+  privacyEmail: string;
+  supportEmail: string;
+  footer: string;
 };
 
-/* --- Sub-components --- */
+const copy: Record<Lang, Copy> = {
+  pt: {
+    title: 'Política de Privacidade',
+    updated: 'Última atualização: 11 de abril de 2026',
+    language: 'Idioma',
+    intro: (
+      <>
+        A <strong className="text-white">Chong Technologies</strong> desenvolveu o{' '}
+        <strong className="text-white">EntryFlow</strong> para gestão de portaria em condomínios. Esta página explica
+        como recolhemos, utilizamos, armazenamos e protegemos os dados tratados pela aplicação.
+      </>
+    ),
+    introNote:
+      'Ao utilizar a aplicação, concorda com as práticas descritas nesta política. Se não concordar, não deve utilizar o serviço.',
+    controllerTitle: 'Responsável pelo Tratamento',
+    controllerText: 'A entidade responsável pelo tratamento dos dados pessoais é:',
+    company: 'Empresa',
+    application: 'Aplicação',
+    contact: 'Contacto',
+    dataTitle: 'Dados Recolhidos',
+    dataText: 'Recolhemos apenas os dados necessários para operar o controlo de acessos e a segurança do condomínio:',
+    dataRows: [
+      {
+        title: 'Colaboradores',
+        data: 'Nome, apelido, função e PIN armazenado como hash bcrypt',
+        purpose: 'Autenticação de guardas e administradores',
+      },
+      {
+        title: 'Visitas',
+        data: 'Nome do visitante, documento opcional, horários, unidade visitada e tipo de visita',
+        purpose: 'Registo de acessos e histórico de segurança',
+      },
+      {
+        title: 'Fotografias',
+        data: 'Fotos de visitantes e fotos de perfil de colaboradores',
+        purpose: 'Identificação visual e documentação operacional',
+      },
+      {
+        title: 'Dispositivo e auditoria',
+        data: 'Identificador local do dispositivo, modelo, sistema operativo e ações realizadas na aplicação',
+        purpose: 'Gestão de dispositivos autorizados, rastreabilidade e suporte técnico',
+      },
+    ],
+    dataLabel: 'Dados',
+    purposeLabel: 'Finalidade',
+    pinNote: 'Os PINs nunca são guardados em texto simples e não são transmitidos sem proteção.',
+    useTitle: 'Como Utilizamos os Dados',
+    useItems: [
+      'Autenticar utilizadores e controlar o acesso à aplicação.',
+      'Registar entradas, saídas, visitas e incidentes.',
+      'Permitir aprovação de visitas por moradores.',
+      'Sincronizar dados entre o dispositivo e o backend.',
+      'Monitorizar erros e melhorar a estabilidade do sistema.',
+    ],
+    useNote: 'Os dados não são usados para publicidade, perfis comerciais ou venda a terceiros.',
+    sharingTitle: 'Partilha com Terceiros',
+    sharingText: 'Partilhamos dados apenas com fornecedores necessários para o funcionamento técnico da aplicação:',
+    vendors: [
+      {
+        name: 'Supabase Inc.',
+        service: 'Base de dados e armazenamento',
+        shared: 'Dados operacionais e fotografias',
+      },
+      {
+        name: 'Sentry',
+        service: 'Monitorização de erros',
+        shared: 'Logs técnicos e stack traces sem dados pessoais diretos',
+      },
+      {
+        name: 'Vercel Inc.',
+        service: 'Alojamento da aplicação web',
+        shared: 'Metadados técnicos de pedidos HTTP',
+      },
+    ],
+    serviceLabel: 'Serviço',
+    sharedLabel: 'Dados partilhados',
+    securityTitle: 'Armazenamento e Segurança',
+    securityItems: [
+      'Funcionamento offline com IndexedDB e sincronização quando a ligação é restaurada.',
+      'Encriptação em trânsito e em repouso nos serviços cloud utilizados.',
+      'Buckets privados para fotografias e acesso apenas por utilizadores autenticados.',
+      'Row Level Security e separação de dados por condomínio.',
+      'Logs de auditoria para ações críticas.',
+    ],
+    retentionTitle: 'Retenção de Dados',
+    retentionItems: [
+      'Registos de visitas e incidentes: mantidos enquanto a subscrição estiver ativa e eliminados após encerramento da conta.',
+      'Fotografias: mantidas com o respetivo registo e removidas em conjunto com ele.',
+      'Logs de auditoria: retidos por até 12 meses para segurança e conformidade.',
+      'Dados de diagnóstico: retidos segundo a política do fornecedor técnico aplicável.',
+    ],
+    rightsTitle: 'Direitos do Titular',
+    rightsItems: [
+      'Acesso aos seus dados pessoais.',
+      'Retificação de dados incorretos ou incompletos.',
+      'Eliminação quando legalmente aplicável.',
+      'Portabilidade dos dados.',
+      'Oposição ao tratamento, quando permitido por lei.',
+    ],
+    permissionsTitle: 'Permissões da Aplicação',
+    permissionsItems: [
+      {
+        icon: 'camera',
+        label: 'Câmara',
+        text: 'Utilizada para captar fotografias de visitantes no momento do registo.',
+      },
+      {
+        icon: 'database',
+        label: 'Armazenamento local',
+        text: 'Utilizado para operação offline e persistência local temporária.',
+      },
+      {
+        icon: 'bell',
+        label: 'Ligação à internet',
+        text: 'Utilizada para sincronização, notificações e comunicação com o backend.',
+      },
+    ],
+    childrenTitle: 'Menores de Idade',
+    childrenText:
+      'A aplicação destina-se a utilização profissional em condomínios e não é direcionada a menores de 18 anos.',
+    changesTitle: 'Alterações a Esta Política',
+    changesText:
+      'Podemos atualizar esta política periodicamente. Quando isso acontecer, a data de atualização será revista nesta página.',
+    contactTitle: 'Contacto',
+    contactText: 'Para pedidos ou questões sobre privacidade, contacte-nos através dos endereços abaixo.',
+    privacyEmail: 'E-mail de privacidade',
+    supportEmail: 'Suporte geral',
+    footer: '© 2026 Chong Technologies. Todos os direitos reservados.',
+  },
+  en: {
+    title: 'Privacy Policy',
+    updated: 'Last updated: April 11, 2026',
+    language: 'Language',
+    intro: (
+      <>
+        <strong className="text-white">Chong Technologies</strong> developed{' '}
+        <strong className="text-white">EntryFlow</strong> for condominium gate management. This page explains how we
+        collect, use, store, and protect the data processed by the application.
+      </>
+    ),
+    introNote:
+      'By using the application, you agree to the practices described in this policy. If you do not agree, you should not use the service.',
+    controllerTitle: 'Data Controller',
+    controllerText: 'The entity responsible for processing personal data is:',
+    company: 'Company',
+    application: 'Application',
+    contact: 'Contact',
+    dataTitle: 'Data We Collect',
+    dataText: 'We collect only the data required to operate access control and condominium security:',
+    dataRows: [
+      {
+        title: 'Staff',
+        data: 'Name, surname, role, and PIN stored as a bcrypt hash',
+        purpose: 'Authentication of guards and administrators',
+      },
+      {
+        title: 'Visits',
+        data: 'Visitor name, optional document, timestamps, visited unit, and visit type',
+        purpose: 'Access records and security history',
+      },
+      {
+        title: 'Photographs',
+        data: 'Visitor photos and staff profile photos',
+        purpose: 'Visual identification and operational documentation',
+      },
+      {
+        title: 'Device and audit data',
+        data: 'Local device identifier, model, operating system, and actions performed in the app',
+        purpose: 'Authorized device management, traceability, and technical support',
+      },
+    ],
+    dataLabel: 'Data',
+    purposeLabel: 'Purpose',
+    pinNote: 'PINs are never stored in plain text and are not transmitted without protection.',
+    useTitle: 'How We Use Data',
+    useItems: [
+      'Authenticate users and control access to the application.',
+      'Register entries, exits, visits, and incidents.',
+      'Allow residents to approve visits.',
+      'Synchronize data between the device and the backend.',
+      'Monitor errors and improve platform stability.',
+    ],
+    useNote: 'Data is not used for advertising, commercial profiling, or resale to third parties.',
+    sharingTitle: 'Sharing with Third Parties',
+    sharingText: 'We share data only with providers required for the technical operation of the application:',
+    vendors: [
+      {
+        name: 'Supabase Inc.',
+        service: 'Database and storage',
+        shared: 'Operational data and photographs',
+      },
+      {
+        name: 'Sentry',
+        service: 'Error monitoring',
+        shared: 'Technical logs and stack traces without direct personal data',
+      },
+      {
+        name: 'Vercel Inc.',
+        service: 'Web hosting',
+        shared: 'Technical HTTP request metadata',
+      },
+    ],
+    serviceLabel: 'Service',
+    sharedLabel: 'Shared data',
+    securityTitle: 'Storage and Security',
+    securityItems: [
+      'Offline-first operation using IndexedDB and synchronization when connectivity is restored.',
+      'Encryption in transit and at rest across the cloud services in use.',
+      'Private buckets for photographs, accessible only to authenticated users.',
+      'Row Level Security and condominium-level data separation.',
+      'Audit logs for critical actions.',
+    ],
+    retentionTitle: 'Data Retention',
+    retentionItems: [
+      'Visit and incident records: kept while the subscription is active and deleted after account closure.',
+      'Photographs: retained with the related record and removed together with it.',
+      'Audit logs: retained for up to 12 months for security and compliance purposes.',
+      'Diagnostic data: retained according to the applicable technical provider policy.',
+    ],
+    rightsTitle: 'Data Subject Rights',
+    rightsItems: [
+      'Access to your personal data.',
+      'Correction of inaccurate or incomplete data.',
+      'Deletion where legally applicable.',
+      'Data portability.',
+      'Objection to processing when permitted by law.',
+    ],
+    permissionsTitle: 'Application Permissions',
+    permissionsItems: [
+      {
+        icon: 'camera',
+        label: 'Camera',
+        text: 'Used to capture visitor photographs during check-in.',
+      },
+      {
+        icon: 'database',
+        label: 'Local storage',
+        text: 'Used for offline operation and temporary local persistence.',
+      },
+      {
+        icon: 'bell',
+        label: 'Internet connection',
+        text: 'Used for synchronization, notifications, and backend communication.',
+      },
+    ],
+    childrenTitle: 'Children',
+    childrenText: 'The application is intended for professional condominium use and is not directed to anyone under 18.',
+    changesTitle: 'Changes to This Policy',
+    changesText: 'We may update this policy from time to time. When we do, the update date on this page will change.',
+    contactTitle: 'Contact',
+    contactText: 'For privacy requests or questions, contact us using the addresses below.',
+    privacyEmail: 'Privacy email',
+    supportEmail: 'General support',
+    footer: '© 2026 Chong Technologies. All rights reserved.',
+  },
+};
 
-const Section: React.FC<{ num: number; title: string; icon: React.ReactNode; children: React.ReactNode }> = ({ num, title, icon, children }) => (
-  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 md:p-6">
-    <h2 className="flex items-center gap-3 text-white font-bold text-base mb-4 pb-3 border-b border-slate-700">
-      <span className="bg-sky-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shrink-0">{num}</span>
+function getPermissionIcon(icon: 'camera' | 'database' | 'bell') {
+  if (icon === 'camera') return <Camera size={16} className="mt-0.5 shrink-0 text-sky-500" />;
+  if (icon === 'database') return <Database size={16} className="mt-0.5 shrink-0 text-sky-500" />;
+  return <Bell size={16} className="mt-0.5 shrink-0 text-sky-500" />;
+}
+
+function enablePageScroll() {
+  const html = document.documentElement;
+  const body = document.body;
+  const root = document.getElementById('root');
+
+  const previous = {
+    htmlOverflow: html.style.overflow,
+    htmlHeight: html.style.height,
+    bodyOverflow: body.style.overflow,
+    bodyOverflowY: body.style.overflowY,
+    bodyHeight: body.style.height,
+    bodyMinHeight: body.style.minHeight,
+    bodyTouchAction: body.style.touchAction,
+    rootHeight: root?.style.height ?? '',
+    rootMinHeight: root?.style.minHeight ?? '',
+    rootOverflow: root?.style.overflow ?? '',
+  };
+
+  html.style.overflow = 'auto';
+  html.style.height = 'auto';
+  body.style.overflow = 'auto';
+  body.style.overflowY = 'auto';
+  body.style.height = 'auto';
+  body.style.minHeight = '100vh';
+  body.style.touchAction = 'pan-y';
+
+  if (root) {
+    root.style.height = 'auto';
+    root.style.minHeight = '100vh';
+    root.style.overflow = 'visible';
+  }
+
+  return () => {
+    html.style.overflow = previous.htmlOverflow;
+    html.style.height = previous.htmlHeight;
+    body.style.overflow = previous.bodyOverflow;
+    body.style.overflowY = previous.bodyOverflowY;
+    body.style.height = previous.bodyHeight;
+    body.style.minHeight = previous.bodyMinHeight;
+    body.style.touchAction = previous.bodyTouchAction;
+    if (root) {
+      root.style.height = previous.rootHeight;
+      root.style.minHeight = previous.rootMinHeight;
+      root.style.overflow = previous.rootOverflow;
+    }
+  };
+}
+
+const Section: React.FC<{ icon: React.ReactNode; title: string; children: React.ReactNode }> = ({ icon, title, children }) => (
+  <section className="rounded-xl border border-slate-700 bg-slate-800/50 p-5 md:p-6">
+    <h2 className="mb-4 flex items-center gap-3 border-b border-slate-700 pb-3 text-base font-bold text-white">
       {icon}
       {title}
     </h2>
     {children}
-  </div>
+  </section>
 );
 
-const InfoCard: React.FC<{ label: string; value: string; isEmail?: boolean }> = ({ label, value, isEmail }) => (
-  <div className="bg-slate-900 border border-slate-700 rounded-lg p-3">
-    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">{label}</p>
+export default function PrivacyPolicy() {
+  const [lang, setLang] = useState<Lang>(() => (navigator.language.toLowerCase().startsWith('pt') ? 'pt' : 'en'));
+  const c = copy[lang];
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    return enablePageScroll();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-200">
+      <header className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 px-4 py-4 backdrop-blur md:px-6">
+        <div className="mx-auto flex max-w-4xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-1.5">
+              <Shield className="h-5 w-5 text-sky-500" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white">{c.title}</h1>
+              <p className="text-xs text-slate-500">{c.updated}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-start rounded-xl border border-slate-700 bg-slate-800 p-1 sm:self-auto">
+            <span className="px-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">{c.language}</span>
+            <button
+              type="button"
+              onClick={() => setLang('pt')}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                lang === 'pt' ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Globe size={14} />
+              PT
+            </button>
+            <button
+              type="button"
+              onClick={() => setLang('en')}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+                lang === 'en' ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Globe size={14} />
+              EN
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-4xl space-y-6 px-4 py-8 md:px-6">
+        <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 p-5">
+          <p className="text-sm leading-relaxed text-slate-300">{c.intro}</p>
+          <p className="mt-3 text-sm text-slate-400">{c.introNote}</p>
+        </div>
+
+        <Section icon={<Users size={18} />} title={c.controllerTitle}>
+          <p className="mb-4 text-sm text-slate-400">{c.controllerText}</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <InfoCard label={c.company} value="Chong Technologies" />
+            <InfoCard label={c.application} value="EntryFlow" />
+            <InfoCard label={c.contact} value="privacy@chongtechnologies.com" isEmail />
+          </div>
+        </Section>
+
+        <Section icon={<Database size={18} />} title={c.dataTitle}>
+          <p className="mb-4 text-sm text-slate-400">{c.dataText}</p>
+          <div className="space-y-3">
+            {c.dataRows.map((row) => (
+              <div key={row.title} className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-3">
+                <p className="mb-1 text-sm font-semibold text-white">{row.title}</p>
+                <p className="mb-1 text-xs text-slate-400">
+                  <span className="text-slate-500">{c.dataLabel}:</span> {row.data}
+                </p>
+                <p className="text-xs text-slate-400">
+                  <span className="text-slate-500">{c.purposeLabel}:</span> {row.purpose}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-4">
+            <p className="flex items-start gap-2 text-sm text-amber-300">
+              <Lock size={16} className="mt-0.5 shrink-0" />
+              {c.pinNote}
+            </p>
+          </div>
+        </Section>
+
+        <Section icon={<Shield size={18} />} title={c.useTitle}>
+          <ul className="space-y-2 text-sm text-slate-300">
+            {c.useItems.map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <span className="mt-1 text-sky-500">&bull;</span>
+                {item}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-sm font-semibold text-emerald-400">{c.useNote}</p>
+        </Section>
+
+        <Section icon={<Users size={18} />} title={c.sharingTitle}>
+          <p className="mb-4 text-sm text-slate-400">{c.sharingText}</p>
+          <div className="space-y-3">
+            {c.vendors.map((vendor) => (
+              <div key={vendor.name} className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-3">
+                <p className="text-sm font-semibold text-white">{vendor.name}</p>
+                <p className="text-xs text-slate-400">
+                  <span className="text-slate-500">{c.serviceLabel}:</span> {vendor.service}
+                </p>
+                <p className="text-xs text-slate-400">
+                  <span className="text-slate-500">{c.sharedLabel}:</span> {vendor.shared}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section icon={<Lock size={18} />} title={c.securityTitle}>
+          <ul className="space-y-2 text-sm text-slate-300">
+            {c.securityItems.map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <span className="mt-0.5 text-emerald-500">&check;</span>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section icon={<Database size={18} />} title={c.retentionTitle}>
+          <ul className="space-y-2 text-sm text-slate-300">
+            {c.retentionItems.map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <span className="mt-1 text-sky-500">&bull;</span>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section icon={<Shield size={18} />} title={c.rightsTitle}>
+          <ul className="space-y-2 text-sm text-slate-300">
+            {c.rightsItems.map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <span className="mt-1 text-sky-500">&bull;</span>
+                {item}
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section icon={<Smartphone size={18} />} title={c.permissionsTitle}>
+          <ul className="space-y-3 text-sm text-slate-300">
+            {c.permissionsItems.map((item) => (
+              <li key={item.label} className="flex items-start gap-3">
+                {getPermissionIcon(item.icon)}
+                <div>
+                  <strong className="text-white">{item.label}:</strong> <span className="text-slate-400">{item.text}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section icon={<Users size={18} />} title={c.childrenTitle}>
+          <p className="text-sm text-slate-400">{c.childrenText}</p>
+        </Section>
+
+        <Section icon={<Shield size={18} />} title={c.changesTitle}>
+          <p className="text-sm text-slate-400">{c.changesText}</p>
+        </Section>
+
+        <Section icon={<Mail size={18} />} title={c.contactTitle}>
+          <p className="mb-4 text-sm text-slate-400">{c.contactText}</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <InfoCard label={c.privacyEmail} value="privacy@chongtechnologies.com" isEmail />
+            <InfoCard label={c.supportEmail} value="support@chongtechnologies.com" isEmail />
+            <InfoCard label={c.company} value="Chong Technologies" />
+          </div>
+        </Section>
+
+        <div className="border-t border-slate-800 pt-6 text-center text-xs text-slate-600">
+          <p>{c.footer}</p>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+const InfoCard: React.FC<{ label: string; value: string; isEmail?: boolean }> = ({ label, value, isEmail = false }) => (
+  <div className="rounded-lg border border-slate-700 bg-slate-900 p-3">
+    <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
     {isEmail ? (
-      <a href={`mailto:${value}`} className="text-sky-400 text-sm hover:underline break-all">{value}</a>
+      <a href={`mailto:${value}`} className="break-all text-sm text-sky-400 hover:underline">
+        {value}
+      </a>
     ) : (
-      <p className="text-slate-200 text-sm">{value}</p>
+      <p className="text-sm text-slate-200">{value}</p>
     )}
   </div>
 );
-
-const DataRow: React.FC<{ category: string; data: string; purpose: string }> = ({ category, data, purpose }) => (
-  <div className="bg-slate-900/50 border border-slate-700/50 rounded-lg p-3">
-    <p className="text-white text-sm font-semibold mb-1">{category}</p>
-    <p className="text-slate-400 text-xs mb-1"><span className="text-slate-500">Dados:</span> {data}</p>
-    <p className="text-slate-400 text-xs"><span className="text-slate-500">Finalidade:</span> {purpose}</p>
-  </div>
-);
-
-const ThirdPartyRow: React.FC<{ provider: string; service: string; data: string }> = ({ provider, service, data }) => (
-  <div className="bg-slate-900/50 border border-slate-700/50 rounded-lg p-3">
-    <p className="text-white text-sm font-semibold">{provider}</p>
-    <p className="text-slate-400 text-xs"><span className="text-slate-500">Serviço:</span> {service}</p>
-    <p className="text-slate-400 text-xs"><span className="text-slate-500">Dados partilhados:</span> {data}</p>
-  </div>
-);
-
-const RightRow: React.FC<{ right: string; description: string }> = ({ right, description }) => (
-  <div className="flex items-center gap-3 bg-slate-900/50 border border-slate-700/50 rounded-lg p-3">
-    <span className="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-0.5 rounded-full shrink-0">Sim</span>
-    <div>
-      <span className="text-white text-sm font-semibold">{right}</span>
-      <span className="text-slate-400 text-sm"> — {description}</span>
-    </div>
-  </div>
-);
-
-export default PrivacyPolicy;
