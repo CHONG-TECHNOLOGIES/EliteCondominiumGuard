@@ -1688,6 +1688,26 @@ export const SupabaseService = {
   },
 
   /**
+   * Set visitor photo capture setting for a condominium.
+   * Uses a SECURITY DEFINER RPC so it can be called during device setup
+   * before any staff authentication has taken place.
+   */
+  async setCondoVisitorPhotoSetting(condoId: number, enabled: boolean): Promise<boolean> {
+    if (!supabase) return false;
+    try {
+      const { error } = await supabase.rpc('set_condo_visitor_photo_setting', {
+        p_condo_id: condoId,
+        p_enabled: enabled,
+      });
+      if (error) throw error;
+      return true;
+    } catch (err: any) {
+      logger.error('Error setting visitor photo setting', err, ErrorCategory.ADMIN);
+      return false;
+    }
+  },
+
+  /**
    * Admin: Update a device
    */
   async adminUpdateDevice(id: string, updates: Partial<Device>): Promise<Device | null> {

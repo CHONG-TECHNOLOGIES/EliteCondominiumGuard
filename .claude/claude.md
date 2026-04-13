@@ -367,11 +367,10 @@ SQL migration files in `database/` must be applied manually to Supabase:
 
 ## Claude Code Integration
 
-### MCP Server (Notion)
+### SKILLS 
 
 This project integrates with Claude Code via the Model Context Protocol (MCP) for enhanced workflow automation.
 
-**Configuration**: See `docs/MCP.md` for setup instructions.
 
 **Available Skills** (user-invocable slash commands):
 - `/notion-task [task]` - Start work on a Notion task (query, update status, link commits)

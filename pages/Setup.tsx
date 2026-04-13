@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/dataService';
-import { ShieldCheck, AlertCircle, Loader2, Search, Building, RefreshCw, KeyRound, RotateCcw, Tablet, Clock } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Loader2, Search, Building, RefreshCw, KeyRound, RotateCcw, Tablet, Clock, Camera } from 'lucide-react';
 import { Condominium, Device } from '../types';
 
 export default function Setup() {
@@ -13,6 +13,7 @@ export default function Setup() {
   const [loadingList, setLoadingList] = useState(true);
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [error, setError] = useState('');
+  const [visitorPhotoEnabled, setVisitorPhotoEnabled] = useState(true);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
@@ -71,7 +72,7 @@ export default function Setup() {
     setError('');
 
     try {
-      const result = await api.configureDevice(selectedCondoId);
+      const result = await api.configureDevice(selectedCondoId, visitorPhotoEnabled);
       if (result.success) {
         navigate('/login');
       } else {
@@ -341,6 +342,40 @@ export default function Setup() {
               <div>
                 <p className="font-bold text-slate-800">{selectedCondo.name}</p>
                 <p className="text-xs text-slate-500">{selectedCondo.address}</p>
+              </div>
+            </div>
+            {/* Visitor photo capture preference */}
+            <div className="w-full mb-5 p-4 bg-slate-50 rounded-xl border border-slate-200 text-left">
+              <div className="flex items-center gap-2 mb-1">
+                <Camera size={15} className="text-slate-600" />
+                <p className="font-semibold text-slate-700 text-sm">Captura de foto do visitante</p>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">
+                Quando ativado, o guarda é obrigado a fotografar o visitante antes de registar a entrada.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVisitorPhotoEnabled(true)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                    visitorPhotoEnabled
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300'
+                  }`}
+                >
+                  Sim, obrigatório
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisitorPhotoEnabled(false)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                    !visitorPhotoEnabled
+                      ? 'bg-slate-600 text-white border-slate-600'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                  }`}
+                >
+                  Não, ignorar
+                </button>
               </div>
             </div>
             <div className="flex gap-3 w-full">

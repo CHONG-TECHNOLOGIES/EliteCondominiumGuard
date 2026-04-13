@@ -59,6 +59,7 @@ export default function NewEntry() {
 
   const [isOffline, setIsOffline] = useState(!api.checkOnline());
   const [photoQuality, setPhotoQuality] = useState<PhotoQuality>(PhotoQuality.MEDIUM);
+  const [visitorPhotoEnabled, setVisitorPhotoEnabled] = useState(true);
 
   // QR Question Modal State
   const [showQrQuestionModal, setShowQrQuestionModal] = useState(false);
@@ -80,6 +81,8 @@ export default function NewEntry() {
       api.getSports().then(setSports);
       // Load photo quality setting for data saving
       api.getPhotoQuality().then(setPhotoQuality);
+      // Load visitor photo capture preference (set during device setup)
+      api.getVisitorPhotoEnabled().then(setVisitorPhotoEnabled);
     }
     window.addEventListener('offline', () => setIsOffline(true));
     window.addEventListener('online', () => setIsOffline(false));
@@ -573,10 +576,12 @@ export default function NewEntry() {
 
     // Check if visit type requires approval (restaurant and sport don't need approval)
     const isFreeEntry = selectedTypeConfig?.requires_restaurant || selectedTypeConfig?.requires_sport;
-    const titleText = isFreeEntry ? 'Foto & Registo' : 'Foto & Autorização';
+    const titleText = isFreeEntry
+      ? (visitorPhotoEnabled ? 'Foto & Registo' : 'Registo')
+      : (visitorPhotoEnabled ? 'Foto & Autorização' : 'Autorização');
     const subtitleText = isFreeEntry
-      ? 'Capture a foto do visitante - entrada livre, sem necessidade de aprovação'
-      : 'Capture a foto do visitante e selecione o método de aprovação';
+      ? (visitorPhotoEnabled ? 'Capture a foto do visitante - entrada livre, sem necessidade de aprovação' : 'Entrada livre, sem necessidade de aprovação')
+      : (visitorPhotoEnabled ? 'Capture a foto do visitante e selecione o método de aprovação' : 'Selecione o método de aprovação');
 
     return (
       <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-6">
@@ -589,8 +594,9 @@ export default function NewEntry() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: Camera */}
+        <div className={`grid grid-cols-1 gap-6 ${visitorPhotoEnabled ? 'lg:grid-cols-3' : 'lg:grid-cols-1'}`}>
+          {/* Left Column: Camera — only shown when visitor photo capture is enabled */}
+          {visitorPhotoEnabled && (
           <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <h3 className="text-sm font-black text-slate-400 uppercase tracking-wider mb-4">
               Captura de Imagem
@@ -658,6 +664,7 @@ export default function NewEntry() {
               </div>
             </div>
           </div>
+          )}
 
           {/* Right Column: Approval Mode Selector OR Free Entry Message */}
           <div className="space-y-6">
@@ -779,7 +786,7 @@ export default function NewEntry() {
             <div className="space-y-3">
               <button
                 onClick={handleSubmit}
-                disabled={(!photo && approvalMode !== ApprovalMode.QR_SCAN) || (approvalMode === ApprovalMode.QR_SCAN && !qrConfirmed)}
+                disabled={(visitorPhotoEnabled && !photo && approvalMode !== ApprovalMode.QR_SCAN) || (approvalMode === ApprovalMode.QR_SCAN && !qrConfirmed)}
                 className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:text-slate-500 text-white rounded-xl font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
               >
                 <CheckCircle size={20} />

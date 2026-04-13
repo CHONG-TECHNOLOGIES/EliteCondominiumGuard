@@ -634,7 +634,7 @@ class DataService {
     return [];
   }
 
-  async configureDevice(condoId: number): Promise<{ success: boolean; error?: string; existingDevices?: any[] }> {
+  async configureDevice(condoId: number, visitorPhotoEnabled: boolean = true): Promise<{ success: boolean; error?: string; existingDevices?: any[] }> {
     const condo = await SupabaseService.getCondominium(condoId);
     if (!condo) {
       return { success: false, error: "Condomínio não encontrado" };
@@ -665,17 +665,21 @@ class DataService {
       logger.warn('Failed to register device with Supabase, but continuing with local setup');
     }
 
+    // Save visitor photo setting centrally and merge into condo object
+    await SupabaseService.setCondoVisitorPhotoSetting(condoId, visitorPhotoEnabled);
+    const condoWithPhotoSetting: Condominium = { ...condo, visitor_photo_enabled: visitorPhotoEnabled };
+
     // Save configuration locally (IndexedDB + localStorage sync)
-    await db.settings.put({ key: 'device_condo_details', value: condo });
+    await db.settings.put({ key: 'device_condo_details', value: condoWithPhotoSetting });
     await db.settings.put({ key: 'device_id', value: deviceId });
 
     // SYNC: Also save to localStorage for redundancy and fast access
     localStorage.setItem('condo_guard_device_id', deviceId);
-    localStorage.setItem('device_condo_backup', JSON.stringify(condo));
+    localStorage.setItem('device_condo_backup', JSON.stringify(condoWithPhotoSetting));
     logger.info('Device configured - synced to IndexedDB + localStorage');
 
-    this.currentCondoDetails = condo;
-    this.currentCondoId = condo.id;
+    this.currentCondoDetails = condoWithPhotoSetting;
+    this.currentCondoId = condoWithPhotoSetting.id;
     return { success: true };
   }
 
@@ -2416,6 +2420,16 @@ class DataService {
    */
   async setPhotoQuality(quality: PhotoQuality): Promise<void> {
     await db.settings.put({ key: this.photoQualityKey, value: quality });
+  }
+
+  /**
+   * Get whether visitor photo capture is required for this condominium.
+   * Reads from the cached condo details (offline-first, set during device setup).
+   * Defaults to true to preserve existing behaviour for condominiums without the setting.
+   */
+  async getVisitorPhotoEnabled(): Promise<boolean> {
+    const condo = await this.getDeviceCondoDetails();
+    return condo?.visitor_photo_enabled ?? true;
   }
 
   // --- ADMIN METHODS (Online-Only, Cross-Condominium Access) ---

@@ -58,6 +58,7 @@ export interface Condominium {
   contact_email?: string;
   manager_name?: string;
   total_residents?: number;  // Fetched dynamically for Admin Panel
+  visitor_photo_enabled?: boolean; // Whether visitor photo capture is required on entry
 }
 
 export interface Street {
