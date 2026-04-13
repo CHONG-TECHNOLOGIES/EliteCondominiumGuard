@@ -81,7 +81,7 @@ const copy: Record<Lang, Copy> = {
       },
       {
         title: 'Fotografias',
-        data: 'Fotos de visitantes e fotos de perfil de colaboradores',
+        data: 'Fotos de visitantes apenas com consentimento e fotos de perfil de colaboradores',
         purpose: 'Identificação visual e documentação operacional',
       },
       {
@@ -151,7 +151,7 @@ const copy: Record<Lang, Copy> = {
       {
         icon: 'camera',
         label: 'Câmara',
-        text: 'Utilizada para captar fotografias de visitantes no momento do registo.',
+        text: 'Utilizada para captar fotografias de visitantes apenas quando o visitante autoriza o registo.',
       },
       {
         icon: 'database',
@@ -209,7 +209,7 @@ const copy: Record<Lang, Copy> = {
       },
       {
         title: 'Photographs',
-        data: 'Visitor photos and staff profile photos',
+        data: 'Visitor photos only with consent and staff profile photos',
         purpose: 'Visual identification and operational documentation',
       },
       {
@@ -279,7 +279,7 @@ const copy: Record<Lang, Copy> = {
       {
         icon: 'camera',
         label: 'Camera',
-        text: 'Used to capture visitor photographs during check-in.',
+        text: 'Used to capture visitor photographs during check-in only when the visitor allows it.',
       },
       {
         icon: 'database',
@@ -428,7 +428,7 @@ export default function PrivacyPolicy() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <InfoCard label={c.company} value="Chong Technologies" />
             <InfoCard label={c.application} value="EntryFlow" />
-            <InfoCard label={c.contact} value="privacy@chongtechnologies.com" isEmail />
+            <InfoCard label={c.contact} value="entryflow.space@chongtechnologies.com" isEmail />
           </div>
         </Section>
 
@@ -541,8 +541,8 @@ export default function PrivacyPolicy() {
         <Section icon={<Mail size={18} />} title={c.contactTitle}>
           <p className="mb-4 text-sm text-slate-400">{c.contactText}</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <InfoCard label={c.privacyEmail} value="privacy@chongtechnologies.com" isEmail />
-            <InfoCard label={c.supportEmail} value="support@chongtechnologies.com" isEmail />
+            <InfoCard label={c.privacyEmail} value="entryflow.space@chongtechnologies.com" isEmail />
+            <InfoCard label={c.supportEmail} value="entryflow.space@chongtechnologies.com" isEmail />
             <InfoCard label={c.company} value="Chong Technologies" />
           </div>
         </Section>
