@@ -36,8 +36,6 @@ const copy: Record<Lang, Copy> = {
       <>
         Esta pagina explica como pedir a eliminacao de conta e dados associados para a aplicacao{' '}
         <strong className="text-white">EntryFlow</strong>, publicada pela <strong className="text-white">Chong Technologies</strong>.
-        Tambem se aplica a referencias comerciais ou listagens Google Play com o nome{' '}
-        <strong className="text-white">APPGUARD</strong> ou <strong className="text-white">EliteCondoGuard</strong>.
       </>
     ),
     introNote:
@@ -48,7 +46,7 @@ const copy: Record<Lang, Copy> = {
     requestTitle: 'Como Pedir a Eliminacao',
     requestText: 'Para solicitar a eliminacao da conta e dados associados, envie um email para a equipa de privacidade:',
     requestSteps: [
-      'Envie o pedido para entryflow.space@chongtechnologies.com a partir de um email associado a conta ou incluindo detalhes suficientes para verificacao.',
+      'Envie o pedido para entryflow.space@chongtechnologies.com incluindo o numero de telefone associado a conta ou detalhes suficientes para verificacao.',
       'Inclua o nome da aplicacao, condominio, utilizador ou outros identificadores relevantes para localizar o registo correto.',
       'A equipa ira analisar o pedido e confirmar que dados podem ser eliminados, anonimizados ou retidos por obrigacao legal ou de seguranca.',
     ],
@@ -86,9 +84,7 @@ const copy: Record<Lang, Copy> = {
       <>
         This page explains how to request deletion of your account and associated data for the{' '}
         <strong className="text-white">EntryFlow</strong> application published by{' '}
-        <strong className="text-white">Chong Technologies</strong>. It also applies to Google Play or commercial branding
-        that may refer to the product as <strong className="text-white">APPGUARD</strong> or{' '}
-        <strong className="text-white">EliteCondoGuard</strong>.
+        <strong className="text-white">Chong Technologies</strong>.
       </>
     ),
     introNote:
@@ -99,7 +95,7 @@ const copy: Record<Lang, Copy> = {
     requestTitle: 'How To Request Deletion',
     requestText: 'To request deletion of your account and associated data, email the privacy team at:',
     requestSteps: [
-      'Send your request to entryflow.space@chongtechnologies.com from an address linked to the account, or include enough details to verify ownership.',
+      'Send your request to entryflow.space@chongtechnologies.com and include the phone number linked to the account, or enough details to verify ownership.',
       'Include the app name, condominium, user identity, or other relevant identifiers so the correct records can be located.',
       'Our team will review the request and confirm which data can be deleted, anonymized, or retained for legal, security, or compliance reasons.',
     ],
@@ -259,10 +255,9 @@ export default function AccountDeletion() {
 
         <Section icon={<Shield size={18} />} title={c.identityTitle}>
           <p className="mb-4 text-sm text-slate-400">{c.identityText}</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <InfoCard label="Developer" value="Chong Technologies" />
             <InfoCard label="Primary app name" value="EntryFlow" />
-            <InfoCard label="Store / commercial names" value="APPGUARD / EliteCondoGuard" />
           </div>
         </Section>
 
