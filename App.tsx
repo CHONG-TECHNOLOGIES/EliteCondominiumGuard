@@ -28,6 +28,7 @@ const News = React.lazy(() => import('./pages/News'));
 const Setup = React.lazy(() => import('./pages/Setup'));
 const UserManual = React.lazy(() => import('./pages/UserManual'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
+const AccountDeletion = React.lazy(() => import('./pages/AccountDeletion'));
 
 const AdminDashboard = React.lazy(() => import('./pages/admin/AdminDashboard'));
 const AdminCondominiums = React.lazy(() => import('./pages/admin/AdminCondominiums'));
@@ -574,6 +575,7 @@ export default function App() {
                 <Route path="/setup" element={<Setup />} />
                 <Route path="/manual" element={<UserManual />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/account-deletion" element={<AccountDeletion />} />
                 <Route path="/login" element={<ConfigGuard><Login /></ConfigGuard>} />
 
                 {/* Admin Routes */}

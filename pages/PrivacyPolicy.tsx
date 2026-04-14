@@ -547,6 +547,23 @@ export default function PrivacyPolicy() {
           </div>
         </Section>
 
+        <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 p-5">
+          <p className="text-sm font-semibold text-white">
+            {lang === 'pt' ? 'Pedido de eliminacao de conta' : 'Account deletion request'}
+          </p>
+          <p className="mt-2 text-sm text-slate-300">
+            {lang === 'pt'
+              ? 'Para pedir a eliminacao de conta e dados associados, utilize a pagina publica de eliminacao de conta e siga as instrucoes apresentadas.'
+              : 'To request deletion of your account and associated data, use the public account deletion page and follow the listed instructions.'}
+          </p>
+          <a
+            href="#/account-deletion"
+            className="mt-4 inline-flex items-center rounded-lg border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-500/20"
+          >
+            {lang === 'pt' ? 'Abrir pagina de eliminacao de conta' : 'Open account deletion page'}
+          </a>
+        </div>
+
         <div className="border-t border-slate-800 pt-6 text-center text-xs text-slate-600">
           <p>{c.footer}</p>
         </div>
