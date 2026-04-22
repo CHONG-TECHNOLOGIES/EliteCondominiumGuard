@@ -12,7 +12,7 @@ import {
   QrCode, User, Truck, Wrench, GraduationCap, Save, ArrowLeft, Phone,
   CheckCircle, Search, Building, Briefcase,
   Hammer, Wifi, Zap, Droplets, Flower2, Sparkles, MoreHorizontal, ScanLine, Users,
-  UtensilsCrossed, Dumbbell, X, MapPin
+  UtensilsCrossed, Dumbbell, X, MapPin, Camera
 } from 'lucide-react';
 
 export default function NewEntry() {
@@ -50,6 +50,11 @@ export default function NewEntry() {
     setPhoto(photoDataUrl);
   };
 
+  const handleBackToStep2 = () => {
+    setPhotoConsentGiven(false);
+    setStep(2);
+  };
+
   // Modals State
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -60,6 +65,9 @@ export default function NewEntry() {
   const [isOffline, setIsOffline] = useState(!api.checkOnline());
   const [photoQuality, setPhotoQuality] = useState<PhotoQuality>(PhotoQuality.MEDIUM);
   const [visitorPhotoEnabled, setVisitorPhotoEnabled] = useState(true);
+
+  // Photo Consent State — toggle shown in step 3 when visitorPhotoEnabled
+  const [photoConsentGiven, setPhotoConsentGiven] = useState(false);
 
   // QR Question Modal State
   const [showQrQuestionModal, setShowQrQuestionModal] = useState(false);
@@ -259,7 +267,8 @@ export default function NewEntry() {
       qr_token: qrToken || undefined,
       approval_mode: isFreeEntry ? 'ENTRADA_LIVRE' : approvalMode, // Free entry or selected mode
       status: isFreeEntry ? VisitStatus.APPROVED : VisitStatus.PENDING, // Auto-approve free entry
-      guard_id: user!.id
+      guard_id: user!.id,
+      photo_consent_given: visitorPhotoEnabled ? true : undefined,
     };
 
     const createdVisit = await api.createVisit(visitData);
@@ -601,20 +610,53 @@ export default function NewEntry() {
             <h3 className="text-sm font-black text-slate-400 uppercase tracking-wider mb-4">
               Captura de Imagem
             </h3>
-            {approvalMode === ApprovalMode.QR_SCAN && !isScanningQr && !qrConfirmed ? (
-              <div className="flex flex-col items-center justify-center h-80 w-full bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400">
-                <QrCode size={48} className="mb-4 opacity-20" />
-                <p className="font-medium">Câmara em espera...</p>
+
+            {/* Consent toggle — visitor must agree before photo can be taken */}
+            <div className={`flex items-center justify-between p-4 rounded-xl border-2 mb-4 transition-colors ${photoConsentGiven ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center gap-3">
+                <Camera size={20} className={photoConsentGiven ? 'text-emerald-600' : 'text-slate-400'} />
+                <div>
+                  <p className="text-sm font-bold text-slate-700">Consentimento Fotográfico</p>
+                  <p className="text-xs text-slate-500">O visitante autoriza a captura da sua fotografia?</p>
+                </div>
               </div>
+              <button
+                onClick={() => setPhotoConsentGiven(!photoConsentGiven)}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${photoConsentGiven ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                aria-label="Toggle consentimento fotográfico"
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${photoConsentGiven ? 'translate-x-7' : 'translate-x-1'}`} />
+              </button>
+            </div>
+
+            {photoConsentGiven ? (
+              /* Consent ACCEPTED — show camera */
+              <>
+                {approvalMode === ApprovalMode.QR_SCAN && !isScanningQr && !qrConfirmed ? (
+                  <div className="flex flex-col items-center justify-center h-80 w-full bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400">
+                    <QrCode size={48} className="mb-4 opacity-20" />
+                    <p className="font-medium">Câmara em espera...</p>
+                  </div>
+                ) : (
+                  <ErrorBoundary>
+                    <CameraCapture
+                      onCapture={handlePhotoCapture}
+                      mode={approvalMode === ApprovalMode.QR_SCAN && !qrConfirmed ? 'scan' : 'photo'}
+                      onQrScanned={handleQrScanned}
+                      photoQuality={photoQuality}
+                    />
+                  </ErrorBoundary>
+                )}
+              </>
             ) : (
-              <ErrorBoundary>
-                <CameraCapture
-                  onCapture={handlePhotoCapture}
-                  mode={approvalMode === ApprovalMode.QR_SCAN && !qrConfirmed ? 'scan' : 'photo'}
-                  onQrScanned={handleQrScanned}
-                  photoQuality={photoQuality}
-                />
-              </ErrorBoundary>
+              /* Consent NOT given — blocked */
+              <div className="flex flex-col items-center justify-center h-64 w-full bg-red-50 rounded-2xl border-2 border-dashed border-red-200 text-center p-6 gap-3">
+                <X size={40} className="text-red-300" />
+                <div>
+                  <p className="font-bold text-red-700">Entrada Não Autorizada</p>
+                  <p className="text-xs text-red-500 mt-1">As regras do condomínio exigem consentimento fotográfico para autorização de entrada.</p>
+                </div>
+              </div>
             )}
 
             {/* Visit Summary */}
@@ -786,7 +828,11 @@ export default function NewEntry() {
             <div className="space-y-3">
               <button
                 onClick={handleSubmit}
-                disabled={(visitorPhotoEnabled && !photo && approvalMode !== ApprovalMode.QR_SCAN) || (approvalMode === ApprovalMode.QR_SCAN && !qrConfirmed)}
+                disabled={
+                  (visitorPhotoEnabled && !photoConsentGiven) ||
+                  (visitorPhotoEnabled && !photo && approvalMode !== ApprovalMode.QR_SCAN) ||
+                  (approvalMode === ApprovalMode.QR_SCAN && !qrConfirmed)
+                }
                 className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:text-slate-500 text-white rounded-xl font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
               >
                 <CheckCircle size={20} />
@@ -807,7 +853,7 @@ export default function NewEntry() {
                 </button>
               ) : (
                 <button
-                  onClick={() => setStep(2)}
+                  onClick={handleBackToStep2}
                   className="w-full py-3 text-slate-500 hover:text-slate-700 font-semibold text-sm transition-colors"
                 >
                   ← Voltar atrás

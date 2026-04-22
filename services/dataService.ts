@@ -1791,6 +1791,7 @@ class DataService {
       approval_mode: visitData.approval_mode,
       guard_id: visitData.guard_id,
       device_id: this.currentDeviceId || undefined, // Track which device registered this visit
+      photo_consent_given: visitData.photo_consent_given,
       sync_status: SyncStatus.PENDING_SYNC
     };
 

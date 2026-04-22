@@ -212,6 +212,7 @@ export interface Visit {
   unit_number?: string;          // Número da unidade (para exibição)
   reason?: string;
   photo_url?: string;
+  photo_consent_given?: boolean;
   qr_token?: string;
   qr_expires_at?: string;        // timestamptz
   check_in_at: string;           // timestamptz
@@ -395,6 +396,35 @@ export interface SubscriptionAlert {
   reference_month: string;
   sent_by: number;
   created_at?: string;
+}
+
+// ─── Video Call ───────────────────────────────────────────────────────────────
+
+export type VideoCallStatus = 'CALLING' | 'ACCEPTED' | 'REJECTED' | 'MISSED' | 'ENDED' | 'FAILED';
+
+export type SignalingMessageType = 'offer' | 'answer' | 'ice-candidate' | 'reject' | 'hangup';
+
+export interface SignalingMessage {
+  type: SignalingMessageType;
+  sdp?: string;
+  candidate?: RTCIceCandidateInit;
+}
+
+export interface VideoCallSession {
+  id: string;
+  visit_id: number;
+  guard_id: number;
+  resident_id?: number;
+  unit_id?: number;
+  condominium_id: number;
+  device_id?: string;
+  status: VideoCallStatus;
+  initiated_at: string;
+  answered_at?: string;
+  ended_at?: string;
+  duration_seconds?: number;
+  rejection_reason?: string;
+  created_at: string;
 }
 
 
