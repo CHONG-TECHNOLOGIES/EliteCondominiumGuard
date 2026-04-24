@@ -1,17 +1,81 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/dataService';
-import { Visit, VisitEvent, VisitStatus, SyncStatus } from '../types';
+import { SupabaseService } from '../services/Supabase';
+import { db } from '../services/db';
+import { Visit, VisitEvent, VisitStatus, SyncStatus, VideoCallSession } from '../types';
 import { initiatePhoneCall } from '@/utils/approvalModes';
-import { CheckCircle, LogOut, Clock, AlertCircle, User, MapPin, ArrowLeft, Phone, History, X, Search } from 'lucide-react';
+import { getDeviceIdentifier } from '@/services/deviceUtils';
+import { LogOut, Clock, AlertCircle, User, MapPin, ArrowLeft, Phone, History, X, Search, Video } from 'lucide-react';
 import { useToast } from '../components/Toast';
+import { VideoCallModal } from '../components/VideoCallModal';
+import { AuthContext } from '../App';
+
+const CONTACT_DELAY_MS = 7 * 60 * 1000;
+
+function useContactButtonsVisible(visit: Visit): boolean {
+  const [visible, setVisible] = useState(
+    () => Date.now() - new Date(visit.created_at ?? visit.check_in_at).getTime() >= CONTACT_DELAY_MS
+  );
+  useEffect(() => {
+    if (visible) return;
+    const elapsed = Date.now() - new Date(visit.created_at ?? visit.check_in_at).getTime();
+    const remaining = CONTACT_DELAY_MS - elapsed;
+    if (remaining <= 0) { setVisible(true); return; }
+    const timer = setTimeout(() => setVisible(true), remaining);
+    return () => clearTimeout(timer);
+  }, [visit.created_at, visit.check_in_at, visible]);
+  return visible;
+}
+
+function ContactButtons({
+  visit,
+  onPhone,
+  onVideo,
+  isOnline,
+  mobile = false
+}: {
+  visit: Visit;
+  onPhone: (v: Visit) => void;
+  onVideo: (v: Visit) => void;
+  isOnline: boolean;
+  mobile?: boolean;
+}) {
+  const visible = useContactButtonsVisible(visit);
+  if (!visible) return null;
+
+  const baseBtn = mobile
+    ? 'flex-1 px-3 py-2 rounded-lg font-bold text-sm flex justify-center items-center gap-2 transition-colors'
+    : 'px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-colors';
+
+  return (
+    <>
+      <button
+        onClick={() => onPhone(visit)}
+        className={`${baseBtn} bg-blue-600 text-white hover:bg-blue-700 animate-pulse ring-2 ring-amber-400 ring-offset-1`}
+      >
+        <Phone size={16} /> Ligar
+      </button>
+      <button
+        onClick={() => onVideo(visit)}
+        disabled={!isOnline}
+        className={`${baseBtn} ${isOnline ? 'bg-violet-600 text-white hover:bg-violet-700 animate-pulse ring-2 ring-amber-400 ring-offset-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'}`}
+      >
+        <Video size={16} /> Vídeo
+      </button>
+    </>
+  );
+}
 
 export default function DailyList() {
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const { showToast, showConfirm } = useToast();
+  const [isOnline, setIsOnline] = useState(api.checkOnline());
   const [visits, setVisits] = useState<Visit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeVideoCall, setActiveVideoCall] = useState<{ session: VideoCallSession; visit: Visit } | null>(null);
   const [photoModal, setPhotoModal] = useState<{ url: string; name: string } | null>(null);
   const [eventModal, setEventModal] = useState<{
     isOpen: boolean;
@@ -81,6 +145,57 @@ export default function DailyList() {
       initiatePhoneCall(visit.visitor_phone!);
     });
   };
+
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
+  }, []);
+
+  const handleVideoCall = useCallback(async (visit: Visit) => {
+    if (!user) return;
+    if (!visit.unit_id) {
+      showToast('error', 'Esta visita não tem unidade associada para chamada de vídeo.');
+      return;
+    }
+
+    const resident = await db.residents.where('unit_id').equals(visit.unit_id).first();
+    if (!resident?.has_app_installed) {
+      showToast('error', 'O morador desta unidade não tem a app instalada.');
+      return;
+    }
+
+    const session = await SupabaseService.createVideoCallSession({
+      visit_id: visit.id,
+      guard_id: user.id,
+      resident_id: resident.id,
+      unit_id: visit.unit_id,
+      condominium_id: user.condominium_id,
+      device_id: getDeviceIdentifier() ?? undefined
+    });
+
+    if (!session) {
+      showToast('error', 'Não foi possível iniciar a chamada de vídeo.');
+      return;
+    }
+
+    await SupabaseService.createVideoCallNotification({
+      resident_id: resident.id,
+      condominium_id: user.condominium_id,
+      unit_id: visit.unit_id,
+      session_id: session.id,
+      visit_id: visit.id,
+      visitor_name: visit.visitor_name,
+      visitor_photo_url: visit.photo_url ?? undefined,
+      guard_name: `${user.first_name} ${user.last_name}`,
+      unit_number: visit.unit_number ?? undefined,
+      unit_block: visit.unit_block ?? undefined
+    });
+
+    setActiveVideoCall({ session, visit });
+  }, [user, showToast]);
 
   const openEventModal = async (visit: Visit) => {
     setEventModal({ isOpen: true, visit, events: [], loading: true });
@@ -231,22 +346,15 @@ export default function DailyList() {
                 </div>
 
                 <div className="flex justify-end gap-2 mt-2">
-                  {/* PENDING: Show "Contact Resident" + "Authorize" buttons */}
+                  {/* PENDING: Contact buttons visible after 7 minutes */}
                   {visit.status === VisitStatus.PENDING && (
-                    <>
-                      <button
-                        onClick={() => handleContactResident(visit)}
-                        className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm flex justify-center items-center gap-2 hover:bg-blue-700 transition-colors"
-                      >
-                        <Phone size={16} /> Contactar morador
-                      </button>
-                      <button
-                        disabled
-                        className="flex-1 px-3 py-2 bg-green-300 text-green-700 rounded-lg font-bold text-sm flex justify-center items-center gap-2 opacity-50 cursor-not-allowed"
-                      >
-                        <CheckCircle size={16} /> Autorizar
-                      </button>
-                    </>
+                    <ContactButtons
+                      visit={visit}
+                      onPhone={handleContactResident}
+                      onVideo={handleVideoCall}
+                      isOnline={isOnline}
+                      mobile
+                    />
                   )}
 
                   {/* APPROVED/INSIDE: Show only "Mark Exit" button (enabled) */}
@@ -335,22 +443,14 @@ export default function DailyList() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {/* PENDING: Show "Contact Resident" + "Authorize" buttons */}
+                        {/* PENDING: Contact buttons visible after 7 minutes */}
                         {visit.status === VisitStatus.PENDING && (
-                          <>
-                            <button
-                              onClick={() => handleContactResident(visit)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-bold text-sm hover:bg-blue-700 flex items-center gap-2 transition-colors"
-                            >
-                              <Phone size={16} /> Contactar morador
-                            </button>
-                            <button
-                              disabled
-                              className="px-4 py-2 bg-green-300 text-green-700 rounded-lg font-bold text-sm flex items-center gap-2 opacity-50 cursor-not-allowed"
-                            >
-                              <CheckCircle size={16} /> Autorizar
-                            </button>
-                          </>
+                          <ContactButtons
+                            visit={visit}
+                            onPhone={handleContactResident}
+                            onVideo={handleVideoCall}
+                            isOnline={isOnline}
+                          />
                         )}
 
                         {/* APPROVED/INSIDE: Show only "Mark Exit" button (enabled) */}
@@ -393,6 +493,15 @@ export default function DailyList() {
             <p className="text-center text-white font-bold mt-3 text-lg">{photoModal.name}</p>
           </div>
         </div>
+      )}
+
+      {/* Video Call Modal */}
+      {activeVideoCall && (
+        <VideoCallModal
+          session={activeVideoCall.session}
+          visit={activeVideoCall.visit}
+          onClose={() => setActiveVideoCall(null)}
+        />
       )}
 
       {/* Event History Modal */}

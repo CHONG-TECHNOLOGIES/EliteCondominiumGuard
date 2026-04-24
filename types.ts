@@ -59,6 +59,14 @@ export interface Condominium {
   manager_name?: string;
   total_residents?: number;  // Fetched dynamically for Admin Panel
   visitor_photo_enabled?: boolean; // Whether visitor photo capture is required on entry
+  intercom_approval_enabled?: boolean; // Whether intercom approval is available for this condominium
+  guard_manual_approval_enabled?: boolean; // Whether guards can manually approve entries
+}
+
+export interface CondoSetupSettings {
+  visitor_photo_enabled: boolean;
+  intercom_approval_enabled: boolean;
+  guard_manual_approval_enabled: boolean;
 }
 
 export interface Street {
