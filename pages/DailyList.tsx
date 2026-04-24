@@ -43,6 +43,14 @@ function ContactButtons({
   mobile?: boolean;
 }) {
   const visible = useContactButtonsVisible(visit);
+  const [residentHasApp, setResidentHasApp] = useState(false);
+
+  useEffect(() => {
+    if (!visit.unit_id) return;
+    db.residents.where('unit_id').equals(visit.unit_id).first()
+      .then(r => { if (r?.has_app_installed) setResidentHasApp(true); });
+  }, [visit.unit_id]);
+
   if (!visible) return null;
 
   const baseBtn = mobile
@@ -57,13 +65,15 @@ function ContactButtons({
       >
         <Phone size={16} /> Ligar
       </button>
-      <button
-        onClick={() => onVideo(visit)}
-        disabled={!isOnline}
-        className={`${baseBtn} ${isOnline ? 'bg-violet-600 text-white hover:bg-violet-700 animate-pulse ring-2 ring-amber-400 ring-offset-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'}`}
-      >
-        <Video size={16} /> Vídeo
-      </button>
+      {residentHasApp && (
+        <button
+          onClick={() => onVideo(visit)}
+          disabled={!isOnline}
+          className={`${baseBtn} ${isOnline ? 'bg-violet-600 text-white hover:bg-violet-700 animate-pulse ring-2 ring-amber-400 ring-offset-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'}`}
+        >
+          <Video size={16} /> Vídeo
+        </button>
+      )}
     </>
   );
 }
@@ -121,20 +131,40 @@ export default function DailyList() {
     loadVisits();
   };
 
-  const handleContactResident = (visit: Visit) => {
-    if (!visit.visitor_phone) {
-      alert('N?mero de telefone n?o dispon?vel para este visitante.');
+  const handleContactResident = useCallback(async (visit: Visit) => {
+    if (!visit.unit_id) {
+      showToast('error', 'Esta visita não tem unidade associada.');
+      return;
+    }
+
+    let resident = await db.residents.where('unit_id').equals(visit.unit_id).first();
+
+    if (!resident && isOnline) {
+      const fetched = await SupabaseService.getResidentByUnitId(visit.unit_id);
+      if (fetched) {
+        resident = fetched;
+        await db.residents.put(fetched);
+      }
+    }
+
+    if (!resident) {
+      showToast('error', 'Dados do morador não disponíveis. Verifique a ligação e sincronize.');
+      return;
+    }
+
+    if (!resident.phone) {
+      showToast('error', 'O morador desta unidade não tem número de telefone registado.');
       return;
     }
 
     const unitLabel = visit.unit_block && visit.unit_number
       ? `${visit.unit_block} ${visit.unit_number}`
-      : undefined;
+      : visit.unit_number ?? String(visit.unit_id);
 
-    showConfirm(`Confirmar chamada para ${visit.visitor_phone}?`, async () => {
+    showConfirm(`Ligar para o morador da unidade ${unitLabel}?`, async () => {
       await api.logCallInitiated({
-        phone: visit.visitor_phone,
-        source: 'visitor',
+        phone: resident!.phone,
+        source: 'resident',
         visitId: visit.id,
         unitId: visit.unit_id,
         unitLabel,
@@ -142,9 +172,9 @@ export default function DailyList() {
         targetTable: 'visits',
         targetId: visit.id
       });
-      initiatePhoneCall(visit.visitor_phone!);
+      initiatePhoneCall(resident!.phone!);
     });
-  };
+  }, [showToast, showConfirm, isOnline]);
 
   useEffect(() => {
     const onOnline = () => setIsOnline(true);

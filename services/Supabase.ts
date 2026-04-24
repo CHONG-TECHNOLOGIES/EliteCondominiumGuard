@@ -618,6 +618,22 @@ export const SupabaseService = {
     }
   },
 
+  async getResidentByUnitId(unitId: number): Promise<Resident | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('residents')
+        .select('*')
+        .eq('unit_id', unitId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data as Resident;
+    } catch (err: any) {
+      logger.error('Error fetching resident by unit_id', err, ErrorCategory.NETWORK);
+      return null;
+    }
+  },
+
   // --- Visitas ---
   async getTodaysVisits(condoId: number): Promise<Visit[]> {
     if (!supabase) return [];
