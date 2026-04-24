@@ -1,14 +1,68 @@
 
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, List, AlertTriangle, RefreshCw, MessageSquare, Send, X, Clock, CheckCircle, LogOut, User, MapPin, ShieldCheck, ChevronRight, Phone, Search, Newspaper } from 'lucide-react';
+import { UserPlus, List, AlertTriangle, RefreshCw, MessageSquare, Send, X, Clock, LogOut, User, MapPin, ShieldCheck, ChevronRight, Phone, Search, Newspaper, Video } from 'lucide-react';
 import { api } from '../services/dataService';
+import { SupabaseService } from '../services/Supabase';
+import { db } from '../services/db';
 import { askConcierge } from '../services/geminiService';
-import { CondominiumNews, Visit, VisitStatus } from '../types';
+import { CondominiumNews, Visit, VisitStatus, VideoCallSession } from '../types';
 import { AuthContext } from '../App';
 import { useToast } from '../components/Toast';
 import { audioService } from '../services/audioService';
 import { logger, ErrorCategory } from '@/services/logger';
+import { VideoCallModal } from '../components/VideoCallModal';
+import { getDeviceIdentifier } from '@/services/deviceUtils';
+
+const CONTACT_DELAY_MS = 7 * 60 * 1000;
+
+function useContactButtonsVisible(visit: Visit): boolean {
+  const [visible, setVisible] = useState(
+    () => Date.now() - new Date(visit.created_at ?? visit.check_in_at).getTime() >= CONTACT_DELAY_MS
+  );
+  useEffect(() => {
+    if (visible) return;
+    const elapsed = Date.now() - new Date(visit.created_at ?? visit.check_in_at).getTime();
+    const remaining = CONTACT_DELAY_MS - elapsed;
+    if (remaining <= 0) { setVisible(true); return; }
+    const timer = setTimeout(() => setVisible(true), remaining);
+    return () => clearTimeout(timer);
+  }, [visit.created_at, visit.check_in_at, visible]);
+  return visible;
+}
+
+function DashContactButtons({
+  visit,
+  onPhone,
+  onVideo,
+  isOnline
+}: {
+  visit: Visit;
+  onPhone: (v: Visit) => void;
+  onVideo: (v: Visit) => void;
+  isOnline: boolean;
+}) {
+  const visible = useContactButtonsVisible(visit);
+  if (!visible) return null;
+
+  return (
+    <>
+      <button
+        onClick={() => onPhone(visit)}
+        className="flex-1 md:flex-none h-12 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-all animate-pulse ring-2 ring-amber-400 ring-offset-1"
+      >
+        <Phone size={18} /> Ligar
+      </button>
+      <button
+        onClick={() => onVideo(visit)}
+        disabled={!isOnline}
+        className={`flex-1 md:flex-none h-12 px-5 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all ${isOnline ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-600/20 animate-pulse ring-2 ring-amber-400 ring-offset-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'}`}
+      >
+        <Video size={18} /> Vídeo
+      </button>
+    </>
+  );
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -25,6 +79,7 @@ export default function Dashboard() {
   // Quick Actions State
   const [activeVisits, setActiveVisits] = useState<Visit[]>([]);
   const [todaysVisitsCount, setTodaysVisitsCount] = useState(0);
+  const [activeVideoCall, setActiveVideoCall] = useState<{ session: VideoCallSession; visit: Visit } | null>(null);
   const [incidentsCount, setIncidentsCount] = useState(0);
   const previousIncidentCountRef = useRef<number>(-1);
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -229,6 +284,49 @@ export default function Dashboard() {
       window.open(`tel:${visit.visitor_phone}`, '_self');
     });
   };
+
+  const handleVideoCall = useCallback(async (visit: Visit) => {
+    if (!user) return;
+    if (!visit.unit_id) {
+      showToast('error', 'Esta visita não tem unidade associada para chamada de vídeo.');
+      return;
+    }
+
+    const resident = await db.residents.where('unit_id').equals(visit.unit_id).first();
+    if (!resident?.has_app_installed) {
+      showToast('error', 'O morador desta unidade não tem a app instalada.');
+      return;
+    }
+
+    const session = await SupabaseService.createVideoCallSession({
+      visit_id: visit.id,
+      guard_id: user.id,
+      resident_id: resident.id,
+      unit_id: visit.unit_id,
+      condominium_id: user.condominium_id,
+      device_id: getDeviceIdentifier() ?? undefined
+    });
+
+    if (!session) {
+      showToast('error', 'Não foi possível iniciar a chamada de vídeo.');
+      return;
+    }
+
+    await SupabaseService.createVideoCallNotification({
+      resident_id: resident.id,
+      condominium_id: user.condominium_id,
+      unit_id: visit.unit_id,
+      session_id: session.id,
+      visit_id: visit.id,
+      visitor_name: visit.visitor_name,
+      visitor_photo_url: visit.photo_url ?? undefined,
+      guard_name: `${user.first_name} ${user.last_name}`,
+      unit_number: visit.unit_number ?? undefined,
+      unit_block: visit.unit_block ?? undefined
+    });
+
+    setActiveVideoCall({ session, visit });
+  }, [user, showToast]);
 
   const getStatusColor = (status: VisitStatus) => {
     switch (status) {
@@ -469,22 +567,14 @@ export default function Dashboard() {
 
                   {/* Quick Actions */}
                   <div className="w-full md:w-auto flex gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-slate-50 mt-2 md:mt-0">
-                    {/* PENDING: Show "Contact Resident" + "Authorize" buttons */}
+                    {/* PENDING: Contact buttons visible after 7 minutes */}
                     {visit.status === VisitStatus.PENDING && (
-                      <>
-                        <button
-                          onClick={() => handleContactResident(visit)}
-                          className="flex-1 md:flex-none h-12 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
-                        >
-                          <Phone size={18} /> Contactar morador
-                        </button>
-                        <button
-                          disabled
-                          className="flex-1 md:flex-none h-12 px-6 bg-emerald-300 text-emerald-700 rounded-xl font-bold flex items-center justify-center gap-2 opacity-50 cursor-not-allowed"
-                        >
-                          <CheckCircle size={18} /> Autorizar
-                        </button>
-                      </>
+                      <DashContactButtons
+                        visit={visit}
+                        onPhone={handleContactResident}
+                        onVideo={handleVideoCall}
+                        isOnline={isOnline}
+                      />
                     )}
 
                     {/* APPROVED: Show "Mark Inside" */}
@@ -526,6 +616,15 @@ export default function Dashboard() {
           <span className="font-bold hidden md:inline">Assistente</span>
         </button>
       </div>
+
+      {/* Video Call Modal */}
+      {activeVideoCall && (
+        <VideoCallModal
+          session={activeVideoCall.session}
+          visit={activeVideoCall.visit}
+          onClose={() => setActiveVideoCall(null)}
+        />
+      )}
     </div>
   );
 }

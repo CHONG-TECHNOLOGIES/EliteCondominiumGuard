@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ApprovalMode, Unit } from '../types';
+import { ApprovalMode, Condominium, Unit } from '../types';
 import { api } from '../services/dataService';
 import {
   getAvailableApprovalModes,
@@ -27,6 +27,7 @@ interface ApprovalModeSelectorProps {
   onModeSelect: (mode: ApprovalMode) => void;
   isOnline: boolean;
   unit?: Unit;
+  condominium?: Pick<Condominium, 'intercom_approval_enabled' | 'guard_manual_approval_enabled'> | null;
   visitorPhone?: string;
 }
 
@@ -76,11 +77,12 @@ export default function ApprovalModeSelector({
   onModeSelect,
   isOnline,
   unit,
+  condominium,
   visitorPhone
 }: ApprovalModeSelectorProps) {
   const [calling, setCalling] = useState(false);
   const { showToast, showConfirm } = useToast();
-  const availableModes = getAvailableApprovalModes(isOnline, unit); // Pass unit for contextual logic
+  const availableModes = getAvailableApprovalModes(isOnline, unit, condominium); // Pass unit and condo for contextual logic
   const residentPhones = unit ? getResidentPhones(unit) : [];
   const hasAppInstalled = unit ? unitHasAppInstalled(unit) : false;
   const preferredPhone = residentPhones[0] || visitorPhone || '';
@@ -167,7 +169,7 @@ export default function ApprovalModeSelector({
                 Residente sem Aplicativo
               </p>
               <p className="text-xs text-amber-700 leading-relaxed">
-                Nenhum morador desta unidade possui o app instalado. Use telefone ou interfone para aprovação.
+                Nenhum morador desta unidade possui o app instalado. Use os metodos disponiveis para aprovacao.
               </p>
             </div>
           </div>
