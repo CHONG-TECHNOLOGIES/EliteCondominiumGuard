@@ -618,29 +618,11 @@ export const SupabaseService = {
     }
   },
 
-  async getResidentByUnitId(unitId: number): Promise<Resident | null> {
-    if (!supabase) return null;
-    try {
-      const { data, error } = await supabase
-        .from('residents')
-        .select('*')
-        .eq('unit_id', unitId)
-        .maybeSingle();
-      if (error || !data) return null;
-      return data as Resident;
-    } catch (err: any) {
-      logger.error('Error fetching resident by unit_id', err, ErrorCategory.NETWORK);
-      return null;
-    }
-  },
-
   async getResidentsByUnitId(unitId: number): Promise<Resident[]> {
     if (!supabase) return [];
     try {
       const { data, error } = await supabase
-        .from('residents')
-        .select('*')
-        .eq('unit_id', unitId);
+        .rpc('get_residents_by_unit_id', { p_unit_id: unitId });
       if (error || !data) return [];
       return data as Resident[];
     } catch (err: any) {
@@ -653,12 +635,9 @@ export const SupabaseService = {
     if (!supabase) return null;
     try {
       const { data, error } = await supabase
-        .from('residents')
-        .select('*')
-        .eq('id', residentId)
-        .maybeSingle();
-      if (error || !data) return null;
-      return data as Resident;
+        .rpc('get_resident', { p_id: residentId });
+      if (error || !data?.length) return null;
+      return data[0] as Resident;
     } catch (err: any) {
       logger.error('Error fetching resident by id', err, ErrorCategory.NETWORK);
       return null;
