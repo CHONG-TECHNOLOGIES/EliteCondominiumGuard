@@ -1800,6 +1800,7 @@ class DataService {
       service_type_id: visitData.service_type_id,
       restaurant_id: visitData.restaurant_id ? String(visitData.restaurant_id) : undefined,
       sport_id: visitData.sport_id ? String(visitData.sport_id) : undefined,
+      resident_id: visitData.resident_id,
       unit_id: visitData.unit_id,
       reason: visitData.reason,
       photo_url: visitData.photo_url,

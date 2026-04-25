@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { UserPlus, List, AlertTriangle, RefreshCw, MessageSquare, Send, X, Clock, LogOut, User, MapPin, ShieldCheck, ChevronRight, Phone, Search, Newspaper, Video } from 'lucide-react';
 import { api } from '../services/dataService';
 import { SupabaseService } from '../services/Supabase';
-import { db } from '../services/db';
 import { askConcierge } from '../services/geminiService';
 import { CondominiumNews, Visit, VisitStatus, VideoCallSession } from '../types';
 import { AuthContext } from '../App';
@@ -14,6 +13,7 @@ import { logger, ErrorCategory } from '@/services/logger';
 import { VideoCallModal } from '../components/VideoCallModal';
 import { getDeviceIdentifier } from '@/services/deviceUtils';
 import { initiatePhoneCall } from '@/utils/approvalModes';
+import { findResidentForPhone, findResidentForVideoCall, visitHasResidentWithApp } from '@/utils/residentLookup';
 
 const CONTACT_DELAY_MS = 7 * 60 * 1000;
 
@@ -47,10 +47,17 @@ function DashContactButtons({
   const [residentHasApp, setResidentHasApp] = useState(false);
 
   useEffect(() => {
-    if (!visit.unit_id) return;
-    db.residents.where('unit_id').equals(visit.unit_id).first()
-      .then(r => { if (r?.has_app_installed) setResidentHasApp(true); });
-  }, [visit.unit_id]);
+    if (!visit.unit_id && !visit.qr_token && !visit.resident_id) return;
+
+    let cancelled = false;
+    visitHasResidentWithApp(visit, isOnline).then(hasApp => {
+      if (!cancelled) setResidentHasApp(hasApp);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visit, isOnline]);
 
   if (!visible) return null;
 
@@ -272,20 +279,12 @@ export default function Dashboard() {
   };
 
   const handleContactResident = useCallback(async (visit: Visit) => {
-    if (!visit.unit_id) {
+    if (!visit.unit_id && !visit.qr_token && !visit.resident_id) {
       showToast('error', 'Esta visita não tem unidade associada.');
       return;
     }
 
-    let resident = await db.residents.where('unit_id').equals(visit.unit_id).first();
-
-    if (!resident && isOnline) {
-      const fetched = await SupabaseService.getResidentByUnitId(visit.unit_id);
-      if (fetched) {
-        resident = fetched;
-        await db.residents.put(fetched);
-      }
-    }
+    const resident = await findResidentForPhone(visit, isOnline);
 
     if (!resident) {
       showToast('error', 'Dados do morador não disponíveis. Verifique a ligação e sincronize.');
@@ -318,13 +317,13 @@ export default function Dashboard() {
 
   const handleVideoCall = useCallback(async (visit: Visit) => {
     if (!user) return;
-    if (!visit.unit_id) {
+    if (!visit.unit_id && !visit.qr_token && !visit.resident_id) {
       showToast('error', 'Esta visita não tem unidade associada para chamada de vídeo.');
       return;
     }
 
-    const resident = await db.residents.where('unit_id').equals(visit.unit_id).first();
-    if (!resident?.has_app_installed) {
+    const resident = await findResidentForVideoCall(visit, isOnline);
+    if (!resident) {
       showToast('error', 'O morador desta unidade não tem a app instalada.');
       return;
     }
@@ -357,7 +356,7 @@ export default function Dashboard() {
     });
 
     setActiveVideoCall({ session, visit });
-  }, [user, showToast]);
+  }, [user, showToast, isOnline]);
 
   const getStatusColor = (status: VisitStatus) => {
     switch (status) {
