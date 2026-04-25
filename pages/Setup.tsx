@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/dataService';
-import { ShieldCheck, AlertCircle, Loader2, Search, Building, RefreshCw, KeyRound, RotateCcw, Tablet, Clock, Camera } from 'lucide-react';
+import { ShieldCheck, AlertCircle, Loader2, Search, Building, RefreshCw, KeyRound, RotateCcw, Tablet, Clock, Camera, PhoneCall, UserCheck } from 'lucide-react';
 import { Condominium, Device } from '../types';
 
 export default function Setup() {
@@ -14,6 +14,8 @@ export default function Setup() {
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [error, setError] = useState('');
   const [visitorPhotoEnabled, setVisitorPhotoEnabled] = useState(true);
+  const [intercomApprovalEnabled, setIntercomApprovalEnabled] = useState(true);
+  const [guardManualApprovalEnabled, setGuardManualApprovalEnabled] = useState(true);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
@@ -43,6 +45,12 @@ export default function Setup() {
 
   useEffect(() => {
     loadCondos();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then((registration) => registration.update())
+        .catch(() => { /* SW not available yet */ });
+    }
 
     // Online/offline listener
     const handleOnline = () => setIsOnline(true);
@@ -80,7 +88,11 @@ export default function Setup() {
     setError('');
 
     try {
-      const result = await api.configureDevice(selectedCondoId, visitorPhotoEnabled);
+      const result = await api.configureDevice(selectedCondoId, {
+        visitor_photo_enabled: visitorPhotoEnabled,
+        intercom_approval_enabled: intercomApprovalEnabled,
+        guard_manual_approval_enabled: guardManualApprovalEnabled,
+      });
       if (result.success) {
         navigate('/login');
       } else {
@@ -115,7 +127,11 @@ export default function Setup() {
       }
 
       // 2. Force Configure
-      const result = await api.forceConfigureDevice(selectedCondoId, staff);
+      const result = await api.forceConfigureDevice(selectedCondoId, staff, {
+        visitor_photo_enabled: visitorPhotoEnabled,
+        intercom_approval_enabled: intercomApprovalEnabled,
+        guard_manual_approval_enabled: guardManualApprovalEnabled,
+      });
 
       if (result.success) {
         navigate('/login');
@@ -325,7 +341,7 @@ export default function Setup() {
       </div>
       {showConfirmModal && selectedCondo && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
             <div className="w-16 h-16 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-4">
               <AlertCircle size={32} />
             </div>
@@ -383,6 +399,72 @@ export default function Setup() {
                   }`}
                 >
                   Não, ignorar
+                </button>
+              </div>
+            </div>
+            <div className="w-full mb-5 p-4 bg-slate-50 rounded-xl border border-slate-200 text-left">
+              <div className="flex items-center gap-2 mb-1">
+                <PhoneCall size={15} className="text-slate-600" />
+                <p className="font-semibold text-slate-700 text-sm">Aprovacao por interfone</p>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">
+                Quando ativado, o guarda pode chamar a unidade pelo interfone como metodo de aprovacao.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIntercomApprovalEnabled(true)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                    intercomApprovalEnabled
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300'
+                  }`}
+                >
+                  Sim, permitir
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIntercomApprovalEnabled(false)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                    !intercomApprovalEnabled
+                      ? 'bg-slate-600 text-white border-slate-600'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                  }`}
+                >
+                  Nao permitir
+                </button>
+              </div>
+            </div>
+            <div className="w-full mb-5 p-4 bg-slate-50 rounded-xl border border-slate-200 text-left">
+              <div className="flex items-center gap-2 mb-1">
+                <UserCheck size={15} className="text-slate-600" />
+                <p className="font-semibold text-slate-700 text-sm">Aprovacao manual pelo guarda</p>
+              </div>
+              <p className="text-xs text-slate-500 mb-3">
+                Quando ativado, o guarda pode autorizar a entrada se o residente nao responder.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setGuardManualApprovalEnabled(true)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                    guardManualApprovalEnabled
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-blue-300'
+                  }`}
+                >
+                  Sim, permitir
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGuardManualApprovalEnabled(false)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-bold border-2 transition-all ${
+                    !guardManualApprovalEnabled
+                      ? 'bg-slate-600 text-white border-slate-600'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                  }`}
+                >
+                  Nao permitir
                 </button>
               </div>
             </div>

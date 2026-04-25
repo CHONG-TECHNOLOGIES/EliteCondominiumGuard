@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit2, Power, MapPin, Loader2, Search, X, Users } from 'lucide-react';
+import { Building2, Plus, Edit2, Power, MapPin, Loader2, Search, X, Users, Camera, PhoneCall, UserCheck } from 'lucide-react';
 import { api } from '../../services/dataService';
 import { Condominium, Street } from '../../types';
 import { useToast } from '../../components/Toast';
@@ -29,7 +29,10 @@ export default function AdminCondominiums() {
     phone_number: '',
     contact_person: '',
     contact_email: '',
-    manager_name: ''
+    manager_name: '',
+    visitor_photo_enabled: true,
+    intercom_approval_enabled: true,
+    guard_manual_approval_enabled: true
   });
 
   // Street management state
@@ -171,7 +174,10 @@ export default function AdminCondominiums() {
       phone_number: condo.phone_number || '',
       contact_person: condo.contact_person || '',
       contact_email: condo.contact_email || '',
-      manager_name: condo.manager_name || ''
+      manager_name: condo.manager_name || '',
+      visitor_photo_enabled: condo.visitor_photo_enabled ?? true,
+      intercom_approval_enabled: condo.intercom_approval_enabled ?? true,
+      guard_manual_approval_enabled: condo.guard_manual_approval_enabled ?? true
     });
     setLogoPreviewUrl(condo.logo_url || null);
     setShowEditModal(true);
@@ -307,7 +313,10 @@ export default function AdminCondominiums() {
       phone_number: '',
       contact_person: '',
       contact_email: '',
-      manager_name: ''
+      manager_name: '',
+      visitor_photo_enabled: true,
+      intercom_approval_enabled: true,
+      guard_manual_approval_enabled: true
     });
     setPendingStreets([]);
     setPendingStreetName('');
@@ -320,6 +329,53 @@ export default function AdminCondominiums() {
     const matchesStatus = statusFilter === 'ALL' || condo.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const renderEntryPermissionFields = () => (
+    <div className="border-t border-border-main pt-4 mt-4">
+      <h3 className="text-lg font-bold text-text-main mb-3">Permissoes de entrada</h3>
+      <div className="space-y-3">
+        <label className="flex items-start gap-3 p-3 border border-border-main rounded-lg bg-bg-surface cursor-pointer">
+          <input
+            type="checkbox"
+            checked={formData.visitor_photo_enabled}
+            onChange={(e) => setFormData({ ...formData, visitor_photo_enabled: e.target.checked })}
+            className="mt-1 h-4 w-4 rounded border-border-main text-blue-600 focus:ring-blue-500"
+          />
+          <Camera size={18} className="mt-0.5 text-text-dim flex-shrink-0" />
+          <span>
+            <span className="block text-sm font-semibold text-text-main">Captura obrigatoria de foto</span>
+            <span className="block text-xs text-text-dim">Exige foto do visitante antes de registar a entrada.</span>
+          </span>
+        </label>
+        <label className="flex items-start gap-3 p-3 border border-border-main rounded-lg bg-bg-surface cursor-pointer">
+          <input
+            type="checkbox"
+            checked={formData.intercom_approval_enabled}
+            onChange={(e) => setFormData({ ...formData, intercom_approval_enabled: e.target.checked })}
+            className="mt-1 h-4 w-4 rounded border-border-main text-blue-600 focus:ring-blue-500"
+          />
+          <PhoneCall size={18} className="mt-0.5 text-text-dim flex-shrink-0" />
+          <span>
+            <span className="block text-sm font-semibold text-text-main">Aprovacao por interfone</span>
+            <span className="block text-xs text-text-dim">Permite chamar a unidade pelo interfone como metodo de aprovacao.</span>
+          </span>
+        </label>
+        <label className="flex items-start gap-3 p-3 border border-border-main rounded-lg bg-bg-surface cursor-pointer">
+          <input
+            type="checkbox"
+            checked={formData.guard_manual_approval_enabled}
+            onChange={(e) => setFormData({ ...formData, guard_manual_approval_enabled: e.target.checked })}
+            className="mt-1 h-4 w-4 rounded border-border-main text-blue-600 focus:ring-blue-500"
+          />
+          <UserCheck size={18} className="mt-0.5 text-text-dim flex-shrink-0" />
+          <span>
+            <span className="block text-sm font-semibold text-text-main">Aprovacao manual pelo guarda</span>
+            <span className="block text-xs text-text-dim">Permite ao guarda autorizar se o residente nao responder.</span>
+          </span>
+        </label>
+      </div>
+    </div>
+  );
 
   return (
     <div className="p-3 md:p-4 lg:p-6 max-w-7xl mx-auto">
@@ -442,6 +498,17 @@ export default function AdminCondominiums() {
                         )}
                       </div>
                     )}
+                    <div className="flex flex-wrap gap-2 mb-2 text-xs">
+                      <span className={`px-2 py-1 rounded-full border ${condo.visitor_photo_enabled ?? true ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                        Foto {condo.visitor_photo_enabled ?? true ? 'ativa' : 'inativa'}
+                      </span>
+                      <span className={`px-2 py-1 rounded-full border ${condo.intercom_approval_enabled ?? true ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                        Interfone {condo.intercom_approval_enabled ?? true ? 'ativo' : 'inativo'}
+                      </span>
+                      <span className={`px-2 py-1 rounded-full border ${condo.guard_manual_approval_enabled ?? true ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                        Manual {condo.guard_manual_approval_enabled ?? true ? 'ativo' : 'inativo'}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-text-dim">
                       <Users size={16} />
                       <span className="font-medium">{condo.total_residents || 0} residentes</span>
@@ -554,6 +621,7 @@ export default function AdminCondominiums() {
                   placeholder="Nome do gestor"
                 />
               </div>
+              {renderEntryPermissionFields()}
               <div>
                 <label className="block text-sm font-medium text-text-main mb-2">Logo do Condomínio</label>
                 <input
@@ -773,6 +841,7 @@ export default function AdminCondominiums() {
                   placeholder="Nome do gestor"
                 />
               </div>
+              {renderEntryPermissionFields()}
               <div>
                 <label className="block text-sm font-medium text-text-main mb-2">Logo do Condomínio</label>
                 <input

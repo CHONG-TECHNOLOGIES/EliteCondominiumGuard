@@ -1,4 +1,4 @@
-import { ApprovalMode, ApprovalModeConfig } from '../types';
+import { ApprovalMode, ApprovalModeConfig, Condominium } from '../types';
 
 export const APPROVAL_MODE_CONFIGS: ApprovalModeConfig[] = [
   {
@@ -49,37 +49,49 @@ export const APPROVAL_MODE_CONFIGS: ApprovalModeConfig[] = [
  * Returns approval modes available based on online/offline status and unit context
  *
  * CONTEXTUAL LOGIC:
- * - ONLINE + Resident HAS App: Show only APP
- * - ONLINE + Resident NO App: Show only PHONE, INTERCOM, GUARD_MANUAL
- * - OFFLINE: Show only PHONE, INTERCOM, GUARD_MANUAL
+ * - ONLINE + Resident HAS App: Show APP plus enabled fallback methods
+ * - ONLINE + Resident NO App: Show PHONE plus enabled local methods
+ * - OFFLINE: Show PHONE plus enabled local methods
  */
-export function getAvailableApprovalModes(isOnline: boolean, unit?: any): ApprovalModeConfig[] {
+export function getAvailableApprovalModes(
+  isOnline: boolean,
+  unit?: any,
+  condominium?: Pick<Condominium, 'intercom_approval_enabled' | 'guard_manual_approval_enabled'> | null
+): ApprovalModeConfig[] {
   // Check if any resident in the unit has the app installed
   const hasAppInstalled = unit?.residents?.some(
     (r: any) => r.has_app_installed === true || r.device_token
   ) || false;
+  const intercomApprovalEnabled = condominium?.intercom_approval_enabled ?? true;
+  const guardManualApprovalEnabled = condominium?.guard_manual_approval_enabled ?? true;
+
+  const isEnabledLocalMode = (mode: ApprovalMode) => {
+    if (mode === ApprovalMode.PHONE) return true;
+    if (mode === ApprovalMode.INTERCOM) return intercomApprovalEnabled;
+    if (mode === ApprovalMode.GUARD_MANUAL) return guardManualApprovalEnabled;
+    return false;
+  };
 
   if (isOnline) {
     if (hasAppInstalled) {
-      // ONLINE + Resident HAS App: Show ONLY Aplicativo
-      return APPROVAL_MODE_CONFIGS.filter(config =>
-        config.mode === ApprovalMode.APP
-      );
+      // ONLINE + Resident HAS App: Show app first, then enabled local fallbacks.
+      return APPROVAL_MODE_CONFIGS.filter(config => {
+        if (config.mode === ApprovalMode.APP) return true;
+        if (config.mode === ApprovalMode.INTERCOM) return isEnabledLocalMode(config.mode);
+        if (config.mode === ApprovalMode.GUARD_MANUAL) return isEnabledLocalMode(config.mode);
+        return false;
+      });
     } else {
-      // ONLINE + Resident NO App: Show only local methods
+      // ONLINE + Resident NO App: Show only allowed local methods
       // (APP wouldn't work anyway, so don't show it)
       return APPROVAL_MODE_CONFIGS.filter(config =>
-        config.mode === ApprovalMode.PHONE ||
-        config.mode === ApprovalMode.INTERCOM ||
-        config.mode === ApprovalMode.GUARD_MANUAL
+        isEnabledLocalMode(config.mode)
       );
     }
   } else {
-    // OFFLINE: Show only local methods
+    // OFFLINE: Show only allowed local methods
     return APPROVAL_MODE_CONFIGS.filter(config =>
-      config.mode === ApprovalMode.PHONE ||
-      config.mode === ApprovalMode.INTERCOM ||
-      config.mode === ApprovalMode.GUARD_MANUAL
+      isEnabledLocalMode(config.mode)
     );
   }
 }

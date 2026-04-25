@@ -72,7 +72,10 @@ begin
     phone_number,
     contact_person,
     contact_email,
-    manager_name
+    manager_name,
+    visitor_photo_enabled,
+    intercom_approval_enabled,
+    guard_manual_approval_enabled
   )
   values (
     p_data->>'name',
@@ -85,7 +88,10 @@ begin
     p_data->>'phone_number',
     p_data->>'contact_person',
     p_data->>'contact_email',
-    p_data->>'manager_name'
+    p_data->>'manager_name',
+    COALESCE((p_data->>'visitor_photo_enabled')::boolean, true),
+    COALESCE((p_data->>'intercom_approval_enabled')::boolean, true),
+    COALESCE((p_data->>'guard_manual_approval_enabled')::boolean, true)
   )
   returning * into v_row;
 

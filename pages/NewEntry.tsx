@@ -4,7 +4,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../App';
 import { api } from '../services/dataService';
-import { Unit, VisitType, ApprovalMode, VisitStatus, VisitTypeConfig, ServiceTypeConfig, Restaurant, Sport, PhotoQuality, QrValidationResult } from '../types';
+import { Unit, VisitType, ApprovalMode, VisitStatus, VisitTypeConfig, ServiceTypeConfig, Restaurant, Sport, PhotoQuality, QrValidationResult, Condominium } from '../types';
 import CameraCapture from '../components/CameraCapture';
 import ErrorBoundary from '../components/ErrorBoundary';
 import ApprovalModeSelector from '../components/ApprovalModeSelector';
@@ -43,6 +43,7 @@ export default function NewEntry() {
   const [reason, setReason] = useState('');
   const [photo, setPhoto] = useState('');
   const [qrToken, setQrToken] = useState('');
+  const [qrValidation, setQrValidation] = useState<QrValidationResult | null>(null);
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>(ApprovalMode.APP);
   const [qrConfirmed, setQrConfirmed] = useState(false);
 
@@ -65,6 +66,7 @@ export default function NewEntry() {
   const [isOffline, setIsOffline] = useState(!api.checkOnline());
   const [photoQuality, setPhotoQuality] = useState<PhotoQuality>(PhotoQuality.MEDIUM);
   const [visitorPhotoEnabled, setVisitorPhotoEnabled] = useState(true);
+  const [deviceCondo, setDeviceCondo] = useState<Condominium | null>(null);
 
   // Photo Consent State — toggle shown in step 3 when visitorPhotoEnabled
   const [photoConsentGiven, setPhotoConsentGiven] = useState(false);
@@ -91,6 +93,8 @@ export default function NewEntry() {
       api.getPhotoQuality().then(setPhotoQuality);
       // Load visitor photo capture preference (set during device setup)
       api.getVisitorPhotoEnabled().then(setVisitorPhotoEnabled);
+      // Load condominium-level approval permissions (set during device setup)
+      api.getDeviceCondoDetails().then(setDeviceCondo);
     }
     window.addEventListener('offline', () => setIsOffline(true));
     window.addEventListener('online', () => setIsOffline(false));
@@ -198,12 +202,14 @@ export default function NewEntry() {
     setQrValidating(true);
     setQrError(null);
     setQrToken(qrData);
+    setQrValidation(null);
 
     try {
       const result = await api.validateQrCode(qrData);
 
       if (result && result.is_valid) {
         // Pre-fill form with QR data
+        setQrValidation(result);
         setVisitorName(result.visitor_name || '');
         setVisitorPhone(result.visitor_phone || '');
         const notesText = result.notes || '';
@@ -261,6 +267,7 @@ export default function NewEntry() {
       service_type_id: serviceTypeId || undefined,
       restaurant_id: restaurantId || undefined,
       sport_id: sportId || undefined,
+      resident_id: qrValidation?.resident_id || undefined,
       unit_id: unitId || undefined,
       reason: reason || undefined,
       photo_data_url: photo || undefined, // Base64 data URL for upload to Storage
@@ -819,6 +826,7 @@ export default function NewEntry() {
                   onModeSelect={setApprovalMode}
                   isOnline={!isOffline}
                   unit={selectedUnit}
+                  condominium={deviceCondo}
                   visitorPhone={visitorPhone}
                 />
               )}

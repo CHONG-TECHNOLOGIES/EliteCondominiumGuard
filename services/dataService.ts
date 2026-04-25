@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment } from '../types';
+import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondoSetupSettings, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 import { logger, ErrorCategory } from '@/services/logger';
@@ -14,6 +14,12 @@ export interface SyncEventDetail {
   message?: string;
   error?: string;
 }
+
+const DEFAULT_CONDO_SETUP_SETTINGS: CondoSetupSettings = {
+  visitor_photo_enabled: true,
+  intercom_approval_enabled: true,
+  guard_manual_approval_enabled: true,
+};
 
 class DataService {
   private isOnline: boolean = navigator.onLine;
@@ -634,7 +640,10 @@ class DataService {
     return [];
   }
 
-  async configureDevice(condoId: number, visitorPhotoEnabled: boolean = true): Promise<{ success: boolean; error?: string; existingDevices?: any[] }> {
+  async configureDevice(
+    condoId: number,
+    setupSettings: CondoSetupSettings = DEFAULT_CONDO_SETUP_SETTINGS
+  ): Promise<{ success: boolean; error?: string; existingDevices?: any[] }> {
     const condo = await SupabaseService.getCondominium(condoId);
     if (!condo) {
       return { success: false, error: "Condomínio não encontrado" };
@@ -665,25 +674,34 @@ class DataService {
       logger.warn('Failed to register device with Supabase, but continuing with local setup');
     }
 
-    // Save visitor photo setting centrally and merge into condo object
-    await SupabaseService.setCondoVisitorPhotoSetting(condoId, visitorPhotoEnabled);
-    const condoWithPhotoSetting: Condominium = { ...condo, visitor_photo_enabled: visitorPhotoEnabled };
+    const normalizedSetupSettings: CondoSetupSettings = {
+      ...DEFAULT_CONDO_SETUP_SETTINGS,
+      ...setupSettings,
+    };
+
+    // Save setup settings centrally and merge into condo object
+    await SupabaseService.setCondoSetupSettings(condoId, normalizedSetupSettings);
+    const condoWithSetupSettings: Condominium = { ...condo, ...normalizedSetupSettings };
 
     // Save configuration locally (IndexedDB + localStorage sync)
-    await db.settings.put({ key: 'device_condo_details', value: condoWithPhotoSetting });
+    await db.settings.put({ key: 'device_condo_details', value: condoWithSetupSettings });
     await db.settings.put({ key: 'device_id', value: deviceId });
 
     // SYNC: Also save to localStorage for redundancy and fast access
     localStorage.setItem('condo_guard_device_id', deviceId);
-    localStorage.setItem('device_condo_backup', JSON.stringify(condoWithPhotoSetting));
+    localStorage.setItem('device_condo_backup', JSON.stringify(condoWithSetupSettings));
     logger.info('Device configured - synced to IndexedDB + localStorage');
 
-    this.currentCondoDetails = condoWithPhotoSetting;
-    this.currentCondoId = condoWithPhotoSetting.id;
+    this.currentCondoDetails = condoWithSetupSettings;
+    this.currentCondoId = condoWithSetupSettings.id;
     return { success: true };
   }
 
-  async forceConfigureDevice(condoId: number, adminAuth: Staff): Promise<{ success: boolean; error?: string }> {
+  async forceConfigureDevice(
+    condoId: number,
+    adminAuth: Staff,
+    setupSettings: CondoSetupSettings = DEFAULT_CONDO_SETUP_SETTINGS
+  ): Promise<{ success: boolean; error?: string }> {
     if (!this.isBackendHealthy) {
       return { success: false, error: "Sem conexão com o servidor." };
     }
@@ -700,7 +718,7 @@ class DataService {
     }
 
     // Configure new device
-    return this.configureDevice(condoId);
+    return this.configureDevice(condoId, setupSettings);
   }
 
   /**
@@ -1782,6 +1800,7 @@ class DataService {
       service_type_id: visitData.service_type_id,
       restaurant_id: visitData.restaurant_id ? String(visitData.restaurant_id) : undefined,
       sport_id: visitData.sport_id ? String(visitData.sport_id) : undefined,
+      resident_id: visitData.resident_id,
       unit_id: visitData.unit_id,
       reason: visitData.reason,
       photo_url: visitData.photo_url,

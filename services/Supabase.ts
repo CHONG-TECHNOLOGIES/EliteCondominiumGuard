@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment } from '../types';
+import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondoSetupSettings, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment, VideoCallSession, VideoCallStatus } from '../types';
 import { buildIncidentActionHistoryIndex } from '../utils/incidentHistory';
 import { logger, ErrorCategory } from '@/services/logger';
 
@@ -615,6 +615,53 @@ export const SupabaseService = {
       logger.error('Error fetching units', err, ErrorCategory.NETWORK);
       // RETHROW error so callers can handle fallback
       throw err;
+    }
+  },
+
+  async getResidentByUnitId(unitId: number): Promise<Resident | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('residents')
+        .select('*')
+        .eq('unit_id', unitId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data as Resident;
+    } catch (err: any) {
+      logger.error('Error fetching resident by unit_id', err, ErrorCategory.NETWORK);
+      return null;
+    }
+  },
+
+  async getResidentsByUnitId(unitId: number): Promise<Resident[]> {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase
+        .from('residents')
+        .select('*')
+        .eq('unit_id', unitId);
+      if (error || !data) return [];
+      return data as Resident[];
+    } catch (err: any) {
+      logger.error('Error fetching residents by unit_id', err, ErrorCategory.NETWORK);
+      return [];
+    }
+  },
+
+  async getResidentById(residentId: number): Promise<Resident | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('residents')
+        .select('*')
+        .eq('id', residentId)
+        .maybeSingle();
+      if (error || !data) return null;
+      return data as Resident;
+    } catch (err: any) {
+      logger.error('Error fetching resident by id', err, ErrorCategory.NETWORK);
+      return null;
     }
   },
 
@@ -1633,7 +1680,10 @@ export const SupabaseService = {
             phone_number: condo.phone_number,
             contact_person: condo.contact_person,
             contact_email: condo.contact_email,
-            manager_name: condo.manager_name
+            manager_name: condo.manager_name,
+            visitor_photo_enabled: condo.visitor_photo_enabled ?? true,
+            intercom_approval_enabled: condo.intercom_approval_enabled ?? true,
+            guard_manual_approval_enabled: condo.guard_manual_approval_enabled ?? true
           }
         });
 
@@ -1688,21 +1738,23 @@ export const SupabaseService = {
   },
 
   /**
-   * Set visitor photo capture setting for a condominium.
+   * Set setup-controlled entry permissions for a condominium.
    * Uses a SECURITY DEFINER RPC so it can be called during device setup
    * before any staff authentication has taken place.
    */
-  async setCondoVisitorPhotoSetting(condoId: number, enabled: boolean): Promise<boolean> {
+  async setCondoSetupSettings(condoId: number, settings: CondoSetupSettings): Promise<boolean> {
     if (!supabase) return false;
     try {
-      const { error } = await supabase.rpc('set_condo_visitor_photo_setting', {
+      const { error } = await supabase.rpc('set_condo_setup_settings', {
         p_condo_id: condoId,
-        p_enabled: enabled,
+        p_visitor_photo_enabled: settings.visitor_photo_enabled,
+        p_intercom_approval_enabled: settings.intercom_approval_enabled,
+        p_guard_manual_approval_enabled: settings.guard_manual_approval_enabled,
       });
       if (error) throw error;
       return true;
     } catch (err: any) {
-      logger.error('Error setting visitor photo setting', err, ErrorCategory.ADMIN);
+      logger.error('Error setting condominium setup settings', err, ErrorCategory.ADMIN);
       return false;
     }
   },
@@ -2965,6 +3017,97 @@ export const SupabaseService = {
     } catch (err: any) {
       logger.error('Error sending subscription alert', err.message);
       return { success: false, message: err.message || 'Erro ao enviar alerta' };
+    }
+  },
+
+  // ─── Video Call ─────────────────────────────────────────────────────────────
+
+  async createVideoCallSession(params: {
+    visit_id: number;
+    guard_id: number;
+    resident_id?: number;
+    unit_id?: number;
+    condominium_id: number;
+    device_id?: string;
+  }): Promise<VideoCallSession | null> {
+    if (!supabase) return null;
+    try {
+      const { data, error } = await supabase.rpc('create_video_call_session', {
+        p_data: {
+          visit_id: params.visit_id,
+          guard_id: params.guard_id,
+          resident_id: params.resident_id ?? null,
+          unit_id: params.unit_id ?? null,
+          condominium_id: params.condominium_id,
+          device_id: params.device_id ?? null
+        }
+      });
+      if (error) throw error;
+      return data as VideoCallSession;
+    } catch (err: any) {
+      logger.error('Error creating video call session', err.message);
+      return null;
+    }
+  },
+
+  async updateVideoCallSessionStatus(
+    sessionId: string,
+    status: VideoCallStatus,
+    rejectionReason?: string
+  ): Promise<void> {
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.rpc('update_video_call_session_status', {
+        p_session_id: sessionId,
+        p_status: status,
+        p_rejection_reason: rejectionReason ?? null
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      logger.error('Error updating video call session status', err.message);
+    }
+  },
+
+  async createVideoCallNotification(params: {
+    resident_id: number;
+    condominium_id: number;
+    unit_id?: number;
+    session_id: string;
+    visit_id: number;
+    visitor_name: string;
+    visitor_photo_url?: string;
+    guard_name: string;
+    unit_number?: string;
+    unit_block?: string;
+  }): Promise<void> {
+    if (!supabase) return;
+    try {
+      const body = params.unit_block && params.unit_number
+        ? `${params.visitor_name} aguarda na portaria. Guarda ${params.guard_name} quer mostrar o visitante. (${params.unit_block} ${params.unit_number})`
+        : `${params.visitor_name} aguarda na portaria. Guarda ${params.guard_name} quer mostrar o visitante.`;
+
+      const { error } = await supabase.rpc('create_notification', {
+        p_data: {
+          resident_id: params.resident_id,
+          condominium_id: params.condominium_id,
+          unit_id: params.unit_id ?? null,
+          title: 'Chamada de vídeo',
+          body,
+          type: 'VIDEO_CALL_REQUEST',
+          data: {
+            session_id: params.session_id,
+            visit_id: params.visit_id,
+            visitor_name: params.visitor_name,
+            visitor_photo_url: params.visitor_photo_url ?? null,
+            guard_name: params.guard_name,
+            unit_number: params.unit_number ?? null,
+            unit_block: params.unit_block ?? null
+          }
+        }
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      logger.error('Error creating video call notification', err.message);
     }
   }
 };

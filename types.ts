@@ -59,6 +59,14 @@ export interface Condominium {
   manager_name?: string;
   total_residents?: number;  // Fetched dynamically for Admin Panel
   visitor_photo_enabled?: boolean; // Whether visitor photo capture is required on entry
+  intercom_approval_enabled?: boolean; // Whether intercom approval is available for this condominium
+  guard_manual_approval_enabled?: boolean; // Whether guards can manually approve entries
+}
+
+export interface CondoSetupSettings {
+  visitor_photo_enabled: boolean;
+  intercom_approval_enabled: boolean;
+  guard_manual_approval_enabled: boolean;
 }
 
 export interface Street {
@@ -207,6 +215,7 @@ export interface Visit {
   sport_id?: string;             // UUID for sport visits
   sport_name?: string;           // Nome do desporto (para exibição)
 
+  resident_id?: number;          // Residente especÃ­fico (ex.: entrada por QR)
   unit_id?: number;              // INT4 (references units) - optional for restaurant/sport visits
   unit_block?: string;           // Bloco da unidade (para exibição)
   unit_number?: string;          // Número da unidade (para exibição)
