@@ -215,6 +215,7 @@ export interface Visit {
   sport_id?: string;             // UUID for sport visits
   sport_name?: string;           // Nome do desporto (para exibição)
 
+  resident_id?: number;          // Residente especÃ­fico (ex.: entrada por QR)
   unit_id?: number;              // INT4 (references units) - optional for restaurant/sport visits
   unit_block?: string;           // Bloco da unidade (para exibição)
   unit_number?: string;          // Número da unidade (para exibição)

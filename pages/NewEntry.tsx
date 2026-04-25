@@ -43,6 +43,7 @@ export default function NewEntry() {
   const [reason, setReason] = useState('');
   const [photo, setPhoto] = useState('');
   const [qrToken, setQrToken] = useState('');
+  const [qrValidation, setQrValidation] = useState<QrValidationResult | null>(null);
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>(ApprovalMode.APP);
   const [qrConfirmed, setQrConfirmed] = useState(false);
 
@@ -201,12 +202,14 @@ export default function NewEntry() {
     setQrValidating(true);
     setQrError(null);
     setQrToken(qrData);
+    setQrValidation(null);
 
     try {
       const result = await api.validateQrCode(qrData);
 
       if (result && result.is_valid) {
         // Pre-fill form with QR data
+        setQrValidation(result);
         setVisitorName(result.visitor_name || '');
         setVisitorPhone(result.visitor_phone || '');
         const notesText = result.notes || '';
@@ -264,6 +267,7 @@ export default function NewEntry() {
       service_type_id: serviceTypeId || undefined,
       restaurant_id: restaurantId || undefined,
       sport_id: sportId || undefined,
+      resident_id: qrValidation?.resident_id || undefined,
       unit_id: unitId || undefined,
       reason: reason || undefined,
       photo_data_url: photo || undefined, // Base64 data URL for upload to Storage
