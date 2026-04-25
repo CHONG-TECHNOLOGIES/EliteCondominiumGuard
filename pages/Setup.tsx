@@ -34,6 +34,14 @@ export default function Setup() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then((reg) => reg.update())
+        .catch(() => { /* SW not available */ });
+    }
+  }, []);
+
+  useEffect(() => {
     loadCondos();
 
     // Online/offline listener
