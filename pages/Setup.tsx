@@ -38,6 +38,12 @@ export default function Setup() {
   useEffect(() => {
     loadCondos();
 
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then((registration) => registration.update())
+        .catch(() => { /* SW not available yet */ });
+    }
+
     // Online/offline listener
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
