@@ -7,10 +7,11 @@ interface Props {
   session: VideoCallSession;
   visit: Visit;
   residentPhotoUrl?: string;
+  residentName?: string;
   onClose: () => void;
 }
 
-export function VideoCallModal({ session, visit, residentPhotoUrl, onClose }: Props) {
+export function VideoCallModal({ session, visit, residentPhotoUrl, residentName, onClose }: Props) {
   const [state, setState] = useState<VideoCallState>('IDLE');
   const [detail, setDetail] = useState<{ rejectionReason?: string; error?: string }>({});
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -126,7 +127,7 @@ export function VideoCallModal({ session, visit, residentPhotoUrl, onClose }: Pr
             )}
 
             <div className="text-center">
-              <p className="text-xl font-semibold">{visit.visitor_name}</p>
+              <p className="text-xl font-semibold">{residentName ?? visit.visitor_name}</p>
               {unitLabel && <p className="text-gray-400 text-sm mt-1">Apartamento {unitLabel}</p>}
             </div>
 

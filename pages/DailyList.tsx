@@ -92,7 +92,7 @@ export default function DailyList() {
   const [isOnline, setIsOnline] = useState(api.checkOnline());
   const [visits, setVisits] = useState<Visit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeVideoCall, setActiveVideoCall] = useState<{ session: VideoCallSession; visit: Visit; residentPhotoUrl?: string } | null>(null);
+  const [activeVideoCall, setActiveVideoCall] = useState<{ session: VideoCallSession; visit: Visit; residentPhotoUrl?: string; residentName?: string } | null>(null);
   const [photoModal, setPhotoModal] = useState<{ url: string; name: string } | null>(null);
   const [eventModal, setEventModal] = useState<{
     isOpen: boolean;
@@ -234,7 +234,7 @@ export default function DailyList() {
       unit_block: visit.unit_block ?? undefined
     });
 
-    setActiveVideoCall({ session, visit, residentPhotoUrl: resident.avatar_url ?? resident.photo_url ?? undefined });
+    setActiveVideoCall({ session, visit, residentPhotoUrl: resident.avatar_url ?? resident.photo_url ?? undefined, residentName: resident.name });
   }, [user, showToast, isOnline]);
 
   const openEventModal = async (visit: Visit) => {
@@ -561,6 +561,7 @@ export default function DailyList() {
           session={activeVideoCall.session}
           visit={activeVideoCall.visit}
           residentPhotoUrl={activeVideoCall.residentPhotoUrl}
+          residentName={activeVideoCall.residentName}
           onClose={() => setActiveVideoCall(null)}
         />
       )}

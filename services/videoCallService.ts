@@ -84,7 +84,9 @@ class VideoCallService {
       }
     };
 
-    this.channel = supabase.channel(`video-call-${session.id}`);
+    this.channel = supabase.channel(`video-call-${session.id}`, {
+      config: { broadcast: { self: false } }
+    });
 
     this.channel
       .on('broadcast', { event: 'answer' }, async ({ payload }: { payload: SignalingMessage }) => {
