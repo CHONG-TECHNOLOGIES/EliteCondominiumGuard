@@ -3058,8 +3058,15 @@ export const SupabaseService = {
     guard_name: string;
     unit_number?: string;
     unit_block?: string;
-  }): Promise<void> {
-    if (!supabase) return;
+  }): Promise<{ notificationCreated: boolean; pushSent: boolean; message?: string; deliveredCount?: number }> {
+    if (!supabase) {
+      return {
+        notificationCreated: false,
+        pushSent: false,
+        message: 'Cliente Supabase indisponível.'
+      };
+    }
+
     try {
       const body = params.unit_block && params.unit_number
         ? `${params.visitor_name} aguarda na portaria. Guarda ${params.guard_name} quer mostrar o visitante. (${params.unit_block} ${params.unit_number})`
@@ -3084,7 +3091,7 @@ export const SupabaseService = {
       });
       if (error) throw error;
 
-      await supabase.functions.invoke('send-video-call-push', {
+      const { data: pushData, error: pushError } = await supabase.functions.invoke('send-video-call-push', {
         body: {
           session_id: params.session_id,
           visit_id: params.visit_id,
@@ -3096,8 +3103,51 @@ export const SupabaseService = {
           unit_block: params.unit_block ?? null
         }
       });
-    } catch (err: any) {
-      logger.error('Error creating video call notification', err.message);
+
+      if (pushError) {
+        logger.warn('Video call push invoke failed', {
+          error: pushError.message,
+          residentId: params.resident_id,
+          sessionId: params.session_id
+        });
+        return {
+          notificationCreated: true,
+          pushSent: false,
+          message: 'O alerta push falhou. O morador pode não receber a chamada.'
+        };
+      }
+
+      const pushResult = pushData as {
+        success?: boolean;
+        error?: string;
+        delivered_count?: number;
+      } | null;
+
+      if (!pushResult?.success) {
+        logger.warn('Video call push returned unsuccessful result', {
+          residentId: params.resident_id,
+          sessionId: params.session_id,
+          pushResult: pushData
+        });
+        return {
+          notificationCreated: true,
+          pushSent: false,
+          message: pushResult?.error || 'O alerta push falhou. O morador pode não receber a chamada.'
+        };
+      }
+
+      return {
+        notificationCreated: true,
+        pushSent: true,
+        deliveredCount: pushResult.delivered_count ?? 0
+      };
+    } catch (err) {
+      logger.error('Error creating video call notification', err);
+      return {
+        notificationCreated: false,
+        pushSent: false,
+        message: 'Não foi possível notificar o morador para a chamada de vídeo.'
+      };
     }
   }
 };
