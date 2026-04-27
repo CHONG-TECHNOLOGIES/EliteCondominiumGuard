@@ -342,7 +342,7 @@ export default function Dashboard() {
       return;
     }
 
-    await SupabaseService.createVideoCallNotification({
+    const notificationResult = await SupabaseService.createVideoCallNotification({
       resident_id: resident.id,
       condominium_id: user.condominium_id,
       unit_id: visit.unit_id,
@@ -354,6 +354,16 @@ export default function Dashboard() {
       unit_number: visit.unit_number ?? undefined,
       unit_block: visit.unit_block ?? undefined
     });
+
+    if (!notificationResult.notificationCreated) {
+      await SupabaseService.updateVideoCallSessionStatus(session.id, 'FAILED');
+      showToast('error', notificationResult.message ?? 'Não foi possível notificar o morador para a chamada de vídeo.');
+      return;
+    }
+
+    if (!notificationResult.pushSent) {
+      showToast('warning', notificationResult.message ?? 'O alerta push falhou. O morador pode não receber a chamada.');
+    }
 
     setActiveVideoCall({ session, visit, residentPhotoUrl: resident.avatar_url ?? resident.photo_url ?? undefined, residentName: resident.name });
   }, [user, showToast, isOnline]);

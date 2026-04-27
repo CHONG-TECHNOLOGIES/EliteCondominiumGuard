@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { VideoCallSession, VideoCallStatus, SignalingMessage } from '../types';
+import { VideoCallSession, SignalingMessage } from '../types';
 import { SupabaseService } from './Supabase';
 import { logger } from './logger';
 
@@ -41,6 +41,7 @@ class VideoCallService {
   private onStateChange: VideoCallStateChangeHandler | null = null;
   private timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   private currentState: VideoCallState = 'IDLE';
+  private pendingIceCandidates: RTCIceCandidateInit[] = [];
 
   getLocalStream(): MediaStream | null { return this.localStream; }
   getRemoteStream(): MediaStream | null { return this.remoteStream; }
@@ -50,8 +51,10 @@ class VideoCallService {
     session: VideoCallSession,
     onStateChange: VideoCallStateChangeHandler
   ): Promise<void> {
+    this.reset();
     this.session = session;
     this.onStateChange = onStateChange;
+    this.pendingIceCandidates = [];
 
     this.setState('REQUESTING_MEDIA');
 
@@ -61,7 +64,7 @@ class VideoCallService {
         audio: true
       });
     } catch {
-      this.setState('FAILED', { error: 'Permita acesso à câmera e microfone nas definições do browser.' });
+      this.setState('FAILED', { error: 'Permita acesso a camera e microfone nas definicoes do browser.' });
       return;
     }
 
@@ -93,80 +96,93 @@ class VideoCallService {
         if (!this.pc || !payload.sdp) return;
         try {
           await this.pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: payload.sdp }));
+          await this.flushPendingIceCandidates();
           this.clearTimeout();
           this.setState('CONNECTED');
-        } catch (err: any) {
-          logger.error('Failed to set remote description', err.message);
+        } catch (err) {
+          logger.error('Failed to set remote description', err);
         }
       })
       .on('broadcast', { event: 'ice-candidate' }, async ({ payload }: { payload: SignalingMessage }) => {
         if (!this.pc || !payload.candidate) return;
         try {
+          if (!this.pc.remoteDescription) {
+            this.pendingIceCandidates.push(payload.candidate);
+            logger.debug('Queued ICE candidate until remote description is ready', {
+              queuedCount: this.pendingIceCandidates.length,
+              sessionId: session.id
+            });
+            return;
+          }
+
           await this.pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-        } catch (err: any) {
-          logger.error('Failed to add ICE candidate', err.message);
+        } catch (err) {
+          logger.error('Failed to add ICE candidate', err);
         }
       })
       .on('broadcast', { event: 'reject' }, ({ payload }: { payload: { reason?: string } }) => {
         this.clearTimeout();
-        this.cleanup('REJECTED');
+        this.cleanup();
         this.setState('REJECTED', { rejectionReason: payload?.reason || 'Chamada recusada pelo morador.' });
-        SupabaseService.updateVideoCallSessionStatus(session.id, 'REJECTED', payload?.reason);
+        void SupabaseService.updateVideoCallSessionStatus(session.id, 'REJECTED', payload?.reason);
       })
       .on('broadcast', { event: 'hangup' }, () => {
-        this.cleanup('ENDED');
+        this.cleanup();
         this.setState('ENDED');
-        SupabaseService.updateVideoCallSessionStatus(session.id, 'ENDED');
+        void SupabaseService.updateVideoCallSessionStatus(session.id, 'ENDED');
       });
 
     this.pc.onicecandidate = (event) => {
       if (!event.candidate) return;
-      this.channel?.send({
-        type: 'broadcast',
-        event: 'ice-candidate',
-        payload: { type: 'ice-candidate', candidate: event.candidate.toJSON() } satisfies SignalingMessage
-      });
+      void this.sendBroadcast('ice-candidate', {
+        type: 'ice-candidate',
+        candidate: event.candidate.toJSON()
+      } satisfies SignalingMessage);
     };
 
-    await this.channel.subscribe();
+    try {
+      await this.subscribeToChannel();
+    } catch (err) {
+      this.cleanup();
+      this.setState('FAILED', { error: 'Nao foi possivel estabelecer a ligacao de sinalizacao.' });
+      logger.error('Failed to subscribe to video call channel', err);
+      return;
+    }
 
     let offer: RTCSessionDescriptionInit;
     try {
       offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
-    } catch (err: any) {
-      this.setState('FAILED', { error: 'Não foi possível iniciar a chamada. Verifique a sua ligação.' });
-      logger.error('Failed to create offer', err.message);
+    } catch (err) {
+      this.setState('FAILED', { error: 'Nao foi possivel iniciar a chamada. Verifique a sua ligacao.' });
+      logger.error('Failed to create offer', err);
       return;
     }
 
-    this.channel.send({
-      type: 'broadcast',
-      event: 'offer',
-      payload: { type: 'offer', sdp: offer.sdp } satisfies SignalingMessage
-    });
+    const offerSent = await this.sendBroadcast('offer', { type: 'offer', sdp: offer.sdp } satisfies SignalingMessage);
+    if (!offerSent) {
+      this.cleanup();
+      this.setState('FAILED', { error: 'Nao foi possivel enviar o pedido de chamada.' });
+      return;
+    }
 
     this.setState('CALLING');
 
     this.timeoutHandle = setTimeout(() => {
-      this.cleanup('MISSED');
+      this.cleanup();
       this.setState('MISSED', { rejectionReason: 'Sem resposta do morador.' });
-      SupabaseService.updateVideoCallSessionStatus(session.id, 'MISSED');
+      void SupabaseService.updateVideoCallSessionStatus(session.id, 'MISSED');
     }, CALL_TIMEOUT_MS);
   }
 
   endCall(): void {
     if (!this.session) return;
-    this.channel?.send({
-      type: 'broadcast',
-      event: 'hangup',
-      payload: {}
-    });
+    void this.sendBroadcast('hangup', {});
     const sessionId = this.session.id;
     const wasConnected = this.currentState === 'CONNECTED';
-    this.cleanup('ENDED');
+    this.cleanup();
     this.setState('ENDED');
-    SupabaseService.updateVideoCallSessionStatus(sessionId, wasConnected ? 'ENDED' : 'MISSED');
+    void SupabaseService.updateVideoCallSessionStatus(sessionId, wasConnected ? 'ENDED' : 'MISSED');
   }
 
   private handleNetworkDrop(): void {
@@ -174,9 +190,11 @@ class VideoCallService {
     setTimeout(() => {
       if (this.pc?.iceConnectionState === 'disconnected' || this.pc?.iceConnectionState === 'failed') {
         const sessionId = this.session?.id;
-        this.cleanup('FAILED');
-        this.setState('FAILED', { error: 'Ligação perdida durante a chamada.' });
-        if (sessionId) SupabaseService.updateVideoCallSessionStatus(sessionId, 'FAILED');
+        this.cleanup();
+        this.setState('FAILED', { error: 'Ligacao perdida durante a chamada.' });
+        if (sessionId) {
+          void SupabaseService.updateVideoCallSessionStatus(sessionId, 'FAILED');
+        }
       }
     }, 10_000);
   }
@@ -193,10 +211,84 @@ class VideoCallService {
     }
   }
 
-  private cleanup(_finalStatus: VideoCallStatus | 'IDLE'): void {
-    this.clearTimeout();
+  private async subscribeToChannel(): Promise<void> {
+    if (!this.channel) throw new Error('Video call channel was not created');
 
-    this.localStream?.getTracks().forEach(t => t.stop());
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const settle = (callback: () => void) => {
+        if (settled) return;
+        settled = true;
+        callback();
+      };
+
+      this.channel!.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          settle(resolve);
+          return;
+        }
+
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          settle(() => reject(new Error(`Video call channel subscribe failed: ${status}`)));
+        }
+      });
+    });
+  }
+
+  private async sendBroadcast(
+    event: SignalingMessage['type'] | 'hangup',
+    payload: Record<string, unknown>
+  ): Promise<boolean> {
+    if (!this.channel) return false;
+
+    try {
+      const result = await this.channel.send({
+        type: 'broadcast',
+        event,
+        payload
+      });
+
+      if (result !== 'ok') {
+        logger.warn('Broadcast send returned non-ok status', {
+          event,
+          result,
+          sessionId: this.session?.id
+        });
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      logger.error('Failed to send signaling message', err, undefined, {
+        event,
+        sessionId: this.session?.id
+      });
+      return false;
+    }
+  }
+
+  private async flushPendingIceCandidates(): Promise<void> {
+    if (!this.pc?.remoteDescription || this.pendingIceCandidates.length === 0) return;
+
+    const queuedCandidates = [...this.pendingIceCandidates];
+    this.pendingIceCandidates = [];
+
+    for (const candidate of queuedCandidates) {
+      try {
+        await this.pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        logger.error('Failed to flush queued ICE candidate', err, undefined, {
+          sessionId: this.session?.id
+        });
+      }
+    }
+  }
+
+  private cleanup(): void {
+    this.clearTimeout();
+    this.pendingIceCandidates = [];
+
+    this.localStream?.getTracks().forEach(track => track.stop());
     this.localStream = null;
 
     if (this.pc) {
@@ -207,7 +299,7 @@ class VideoCallService {
       this.pc = null;
     }
 
-    this.channel?.unsubscribe();
+    void this.channel?.unsubscribe();
     this.channel = null;
     this.remoteStream = null;
     this.session = null;
@@ -215,7 +307,7 @@ class VideoCallService {
   }
 
   reset(): void {
-    this.cleanup('IDLE');
+    this.cleanup();
     this.onStateChange = null;
   }
 }
