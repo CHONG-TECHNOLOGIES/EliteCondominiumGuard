@@ -115,7 +115,8 @@ export interface Resident {
   device_token?: string;             // Push notification token (if app installed)
   app_first_login_at?: string;       // First time resident logged into app
   app_last_seen_at?: string;         // Last activity in app
-  photo_url?: string;                // URL for resident photo
+  photo_url?: string;                // URL for resident photo (may be aliased from avatar_url)
+  avatar_url?: string;               // DB column name for resident photo
 }
 
 export interface ResidentQrCode {

@@ -355,7 +355,7 @@ export default function Dashboard() {
       unit_block: visit.unit_block ?? undefined
     });
 
-    setActiveVideoCall({ session, visit, residentPhotoUrl: resident.photo_url ?? undefined });
+    setActiveVideoCall({ session, visit, residentPhotoUrl: resident.avatar_url ?? resident.photo_url ?? undefined });
   }, [user, showToast, isOnline]);
 
   const getStatusColor = (status: VisitStatus) => {

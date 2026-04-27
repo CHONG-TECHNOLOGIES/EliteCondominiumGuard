@@ -6,7 +6,7 @@ import { SupabaseService } from '../services/Supabase';
 import { Visit, VisitEvent, VisitStatus, SyncStatus, VideoCallSession } from '../types';
 import { initiatePhoneCall } from '@/utils/approvalModes';
 import { getDeviceIdentifier } from '@/services/deviceUtils';
-import { LogOut, Clock, AlertCircle, User, MapPin, ArrowLeft, Phone, History, X, Search, Video } from 'lucide-react';
+import { LogOut, Clock, AlertCircle, User, MapPin, ArrowLeft, Phone, History, X, Search, Video, ShieldCheck } from 'lucide-react';
 import { useToast } from '../components/Toast';
 import { VideoCallModal } from '../components/VideoCallModal';
 import { AuthContext } from '../App';
@@ -133,6 +133,17 @@ export default function DailyList() {
     );
   };
 
+  const handleMarkInside = async (id: number) => {
+    showConfirm(
+      "Marcar entrada (interior)?",
+      async () => {
+        await api.updateVisitStatus(id, VisitStatus.INSIDE);
+        loadVisits();
+        showToast('success', 'Entrada marcada como interior!');
+      }
+    );
+  };
+
   const handleApprove = async (id: number) => {
     await api.updateVisitStatus(id, VisitStatus.APPROVED);
     loadVisits();
@@ -223,7 +234,7 @@ export default function DailyList() {
       unit_block: visit.unit_block ?? undefined
     });
 
-    setActiveVideoCall({ session, visit, residentPhotoUrl: resident.photo_url ?? undefined });
+    setActiveVideoCall({ session, visit, residentPhotoUrl: resident.avatar_url ?? resident.photo_url ?? undefined });
   }, [user, showToast, isOnline]);
 
   const openEventModal = async (visit: Visit) => {
@@ -386,8 +397,18 @@ export default function DailyList() {
                     />
                   )}
 
-                  {/* APPROVED/INSIDE: Show only "Mark Exit" button (enabled) */}
-                  {(visit.status === VisitStatus.APPROVED || visit.status === VisitStatus.INSIDE) && (
+                  {/* APPROVED: Mark Inside (visitor enters building) */}
+                  {visit.status === VisitStatus.APPROVED && (
+                    <button
+                      onClick={() => handleMarkInside(visit.id)}
+                      className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm flex justify-center items-center gap-2 hover:bg-emerald-700 transition-colors"
+                    >
+                      <ShieldCheck size={16} /> Marcar Interior
+                    </button>
+                  )}
+
+                  {/* INSIDE: Mark Exit (visitor leaves) */}
+                  {visit.status === VisitStatus.INSIDE && (
                     <button
                       onClick={() => handleCheckout(visit.id)}
                       className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm flex justify-center items-center gap-2 hover:bg-emerald-700 transition-colors"
@@ -482,8 +503,18 @@ export default function DailyList() {
                           />
                         )}
 
-                        {/* APPROVED/INSIDE: Show only "Mark Exit" button (enabled) */}
-                        {(visit.status === VisitStatus.APPROVED || visit.status === VisitStatus.INSIDE) && (
+                        {/* APPROVED: Mark Inside (visitor enters building) */}
+                        {visit.status === VisitStatus.APPROVED && (
+                          <button
+                            onClick={() => handleMarkInside(visit.id)}
+                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 flex items-center gap-2 transition-colors"
+                          >
+                            <ShieldCheck size={16} /> Marcar Interior
+                          </button>
+                        )}
+
+                        {/* INSIDE: Mark Exit (visitor leaves) */}
+                        {visit.status === VisitStatus.INSIDE && (
                           <button
                             onClick={() => handleCheckout(visit.id)}
                             className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 flex items-center gap-2 transition-colors"
