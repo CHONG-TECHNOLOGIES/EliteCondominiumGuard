@@ -946,7 +946,15 @@ class DataService {
     if (!this.isBackendHealthy) return;
     try {
       const staffList = await SupabaseService.getStaffForSync(condoId);
-      await db.staff.bulkPut(staffList);
+      const existing = await db.staff.toArray();
+      const existingPins = new Map(
+        existing.filter(s => s.pin_hash).map(s => [s.id, s.pin_hash!])
+      );
+      const merged = staffList.map(s => ({
+        ...s,
+        pin_hash: s.pin_hash || existingPins.get(s.id),
+      }));
+      await db.staff.bulkPut(merged);
       logger.info('staff members synced.', { length: staffList.length });
     } catch (e) {
       logger.error('Staff sync failed', e, ErrorCategory.SYNC);
@@ -955,6 +963,8 @@ class DataService {
   }
 
   async login(firstName: string, lastName: string, pin: string): Promise<Staff | null> {
+    await this.verifyConnectivity();
+
     const deviceCondoDetails = await this.getDeviceCondoDetails();
     const deviceCondoId = deviceCondoDetails?.id;
     if (!deviceCondoId) throw new Error("Dispositivo não configurado");
@@ -992,6 +1002,7 @@ class DataService {
               throw new Error(`Acesso Negado: Utilizador pertence ao condomínio ${staffCondoLabel}, mas o tablet está no ${deviceCondoLabel}.`);
             }
           }
+          await db.staff.put(staff); // Cache verified staff (with pin_hash) before syncStaff overwrites
           await this.syncStaff(deviceCondoId); // Sync all staff after a successful login
           await this.refreshConfigs(deviceCondoId);
           await this.logAudit({
