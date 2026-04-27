@@ -6,10 +6,11 @@ import { videoCallService, VideoCallState } from '../services/videoCallService';
 interface Props {
   session: VideoCallSession;
   visit: Visit;
+  residentPhotoUrl?: string;
   onClose: () => void;
 }
 
-export function VideoCallModal({ session, visit, onClose }: Props) {
+export function VideoCallModal({ session, visit, residentPhotoUrl, onClose }: Props) {
   const [state, setState] = useState<VideoCallState>('IDLE');
   const [detail, setDetail] = useState<{ rejectionReason?: string; error?: string }>({});
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -112,10 +113,10 @@ export function VideoCallModal({ session, visit, onClose }: Props) {
         {/* CALLING */}
         {(state === 'IDLE' || state === 'REQUESTING_MEDIA' || state === 'CALLING') && (
           <div className="flex flex-col items-center justify-center py-12 px-6 gap-6">
-            {visit.photo_url ? (
+            {residentPhotoUrl ? (
               <img
-                src={visit.photo_url}
-                alt={visit.visitor_name}
+                src={residentPhotoUrl}
+                alt="Morador"
                 className="w-28 h-28 rounded-full object-cover ring-4 ring-amber-400 ring-offset-4 ring-offset-gray-900"
               />
             ) : (

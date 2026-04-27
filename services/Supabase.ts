@@ -3066,25 +3066,36 @@ export const SupabaseService = {
         : `${params.visitor_name} aguarda na portaria. Guarda ${params.guard_name} quer mostrar o visitante.`;
 
       const { error } = await supabase.rpc('create_notification', {
+        p_resident_id: params.resident_id,
+        p_condominium_id: params.condominium_id,
+        p_unit_id: params.unit_id ?? null,
+        p_title: 'Chamada de vídeo',
+        p_body: body,
+        p_type: 'VIDEO_CALL_REQUEST',
         p_data: {
-          resident_id: params.resident_id,
-          condominium_id: params.condominium_id,
-          unit_id: params.unit_id ?? null,
-          title: 'Chamada de vídeo',
-          body,
-          type: 'VIDEO_CALL_REQUEST',
-          data: {
-            session_id: params.session_id,
-            visit_id: params.visit_id,
-            visitor_name: params.visitor_name,
-            visitor_photo_url: params.visitor_photo_url ?? null,
-            guard_name: params.guard_name,
-            unit_number: params.unit_number ?? null,
-            unit_block: params.unit_block ?? null
-          }
+          session_id: params.session_id,
+          visit_id: params.visit_id,
+          visitor_name: params.visitor_name,
+          visitor_photo_url: params.visitor_photo_url ?? null,
+          guard_name: params.guard_name,
+          unit_number: params.unit_number ?? null,
+          unit_block: params.unit_block ?? null
         }
       });
       if (error) throw error;
+
+      await supabase.functions.invoke('send-video-call-push', {
+        body: {
+          session_id: params.session_id,
+          visit_id: params.visit_id,
+          resident_id: params.resident_id,
+          visitor_name: params.visitor_name,
+          visitor_photo_url: params.visitor_photo_url ?? null,
+          guard_name: params.guard_name,
+          unit_number: params.unit_number ?? null,
+          unit_block: params.unit_block ?? null
+        }
+      });
     } catch (err: any) {
       logger.error('Error creating video call notification', err.message);
     }

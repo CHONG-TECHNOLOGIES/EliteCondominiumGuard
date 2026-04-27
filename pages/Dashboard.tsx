@@ -97,7 +97,7 @@ export default function Dashboard() {
   // Quick Actions State
   const [activeVisits, setActiveVisits] = useState<Visit[]>([]);
   const [todaysVisitsCount, setTodaysVisitsCount] = useState(0);
-  const [activeVideoCall, setActiveVideoCall] = useState<{ session: VideoCallSession; visit: Visit } | null>(null);
+  const [activeVideoCall, setActiveVideoCall] = useState<{ session: VideoCallSession; visit: Visit; residentPhotoUrl?: string } | null>(null);
   const [incidentsCount, setIncidentsCount] = useState(0);
   const previousIncidentCountRef = useRef<number>(-1);
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -355,7 +355,7 @@ export default function Dashboard() {
       unit_block: visit.unit_block ?? undefined
     });
 
-    setActiveVideoCall({ session, visit });
+    setActiveVideoCall({ session, visit, residentPhotoUrl: resident.photo_url ?? undefined });
   }, [user, showToast, isOnline]);
 
   const getStatusColor = (status: VisitStatus) => {
@@ -652,6 +652,7 @@ export default function Dashboard() {
         <VideoCallModal
           session={activeVideoCall.session}
           visit={activeVideoCall.visit}
+          residentPhotoUrl={activeVideoCall.residentPhotoUrl}
           onClose={() => setActiveVideoCall(null)}
         />
       )}
