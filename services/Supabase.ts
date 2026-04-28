@@ -3047,6 +3047,19 @@ export const SupabaseService = {
     }
   },
 
+  async updateVideoCallSessionOffer(sessionId: string, offerSdp: string): Promise<void> {
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.rpc('update_video_call_session_offer', {
+        p_session_id: sessionId,
+        p_offer_sdp: offerSdp
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      logger.error('Error saving video call offer SDP', err.message, ErrorCategory.NETWORK);
+    }
+  },
+
   async createVideoCallNotification(params: {
     resident_id: number;
     condominium_id: number;

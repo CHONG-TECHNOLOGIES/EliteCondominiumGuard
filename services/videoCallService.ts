@@ -153,6 +153,8 @@ class VideoCallService {
     try {
       offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
+      // Persist offer so resident can fetch it even if they miss the broadcast
+      await SupabaseService.updateVideoCallSessionOffer(session.id, offer.sdp!);
     } catch (err) {
       this.setState('FAILED', { error: 'Nao foi possivel iniciar a chamada. Verifique a sua ligacao.' });
       logger.error('Failed to create offer', err);
