@@ -1971,6 +1971,18 @@ class DataService {
     }
   }
 
+  async checkAndTransitionStaleVisits(): Promise<void> {
+    const STALE_MS = 30 * 60 * 1000;
+    const cutoff = new Date(Date.now() - STALE_MS).toISOString();
+    const stale = await db.visits
+      .where('status').equals(VisitStatus.PENDING)
+      .filter(v => v.check_in_at < cutoff)
+      .toArray();
+    for (const visit of stale) {
+      await this.updateVisitStatus(visit.id, VisitStatus.WITHOUT_RESPONSE);
+    }
+  }
+
   async syncPendingItems(): Promise<number> {
     // Prevent concurrent syncs
     if (this.isSyncing) {

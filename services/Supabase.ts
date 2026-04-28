@@ -3104,21 +3104,42 @@ export const SupabaseService = {
       });
       if (error) throw error;
 
-      const { data: pushData, error: pushError } = await supabase.functions.invoke('send-video-call-push', {
-        body: {
-          session_id: params.session_id,
-          visit_id: params.visit_id,
-          resident_id: params.resident_id,
-          visitor_name: params.visitor_name,
-          visitor_photo_url: params.visitor_photo_url ?? null,
-          guard_name: params.guard_name,
-          unit_number: params.unit_number ?? null,
-          unit_block: params.unit_block ?? null
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+      let pushData: { success?: boolean; error?: string; delivered_count?: number } | null = null;
+      let pushError: { message: string } | null = null;
+
+      try {
+        const pushResp = await fetch(`${supabaseUrl}/functions/v1/send-video-call-push`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'apikey': supabaseAnonKey,
+          },
+          body: JSON.stringify({
+            session_id: params.session_id,
+            visit_id: params.visit_id,
+            resident_id: params.resident_id,
+            visitor_name: params.visitor_name,
+            visitor_photo_url: params.visitor_photo_url ?? null,
+            guard_name: params.guard_name,
+            unit_number: params.unit_number ?? null,
+            unit_block: params.unit_block ?? null
+          })
+        });
+
+        pushData = await pushResp.json().catch(() => null);
+        if (!pushResp.ok) {
+          pushError = { message: `HTTP ${pushResp.status}` };
         }
-      });
+      } catch (fetchErr: unknown) {
+        pushError = { message: fetchErr instanceof Error ? fetchErr.message : 'fetch failed' };
+      }
 
       if (pushError) {
-        logger.warn('Video call push invoke failed', {
+        logger.error('Video call push invoke failed', {
           error: pushError.message,
           residentId: params.resident_id,
           sessionId: params.session_id
@@ -3130,17 +3151,13 @@ export const SupabaseService = {
         };
       }
 
-      const pushResult = pushData as {
-        success?: boolean;
-        error?: string;
-        delivered_count?: number;
-      } | null;
+      const pushResult = pushData;
 
       if (!pushResult?.success) {
-        logger.warn('Video call push returned unsuccessful result', {
+        logger.error('Video call push returned unsuccessful result', {
           residentId: params.resident_id,
           sessionId: params.session_id,
-          pushResult: pushData
+          pushResult
         });
         return {
           notificationCreated: true,
