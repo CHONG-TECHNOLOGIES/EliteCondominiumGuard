@@ -102,6 +102,7 @@ export default function DailyList() {
   }>({ isOpen: false, visit: null, events: [], loading: false });
 
   const loadVisits = async () => {
+    await api.checkAndTransitionStaleVisits();
     const data = await api.getTodaysVisits();
     setVisits(data.sort((a, b) => new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime()));
   };
@@ -265,6 +266,7 @@ export default function DailyList() {
       case VisitStatus.INSIDE: return <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs md:text-sm font-bold">{status}</span>;
       case VisitStatus.LEFT: return <span className="bg-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs md:text-sm font-bold">{status}</span>;
       case VisitStatus.DENIED: return <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs md:text-sm font-bold">{status}</span>;
+      case VisitStatus.WITHOUT_RESPONSE: return <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-xs md:text-sm font-bold">{status}</span>;
       default: return null;
     }
   };
@@ -281,6 +283,8 @@ export default function DailyList() {
         return 'bg-blue-500';
       case VisitStatus.LEFT:
         return 'bg-slate-500';
+      case VisitStatus.WITHOUT_RESPONSE:
+        return 'bg-orange-500';
       default:
         return 'bg-slate-400';
     }

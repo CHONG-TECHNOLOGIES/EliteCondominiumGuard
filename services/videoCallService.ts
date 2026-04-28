@@ -30,7 +30,7 @@ const ICE_SERVERS: RTCIceServer[] = [
     : [])
 ];
 
-const CALL_TIMEOUT_MS = 60_000;
+const CALL_TIMEOUT_MS = 90_000;
 
 class VideoCallService {
   private pc: RTCPeerConnection | null = null;

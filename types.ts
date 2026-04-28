@@ -17,7 +17,8 @@ export enum VisitStatus {
   APPROVED = 'AUTORIZADO',
   DENIED = 'NEGADO',
   INSIDE = 'NO INTERIOR',
-  LEFT = 'SAIU'
+  LEFT = 'SAIU',
+  WITHOUT_RESPONSE = 'SEM RESPOSTA'
 }
 
 export enum SyncStatus {

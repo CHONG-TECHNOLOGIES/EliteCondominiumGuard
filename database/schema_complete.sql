@@ -1,4 +1,900 @@
 -- ============================================================
+-- EntryFlow - Complete Schema (all migrations consolidated)
+-- Generated: 2026-04-28
+-- Source: 21 migration files merged in dependency order
+-- ============================================================
+
+
+-- ============================================================
+-- SECTION: 1. NEW TABLES (DDL)
+-- ============================================================
+
+
+-- ------------------------------------------------------------
+-- FILE: add_subscription_management.sql
+-- ------------------------------------------------------------
+-- Migration script for App Pricing and Subscriptions Management
+-- Please run this script in the Supabase SQL Editor.
+
+-- 1. Create App Pricing Rules Table
+CREATE TABLE IF NOT EXISTS public.app_pricing_rules (
+    id SERIAL PRIMARY KEY,
+    min_residents INTEGER NOT NULL,
+    max_residents INTEGER, -- Null means no upper limit (e.g., "1000+" residents)
+    price_per_resident NUMERIC(10, 2) NOT NULL,
+    currency VARCHAR(10) DEFAULT 'AOA' NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Note: Ensure min_residents and max_residents don't overlap in logic, but we won't strictly constrain it here.
+
+-- 2. Create Condominium Subscriptions Table
+CREATE TABLE IF NOT EXISTS public.condominium_subscriptions (
+    id SERIAL PRIMARY KEY,
+    condominium_id INTEGER NOT NULL REFERENCES public.condominiums(id) ON DELETE CASCADE,
+    status VARCHAR(20) DEFAULT 'ACTIVE' NOT NULL CHECK (status IN ('ACTIVE', 'OVERDUE', 'INACTIVE')),
+    last_payment_date DATE,
+    next_due_date DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE(condominium_id) -- One subscription record per condominium
+);
+
+-- Create a function and trigger to automatically create a subscription record when a new condominium is added
+CREATE OR REPLACE FUNCTION public.create_condominium_subscription()
+RETURNS trigger AS $$
+BEGIN
+    INSERT INTO public.condominium_subscriptions (condominium_id, status)
+    VALUES (NEW.id, 'ACTIVE')
+    ON CONFLICT (condominium_id) DO NOTHING;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_condominium_created_subscription
+    AFTER INSERT ON public.condominiums
+    FOR EACH ROW EXECUTE FUNCTION public.create_condominium_subscription();
+
+-- Populate existing condominiums into the subscriptions table
+INSERT INTO public.condominium_subscriptions (condominium_id, status)
+SELECT id, 'ACTIVE' FROM public.condominiums
+ON CONFLICT (condominium_id) DO NOTHING;
+
+-- RLS Policies
+ALTER TABLE public.app_pricing_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.condominium_subscriptions ENABLE ROW LEVEL SECURITY;
+
+-- Only Admins (SUPER_ADMIN or ADMIN, check via staff table or app metadata depending on your setup. Usually, everyone can read, but only SUPER_ADMIN writes)
+-- Since we do auth checks loosely in the frontend and use RPCs or just allow staff, let's just make it open to staff for now like other tables.
+-- A better approach is to check role, but matching existing tables' RLS.
+CREATE POLICY "Allow authenticated full access app_pricing_rules" 
+ON public.app_pricing_rules AS PERMISSIVE FOR ALL TO authenticated USING (true);
+
+CREATE POLICY "Allow authenticated full access condominium_subscriptions" 
+ON public.condominium_subscriptions AS PERMISSIVE FOR ALL TO authenticated USING (true);
+
+-- ------------------------------------------------------------
+-- FILE: add_subscription_payments.sql
+-- ------------------------------------------------------------
+-- Migration script for Subscription Payments and Reporting
+-- Please run this script in the Supabase SQL Editor.
+
+-- 1. Create Subscription Payments Table
+CREATE TABLE IF NOT EXISTS public.subscription_payments (
+    id SERIAL PRIMARY KEY,
+    condominium_id INTEGER NOT NULL REFERENCES public.condominiums(id) ON DELETE CASCADE,
+    amount NUMERIC(10, 2) NOT NULL,
+    currency VARCHAR(10) DEFAULT 'AOA' NOT NULL,
+    payment_date DATE NOT NULL,
+    reference_period VARCHAR(20), -- e.g., '2026-03' or 'Março 2026'
+    status VARCHAR(20) DEFAULT 'PAID' NOT NULL CHECK (status IN ('PAID', 'PENDING', 'FAILED', 'PARTIAL')),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- RLS Policies
+ALTER TABLE public.subscription_payments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow authenticated full access subscription_payments" 
+ON public.subscription_payments AS PERMISSIVE FOR ALL TO authenticated USING (true);
+
+-- ------------------------------------------------------------
+-- FILE: add_subscription_alerts.sql
+-- ------------------------------------------------------------
+-- add_subscription_alerts.sql
+-- Create the subscription_alerts table to track sent alerts
+CREATE TABLE IF NOT EXISTS subscription_alerts (
+    id SERIAL PRIMARY KEY,
+    condominium_id INTEGER NOT NULL REFERENCES condominiums(id) ON DELETE CASCADE,
+    alert_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reference_month TEXT NOT NULL,  -- The month/year the alert refers to, e.g., '03/2026'
+    sent_by INTEGER NOT NULL REFERENCES staff(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Note: Ensure permissions for Admin/Super_admin
+ALTER TABLE subscription_alerts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow authenticated full access subscription_alerts" 
+ON public.subscription_alerts AS PERMISSIVE FOR ALL TO authenticated USING (true);
+
+-- RPC for sending subscription alerts
+CREATE OR REPLACE FUNCTION admin_send_subscription_alert(p_condominium_id INT, p_staff_id INT)
+RETURNS jsonb AS $$
+DECLARE
+    v_total_alerts INT;
+    v_alerts_this_month INT;
+    v_reference_month TEXT;
+    v_months_in_arrears INT;
+    v_blocked BOOLEAN := false;
+    v_result jsonb;
+BEGIN
+    -- Determine current reference month (MM/YYYY)
+    v_reference_month := to_char(CURRENT_DATE, 'MM/YYYY');
+
+    -- Check if alert was already sent this month for this condominium
+    SELECT count(*) INTO v_alerts_this_month
+    FROM subscription_alerts
+    WHERE condominium_id = p_condominium_id
+      AND to_char(alert_date, 'MM/YYYY') = to_char(CURRENT_DATE, 'MM/YYYY');
+
+    IF v_alerts_this_month > 0 THEN
+        RETURN jsonb_build_object(
+            'success', false,
+            'message', 'Já foi enviado um alerta para este condomínio neste mês. Limite de 1 alerta por mês.'
+        );
+    END IF;
+
+    -- Record the new alert
+    INSERT INTO subscription_alerts (condominium_id, alert_date, reference_month, sent_by)
+    VALUES (p_condominium_id, NOW(), v_reference_month, p_staff_id);
+
+    -- Check total alerts sent
+    SELECT count(*) INTO v_total_alerts
+    FROM subscription_alerts
+    WHERE condominium_id = p_condominium_id;
+
+    -- Calculate current arrears (this uses your existing function logic if available, or a simplified check based on what RPCs exist)
+    -- Assuming your view/RPC provides months_in_arrears:
+    -- Here we do a simplified check for > 0 arrears across all time, though normally we'd call a calculation function.
+    -- For safety, we block if total alerts >= 3.
+    IF v_total_alerts >= 3 THEN
+        -- Check if it should be blocked (i.e., it is really still in arrears)
+        -- In the context of calling from the frontend, we are only calling this if it has arrears >= 5.
+        -- So we proceed to block.
+        
+        -- Turn condominium INACTIVE
+        UPDATE condominiums
+        SET status = 'INACTIVE'
+        WHERE id = p_condominium_id;
+
+        -- Turn subscription INACTIVE
+        UPDATE condominium_subscriptions
+        SET status = 'INACTIVE'
+        WHERE condominium_id = p_condominium_id;
+
+        -- Optionally turn devices INACTIVE
+        UPDATE devices
+        SET status = 'INACTIVE'
+        WHERE condominium_id = p_condominium_id;
+
+        v_blocked := true;
+    END IF;
+
+    v_result := jsonb_build_object(
+        'success', true,
+        'message', 'Alerta registado com sucesso.',
+        'total_alerts', v_total_alerts,
+        'blocked', v_blocked
+    );
+
+    RETURN v_result;
+
+EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object(
+        'success', false,
+        'message', SQLERRM
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ------------------------------------------------------------
+-- FILE: add_otp_system.sql
+-- ------------------------------------------------------------
+-- Migration: Sistema de OTP para reset de PIN de residentes
+-- Data: 2025-12-01
+-- Descrição: Permite que residentes resetem seu próprio PIN via SMS
+
+-- 1. Criar tabela de códigos OTP
+CREATE TABLE IF NOT EXISTS otp_codes (
+  id SERIAL PRIMARY KEY,
+  phone TEXT NOT NULL,
+  code TEXT NOT NULL,
+  purpose TEXT NOT NULL, -- 'RESET_PIN', 'VERIFY_PHONE', etc.
+  resident_id INTEGER REFERENCES residents(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '10 minutes'),
+  used_at TIMESTAMPTZ,
+  attempts INTEGER DEFAULT 0,
+  max_attempts INTEGER DEFAULT 3,
+  ip_address TEXT,
+  user_agent TEXT
+);
+
+-- 2. Índices para performance
+CREATE INDEX idx_otp_codes_phone ON otp_codes(phone);
+CREATE INDEX idx_otp_codes_expires_at ON otp_codes(expires_at);
+CREATE INDEX idx_otp_codes_resident_id ON otp_codes(resident_id);
+
+-- 3. Policy de limpeza automática de OTPs expirados (executar diariamente)
+-- Você pode usar pg_cron ou um cronjob externo
+CREATE OR REPLACE FUNCTION cleanup_expired_otps()
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  deleted_count INTEGER;
+BEGIN
+  DELETE FROM otp_codes
+  WHERE expires_at < NOW() - INTERVAL '1 day';
+
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RETURN deleted_count;
+END;
+$$;
+
+-- 4. Trigger para limitar rate de OTPs por telefone
+-- (máximo 5 OTPs por telefone a cada 1 hora)
+CREATE OR REPLACE FUNCTION check_otp_rate_limit()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  recent_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO recent_count
+  FROM otp_codes
+  WHERE phone = NEW.phone
+    AND created_at > NOW() - INTERVAL '1 hour';
+
+  IF recent_count >= 5 THEN
+    RAISE EXCEPTION 'Muitas tentativas. Aguarde 1 hora antes de solicitar novo código.';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trigger_otp_rate_limit
+  BEFORE INSERT ON otp_codes
+  FOR EACH ROW
+  EXECUTE FUNCTION check_otp_rate_limit();
+
+-- 5. Comentários
+COMMENT ON TABLE otp_codes IS 'Armazena códigos OTP temporários para verificação de telefone e reset de PIN';
+COMMENT ON COLUMN otp_codes.purpose IS 'Tipo de operação: RESET_PIN, VERIFY_PHONE, etc.';
+COMMENT ON COLUMN otp_codes.attempts IS 'Número de tentativas de validação do código';
+COMMENT ON COLUMN otp_codes.max_attempts IS 'Máximo de tentativas permitidas antes de invalidar o código';
+
+-- ------------------------------------------------------------
+-- FILE: add_video_call_sessions.sql
+-- ------------------------------------------------------------
+-- Migration: add_video_call_sessions
+-- Creates the video_call_sessions table and 3 supporting RPCs
+
+CREATE TABLE IF NOT EXISTS video_call_sessions (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  visit_id        INT4 NOT NULL REFERENCES visits(id) ON DELETE CASCADE,
+  guard_id        INT4 NOT NULL REFERENCES staff(id),
+  resident_id     INT4 REFERENCES residents(id),
+  unit_id         INT4 REFERENCES units(id),
+  condominium_id  INT4 NOT NULL REFERENCES condominiums(id),
+  device_id       TEXT,
+  status          TEXT NOT NULL DEFAULT 'CALLING'
+                  CHECK (status IN ('CALLING','ACCEPTED','REJECTED','MISSED','ENDED','FAILED')),
+  initiated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  answered_at     TIMESTAMPTZ,
+  ended_at        TIMESTAMPTZ,
+  duration_seconds INT4,
+  rejection_reason TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_video_call_sessions_visit_id     ON video_call_sessions(visit_id);
+CREATE INDEX IF NOT EXISTS idx_video_call_sessions_resident_id  ON video_call_sessions(resident_id);
+CREATE INDEX IF NOT EXISTS idx_video_call_sessions_status       ON video_call_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_video_call_sessions_initiated_at ON video_call_sessions(initiated_at DESC);
+
+ALTER TABLE video_call_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Guards can insert and read sessions for their condominium
+CREATE POLICY "guard_insert_video_call_sessions" ON video_call_sessions
+  FOR INSERT WITH CHECK (
+    condominium_id IN (
+      SELECT condominium_id FROM staff WHERE id = guard_id
+    )
+  );
+
+CREATE POLICY "guard_select_video_call_sessions" ON video_call_sessions
+  FOR SELECT USING (
+    condominium_id IN (
+      SELECT condominium_id FROM staff
+      WHERE id = (SELECT id FROM staff WHERE id = guard_id LIMIT 1)
+    )
+  );
+
+-- Service role can do everything (used by Edge Functions)
+CREATE POLICY "service_role_all_video_call_sessions" ON video_call_sessions
+  USING (auth.role() = 'service_role')
+  WITH CHECK (auth.role() = 'service_role');
+
+-- ─── RPC: create_video_call_session ────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION create_video_call_session(p_data JSONB)
+RETURNS video_call_sessions
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+DECLARE
+  v_session video_call_sessions;
+BEGIN
+  INSERT INTO video_call_sessions (
+    visit_id,
+    guard_id,
+    resident_id,
+    unit_id,
+    condominium_id,
+    device_id,
+    status
+  ) VALUES (
+    (p_data->>'visit_id')::INT4,
+    (p_data->>'guard_id')::INT4,
+    NULLIF(p_data->>'resident_id', '')::INT4,
+    NULLIF(p_data->>'unit_id', '')::INT4,
+    (p_data->>'condominium_id')::INT4,
+    p_data->>'device_id',
+    'CALLING'
+  )
+  RETURNING * INTO v_session;
+
+  RETURN v_session;
+END;
+$$;
+
+-- ─── RPC: update_video_call_session_status ─────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION update_video_call_session_status(
+  p_session_id      UUID,
+  p_status          TEXT,
+  p_rejection_reason TEXT DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE video_call_sessions
+  SET
+    status           = p_status,
+    rejection_reason = COALESCE(p_rejection_reason, rejection_reason),
+    answered_at      = CASE WHEN p_status = 'ACCEPTED'  THEN NOW() ELSE answered_at END,
+    ended_at         = CASE WHEN p_status IN ('ENDED','REJECTED','MISSED','FAILED') THEN NOW() ELSE ended_at END,
+    duration_seconds = CASE
+                         WHEN p_status = 'ENDED' AND answered_at IS NOT NULL
+                         THEN EXTRACT(EPOCH FROM (NOW() - answered_at))::INT4
+                         ELSE duration_seconds
+                       END
+  WHERE id = p_session_id;
+END;
+$$;
+
+-- ─── RPC: get_active_video_call_for_resident ───────────────────────────────────
+
+CREATE OR REPLACE FUNCTION get_active_video_call_for_resident(p_resident_id INT4)
+RETURNS SETOF video_call_sessions
+LANGUAGE sql SECURITY DEFINER
+AS $$
+  SELECT *
+  FROM video_call_sessions
+  WHERE resident_id = p_resident_id
+    AND status IN ('CALLING', 'ACCEPTED')
+  ORDER BY initiated_at DESC
+  LIMIT 1;
+$$;
+
+-- ============================================================
+-- SECTION: 2. COLUMN ADDITIONS (ALTER TABLE)
+-- ============================================================
+
+
+-- ------------------------------------------------------------
+-- FILE: update_subscription_exceptions.sql
+-- ------------------------------------------------------------
+-- Migration script for Custom Subscription Exceptions and Discounts
+-- Please run this script in the Supabase SQL Editor.
+
+ALTER TABLE public.condominium_subscriptions
+ADD COLUMN IF NOT EXISTS custom_price_per_resident NUMERIC(10, 2),
+ADD COLUMN IF NOT EXISTS discount_percentage NUMERIC(5, 2) DEFAULT 0;
+
+-- ------------------------------------------------------------
+-- FILE: add_visitor_photo_enabled.sql
+-- ------------------------------------------------------------
+-- Migration: Add setup-controlled entry permissions to condominiums
+-- Apply manually via Supabase SQL Editor
+
+-- 1. Add columns (DEFAULT true preserves existing condominiums behaviour)
+ALTER TABLE condominiums
+  ADD COLUMN IF NOT EXISTS visitor_photo_enabled BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS intercom_approval_enabled BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS guard_manual_approval_enabled BOOLEAN NOT NULL DEFAULT true;
+
+-- 2. RPC callable during device setup
+--    SECURITY DEFINER: allows the unauthenticated setup screen to write to
+--    condominiums without triggering RLS, while still being a named, auditable operation.
+CREATE OR REPLACE FUNCTION set_condo_setup_settings(
+  p_condo_id                      INTEGER,
+  p_visitor_photo_enabled         BOOLEAN,
+  p_intercom_approval_enabled     BOOLEAN,
+  p_guard_manual_approval_enabled BOOLEAN
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE condominiums
+  SET
+    visitor_photo_enabled = p_visitor_photo_enabled,
+    intercom_approval_enabled = p_intercom_approval_enabled,
+    guard_manual_approval_enabled = p_guard_manual_approval_enabled
+  WHERE id = p_condo_id;
+END;
+$$;
+
+-- 3. Backward-compatible wrapper for older clients that only set the photo flag.
+CREATE OR REPLACE FUNCTION set_condo_visitor_photo_setting(
+  p_condo_id INTEGER,
+  p_enabled   BOOLEAN
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE condominiums
+  SET visitor_photo_enabled = p_enabled
+  WHERE id = p_condo_id;
+END;
+$$;
+
+-- 4. Update admin condominium creation so create/edit admin screens can set
+--    these flags at creation time instead of relying only on defaults.
+CREATE OR REPLACE FUNCTION public.admin_create_condominium(p_data jsonb)
+RETURNS condominiums
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_row public.condominiums;
+BEGIN
+  INSERT INTO public.condominiums (
+    name,
+    address,
+    logo_url,
+    latitude,
+    longitude,
+    gps_radius_meters,
+    status,
+    phone_number,
+    contact_person,
+    contact_email,
+    manager_name,
+    visitor_photo_enabled,
+    intercom_approval_enabled,
+    guard_manual_approval_enabled
+  )
+  VALUES (
+    p_data->>'name',
+    p_data->>'address',
+    p_data->>'logo_url',
+    (p_data->>'latitude')::float8,
+    (p_data->>'longitude')::float8,
+    (p_data->>'gps_radius_meters')::int4,
+    COALESCE(p_data->>'status', 'ACTIVE'),
+    p_data->>'phone_number',
+    p_data->>'contact_person',
+    p_data->>'contact_email',
+    p_data->>'manager_name',
+    COALESCE((p_data->>'visitor_photo_enabled')::boolean, true),
+    COALESCE((p_data->>'intercom_approval_enabled')::boolean, true),
+    COALESCE((p_data->>'guard_manual_approval_enabled')::boolean, true)
+  )
+  RETURNING * INTO v_row;
+
+  RETURN v_row;
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- FILE: add_photo_consent.sql
+-- ------------------------------------------------------------
+-- Migration: Add photo_consent_given to visits table
+-- Apply manually via Supabase SQL Editor
+--
+-- NULL = not applicable (visitor_photo_enabled = false for this condo)
+-- TRUE = visitor explicitly accepted photo capture
+-- FALSE = should never be stored (app blocks submission on refusal)
+
+ALTER TABLE visits
+  ADD COLUMN IF NOT EXISTS photo_consent_given BOOLEAN;
+
+-- Update create_visit RPC to accept and persist the new field
+CREATE OR REPLACE FUNCTION public.create_visit(p_data jsonb)
+  RETURNS visits
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_row public.visits;
+BEGIN
+  INSERT INTO public.visits (
+    condominium_id, visitor_name, visitor_doc, visitor_phone, vehicle_license_plate,
+    visit_type_id, service_type_id, restaurant_id, sport_id,
+    unit_id, reason, photo_url, qr_token, qr_expires_at,
+    check_in_at, check_out_at, status, approval_mode,
+    guard_id, device_id,
+    photo_consent_given
+  ) VALUES (
+    (p_data->>'condominium_id')::int,
+    p_data->>'visitor_name',
+    p_data->>'visitor_doc',
+    p_data->>'visitor_phone',
+    p_data->>'vehicle_license_plate',
+    (p_data->>'visit_type_id')::int,
+    (p_data->>'service_type_id')::int,
+    NULLIF(p_data->>'restaurant_id', '')::uuid,
+    NULLIF(p_data->>'sport_id', '')::uuid,
+    (p_data->>'unit_id')::int,
+    p_data->>'reason',
+    p_data->>'photo_url',
+    p_data->>'qr_token',
+    (p_data->>'qr_expires_at')::timestamptz,
+    (p_data->>'check_in_at')::timestamptz,
+    (p_data->>'check_out_at')::timestamptz,
+    p_data->>'status',
+    p_data->>'approval_mode',
+    (p_data->>'guard_id')::int,
+    NULLIF(p_data->>'device_id', '')::uuid,
+    (p_data->>'photo_consent_given')::boolean
+  )
+  RETURNING * INTO v_row;
+
+  RETURN v_row;
+END;
+$function$;
+
+-- ------------------------------------------------------------
+-- FILE: add_video_call_offer_sdp.sql
+-- ------------------------------------------------------------
+-- Add offer_sdp column so resident app can fetch the offer even if it missed the broadcast
+ALTER TABLE video_call_sessions ADD COLUMN IF NOT EXISTS offer_sdp TEXT;
+
+-- Guard calls this after createOffer() to persist the SDP
+CREATE OR REPLACE FUNCTION update_video_call_session_offer(
+  p_session_id UUID,
+  p_offer_sdp  TEXT
+) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE video_call_sessions SET offer_sdp = p_offer_sdp WHERE id = p_session_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION update_video_call_session_offer(UUID, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION update_video_call_session_offer(UUID, TEXT) TO service_role;
+
+-- Resident app calls this on VideoCallScreen mount to get the stored offer SDP
+CREATE OR REPLACE FUNCTION get_video_call_session_offer(p_session_id UUID)
+RETURNS TEXT
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT offer_sdp FROM video_call_sessions WHERE id = p_session_id;
+$$;
+GRANT EXECUTE ON FUNCTION get_video_call_session_offer(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_video_call_session_offer(UUID) TO service_role;
+
+-- ============================================================
+-- SECTION: 3. CONSTRAINT MODIFICATIONS
+-- ============================================================
+
+
+-- ------------------------------------------------------------
+-- FILE: fix_subscription_payments_status_check.sql
+-- ------------------------------------------------------------
+-- Fix for Subscription Payments Status Check
+-- Run this in the Supabase SQL Editor to allow 'PARTIAL' status
+
+ALTER TABLE public.subscription_payments DROP CONSTRAINT IF EXISTS subscription_payments_status_check;
+ALTER TABLE public.subscription_payments ADD CONSTRAINT subscription_payments_status_check CHECK (status IN ('PAID', 'PENDING', 'FAILED', 'PARTIAL'));
+
+-- Update RPC to return condominium name
+-- NOTE: We must DROP it first because the return type is changing
+DROP FUNCTION IF EXISTS public.admin_get_subscription_payments(integer, integer, integer);
+DROP FUNCTION IF EXISTS public.admin_get_subscription_payments(bigint, integer, integer);
+
+CREATE OR REPLACE FUNCTION public.admin_get_subscription_payments(
+  p_condominium_id BIGINT,
+  p_year INTEGER,
+  p_month INTEGER
+)
+RETURNS TABLE (
+  id BIGINT,
+  condominium_id BIGINT,
+  amount NUMERIC,
+  currency TEXT,
+  payment_date DATE,
+  reference_period TEXT,
+  status TEXT,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE,
+  condominium_name TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    p.id::BIGINT, 
+    p.condominium_id::BIGINT, 
+    p.amount::NUMERIC, 
+    p.currency::TEXT, 
+    p.payment_date::DATE, 
+    p.reference_period::TEXT, 
+    p.status::TEXT, 
+    p.notes::TEXT, 
+    p.created_at, 
+    p.updated_at,
+    c.name::TEXT as condominium_name
+  FROM public.subscription_payments p
+  LEFT JOIN public.condominiums c ON p.condominium_id = c.id
+  WHERE (p_condominium_id IS NULL OR p.condominium_id = p_condominium_id)
+    AND (p_year IS NULL OR EXTRACT(YEAR FROM p.payment_date) = p_year)
+    AND (p_month IS NULL OR EXTRACT(MONTH FROM p.payment_date) = p_month)
+  ORDER BY p.payment_date DESC;
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- FILE: fix_subscription_rpcs.sql
+-- ------------------------------------------------------------
+-- Update Subscription Status Constraint to allow 'TRIAL'
+ALTER TABLE public.condominium_subscriptions 
+DROP CONSTRAINT IF EXISTS condominium_subscriptions_status_check;
+
+ALTER TABLE public.condominium_subscriptions 
+ADD CONSTRAINT condominium_subscriptions_status_check 
+CHECK (status IN ('ACTIVE', 'OVERDUE', 'INACTIVE', 'TRIAL', 'SUSPENDED'));
+
+-- Refine admin_update_subscription_details to be more robust
+CREATE OR REPLACE FUNCTION public.admin_update_subscription_details(
+  p_id INTEGER,
+  p_condominium_id INTEGER,
+  p_status VARCHAR DEFAULT NULL,
+  p_custom_price_per_resident NUMERIC DEFAULT NULL,
+  p_discount_percentage NUMERIC DEFAULT NULL
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- If p_id is null or < 0, we try to find by condominium_id or insert
+  IF p_id IS NULL OR p_id < 0 THEN
+    INSERT INTO public.condominium_subscriptions (condominium_id, status, custom_price_per_resident, discount_percentage)
+    VALUES (p_condominium_id, COALESCE(p_status, 'ACTIVE'), p_custom_price_per_resident, COALESCE(p_discount_percentage, 0))
+    ON CONFLICT (condominium_id) DO UPDATE SET 
+      status = COALESCE(EXCLUDED.status, condominium_subscriptions.status),
+      custom_price_per_resident = EXCLUDED.custom_price_per_resident,
+      discount_percentage = COALESCE(EXCLUDED.discount_percentage, condominium_subscriptions.discount_percentage),
+      updated_at = NOW();
+  ELSE
+    UPDATE public.condominium_subscriptions
+    SET 
+      status = COALESCE(p_status, status),
+      custom_price_per_resident = p_custom_price_per_resident,
+      discount_percentage = COALESCE(p_discount_percentage, discount_percentage),
+      updated_at = NOW()
+    WHERE id = p_id;
+    
+    -- If no rows updated by ID, maybe it was a wrong ID, try by condo_id as fallback
+    IF NOT FOUND THEN
+      UPDATE public.condominium_subscriptions
+      SET 
+        status = COALESCE(p_status, status),
+        custom_price_per_resident = p_custom_price_per_resident,
+        discount_percentage = COALESCE(p_discount_percentage, discount_percentage),
+        updated_at = NOW()
+      WHERE condominium_id = p_condominium_id;
+    END IF;
+  END IF;
+  RETURN TRUE;
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- FILE: add_sem_resposta_status.sql
+-- ------------------------------------------------------------
+-- Allow 'SEM RESPOSTA' as a valid visit status (auto-transition after 30 min PENDING)
+ALTER TABLE visits DROP CONSTRAINT IF EXISTS visits_status_check;
+ALTER TABLE visits ADD CONSTRAINT visits_status_check
+  CHECK (status IN ('PENDENTE','AUTORIZADO','NEGADO','NO INTERIOR','SAIU','SEM RESPOSTA'));
+
+-- ============================================================
+-- SECTION: 4. PERFORMANCE INDEXES
+-- ============================================================
+
+
+-- ------------------------------------------------------------
+-- FILE: add_subscription_indexes.sql
+-- ------------------------------------------------------------
+-- Add performance indexes for subscription and payment queries
+-- These indexes will speed up the admin_get_condominium_subscriptions RPC
+-- and general dashboard loading times.
+
+-- 1. Index for querying subscriptions by condominium
+CREATE INDEX IF NOT EXISTS idx_condominium_subscriptions_condo 
+ON public.condominium_subscriptions(condominium_id);
+
+-- 2. Index for querying payments by condominium and reference period
+-- This is heavily used in the arrears calculation loop
+CREATE INDEX IF NOT EXISTS idx_subscription_payments_condo_period 
+ON public.subscription_payments(condominium_id, reference_period);
+
+-- 3. Index for filtering payments by status (used to check PAID/PARTIAL)
+CREATE INDEX IF NOT EXISTS idx_subscription_payments_status 
+ON public.subscription_payments(status);
+
+-- 4. Index for residents by condominium to speed up the resident counting 
+-- (You might already have this, but CREATE INDEX IF NOT EXISTS is safe)
+CREATE INDEX IF NOT EXISTS idx_residents_condominium_id 
+ON public.residents(condominium_id);
+
+-- ============================================================
+-- SECTION: 5. FUNCTIONS AND RPCs
+-- ============================================================
+
+
+-- ------------------------------------------------------------
+-- FILE: add_resident_app_tracking.sql
+-- ------------------------------------------------------------
+
+
+-- ============================================================================
+-- 3. Create function to update resident last seen
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION update_resident_app_activity(
+  p_resident_id INT4
+)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE residents
+  SET app_last_seen_at = NOW()
+  WHERE id = p_resident_id AND has_app_installed = TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 4. Create function to check if unit has app (for guard app)
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION check_unit_has_app(
+  p_unit_id INT4
+)
+RETURNS JSON AS $$
+DECLARE
+  v_has_app BOOLEAN;
+  v_resident_count INT4;
+  v_app_resident_count INT4;
+  v_result JSON;
+BEGIN
+  -- Count total residents
+  SELECT COUNT(*) INTO v_resident_count
+  FROM residents
+  WHERE unit_id = p_unit_id;
+
+  -- Count residents with app
+  SELECT COUNT(*) INTO v_app_resident_count
+  FROM residents
+  WHERE unit_id = p_unit_id AND has_app_installed = TRUE;
+
+  -- Determine if unit has app (at least one resident)
+  v_has_app := (v_app_resident_count > 0);
+
+  -- Build result
+  SELECT json_build_object(
+    'unit_id', p_unit_id,
+    'has_app', v_has_app,
+    'total_residents', v_resident_count,
+    'residents_with_app', v_app_resident_count,
+    'coverage_percent',
+      CASE
+        WHEN v_resident_count > 0
+        THEN ROUND((v_app_resident_count::NUMERIC / v_resident_count::NUMERIC) * 100, 1)
+        ELSE 0
+      END
+  ) INTO v_result;
+
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 5. Create view for app adoption statistics (admin dashboard)
+-- ============================================================================
+
+CREATE OR REPLACE VIEW v_app_adoption_stats AS
+SELECT
+  c.id AS condominium_id,
+  c.name AS condominium_name,
+  COUNT(DISTINCT u.id) AS total_units,
+  COUNT(DISTINCT r.id) AS total_residents,
+  COUNT(DISTINCT CASE WHEN r.has_app_installed THEN r.id END) AS residents_with_app,
+  COUNT(DISTINCT CASE WHEN r.has_app_installed THEN u.id END) AS units_with_app,
+  ROUND(
+    (COUNT(DISTINCT CASE WHEN r.has_app_installed THEN r.id END)::NUMERIC /
+     NULLIF(COUNT(DISTINCT r.id), 0)::NUMERIC) * 100,
+    1
+  ) AS resident_adoption_percent,
+  ROUND(
+    (COUNT(DISTINCT CASE WHEN r.has_app_installed THEN u.id END)::NUMERIC /
+     NULLIF(COUNT(DISTINCT u.id), 0)::NUMERIC) * 100,
+    1
+  ) AS unit_coverage_percent
+FROM condominiums c
+LEFT JOIN units u ON u.condominium_id = c.id
+LEFT JOIN residents r ON r.unit_id = u.id
+GROUP BY c.id, c.name
+ORDER BY condominium_name;
+
+COMMENT ON VIEW v_app_adoption_stats IS 'Statistics on resident app adoption per condominium';
+
+-- ============================================================================
+-- 6. Grant permissions (adjust as needed for your security model)
+-- ============================================================================
+
+-- Allow authenticated users to call the functions
+-- GRANT EXECUTE ON FUNCTION register_resident_app_login TO authenticated;
+-- GRANT EXECUTE ON FUNCTION update_resident_app_activity TO authenticated;
+-- GRANT EXECUTE ON FUNCTION check_unit_has_app TO authenticated;
+
+-- ============================================================================
+-- ROLLBACK (if needed)
+-- ============================================================================
+
+/*
+-- To rollback this migration:
+
+DROP VIEW IF EXISTS v_app_adoption_stats;
+DROP FUNCTION IF EXISTS check_unit_has_app(INT4);
+DROP FUNCTION IF EXISTS update_resident_app_activity(INT4);
+DROP FUNCTION IF EXISTS register_resident_app_login(INT4, TEXT, TEXT);
+DROP INDEX IF EXISTS idx_residents_has_app;
+
+ALTER TABLE residents
+DROP COLUMN IF EXISTS has_app_installed,
+DROP COLUMN IF EXISTS device_token,
+DROP COLUMN IF EXISTS app_first_login_at,
+DROP COLUMN IF EXISTS app_last_seen_at;
+*/
+
+-- ------------------------------------------------------------
+-- FILE: all_rpcs.sql (base ~178 RPCs)
+-- ------------------------------------------------------------
+-- ============================================================
 -- All RPC Functions - EntryFlow (Supabase/PostgreSQL)
 -- Generated: 2026-03-28
 -- Total functions: 178
@@ -4841,3 +5737,724 @@ CREATE OR REPLACE FUNCTION public.word_similarity_op(text, text)
  STABLE PARALLEL SAFE STRICT
 AS '$libdir/pg_trgm', $function$word_similarity_op$function$
 ;
+
+-- ------------------------------------------------------------
+-- FILE: add_subscription_rpcs.sql
+-- ------------------------------------------------------------
+-- RPCs for Subscription Management (Bypassing RLS with SECURITY DEFINER)
+-- Run this in the Supabase SQL Editor
+
+-- Pricing Rules
+CREATE OR REPLACE FUNCTION public.admin_get_app_pricing_rules()
+RETURNS SETOF public.app_pricing_rules
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT * FROM public.app_pricing_rules ORDER BY min_residents ASC;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_create_app_pricing_rule(
+  p_min_residents INTEGER,
+  p_max_residents INTEGER,
+  p_price_per_resident NUMERIC,
+  p_currency VARCHAR
+)
+RETURNS public.app_pricing_rules
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_rule public.app_pricing_rules;
+BEGIN
+  INSERT INTO public.app_pricing_rules (min_residents, max_residents, price_per_resident, currency)
+  VALUES (p_min_residents, p_max_residents, p_price_per_resident, p_currency)
+  RETURNING * INTO v_rule;
+  
+  RETURN v_rule;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_update_app_pricing_rule(
+  p_id INTEGER,
+  p_min_residents INTEGER,
+  p_max_residents INTEGER,
+  p_price_per_resident NUMERIC,
+  p_currency VARCHAR
+)
+RETURNS public.app_pricing_rules
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_rule public.app_pricing_rules;
+BEGIN
+  UPDATE public.app_pricing_rules
+  SET min_residents = COALESCE(p_min_residents, min_residents),
+      max_residents = COALESCE(p_max_residents, max_residents),
+      price_per_resident = COALESCE(p_price_per_resident, price_per_resident),
+      currency = COALESCE(p_currency, currency),
+      updated_at = NOW()
+  WHERE id = p_id
+  RETURNING * INTO v_rule;
+  
+  RETURN v_rule;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_app_pricing_rule(
+  p_id INTEGER
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  DELETE FROM public.app_pricing_rules WHERE id = p_id;
+  RETURN FOUND;
+END;
+$$;
+
+
+-- Subscriptions
+CREATE OR REPLACE FUNCTION public.admin_get_condominium_subscriptions()
+RETURNS TABLE (
+  id INTEGER,
+  condominium_id INTEGER,
+  status VARCHAR,
+  custom_price_per_resident NUMERIC,
+  discount_percentage NUMERIC,
+  last_payment_date DATE,
+  next_due_date DATE,
+  created_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE,
+  condominium_name VARCHAR
+)
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT 
+    s.id, 
+    s.condominium_id, 
+    s.status, 
+    s.custom_price_per_resident, 
+    s.discount_percentage,
+    s.last_payment_date, 
+    s.next_due_date, 
+    s.created_at, 
+    s.updated_at,
+    c.name as condominium_name
+  FROM public.condominium_subscriptions s
+  JOIN public.condominiums c ON s.condominium_id = c.id;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_update_subscription_status(
+  p_id INTEGER,
+  p_condominium_id INTEGER,
+  p_status VARCHAR
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF p_id < 0 THEN
+    INSERT INTO public.condominium_subscriptions (condominium_id, status)
+    VALUES (p_condominium_id, p_status)
+    ON CONFLICT (condominium_id) DO UPDATE SET status = EXCLUDED.status;
+  ELSE
+    UPDATE public.condominium_subscriptions
+    SET status = p_status, updated_at = NOW()
+    WHERE id = p_id;
+  END IF;
+  RETURN TRUE;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_update_subscription_details(
+  p_id INTEGER,
+  p_condominium_id INTEGER,
+  p_status VARCHAR,
+  p_custom_price_per_resident NUMERIC,
+  p_discount_percentage NUMERIC
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF p_id < 0 THEN
+    INSERT INTO public.condominium_subscriptions (condominium_id, status, custom_price_per_resident, discount_percentage)
+    VALUES (p_condominium_id, p_status, p_custom_price_per_resident, COALESCE(p_discount_percentage, 0))
+    ON CONFLICT (condominium_id) DO UPDATE SET 
+      status = EXCLUDED.status,
+      custom_price_per_resident = EXCLUDED.custom_price_per_resident,
+      discount_percentage = EXCLUDED.discount_percentage,
+      updated_at = NOW();
+  ELSE
+    UPDATE public.condominium_subscriptions
+    SET 
+      status = COALESCE(p_status, status),
+      custom_price_per_resident = p_custom_price_per_resident,
+      discount_percentage = COALESCE(p_discount_percentage, discount_percentage),
+      updated_at = NOW()
+    WHERE id = p_id;
+  END IF;
+  RETURN TRUE;
+END;
+$$;
+
+
+-- Payments
+-- NOTE: We must DROP it first because the return type is changing from SETOF to TABLE
+DROP FUNCTION IF EXISTS public.admin_get_subscription_payments(integer, integer, integer);
+DROP FUNCTION IF EXISTS public.admin_get_subscription_payments(bigint, integer, integer);
+
+CREATE OR REPLACE FUNCTION public.admin_get_subscription_payments(
+  p_condominium_id BIGINT,
+  p_year INTEGER,
+  p_month INTEGER
+)
+RETURNS TABLE (
+  id BIGINT,
+  condominium_id BIGINT,
+  amount NUMERIC,
+  currency TEXT,
+  payment_date DATE,
+  reference_period TEXT,
+  status TEXT,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE,
+  condominium_name TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    p.id::BIGINT, 
+    p.condominium_id::BIGINT, 
+    p.amount::NUMERIC, 
+    p.currency::TEXT, 
+    p.payment_date::DATE, 
+    p.reference_period::TEXT, 
+    p.status::TEXT, 
+    p.notes::TEXT, 
+    p.created_at, 
+    p.updated_at,
+    c.name::TEXT as condominium_name
+  FROM public.subscription_payments p
+  LEFT JOIN public.condominiums c ON p.condominium_id = c.id
+  WHERE (p_condominium_id IS NULL OR p.condominium_id = p_condominium_id)
+    AND (p_year IS NULL OR EXTRACT(YEAR FROM p.payment_date) = p_year)
+    AND (p_month IS NULL OR EXTRACT(MONTH FROM p.payment_date) = p_month)
+  ORDER BY p.payment_date DESC;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.admin_create_subscription_payment(
+  p_condominium_id INTEGER,
+  p_amount NUMERIC,
+  p_currency VARCHAR,
+  p_payment_date DATE,
+  p_reference_period VARCHAR,
+  p_status VARCHAR,
+  p_notes TEXT
+)
+RETURNS public.subscription_payments
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_payment public.subscription_payments;
+BEGIN
+  INSERT INTO public.subscription_payments (
+    condominium_id, amount, currency, payment_date, reference_period, status, notes
+  ) VALUES (
+    p_condominium_id, p_amount, COALESCE(p_currency, 'AOA'), p_payment_date, p_reference_period, COALESCE(p_status, 'PAID'), p_notes
+  )
+  RETURNING * INTO v_payment;
+  
+  -- Also update the condominium's last payment date
+  UPDATE public.condominium_subscriptions
+  SET last_payment_date = p_payment_date, updated_at = NOW()
+  WHERE condominium_id = p_condominium_id;
+
+  RETURN v_payment;
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- FILE: enhance_subscription_rpcs.sql
+-- ------------------------------------------------------------
+-- "Master" Version of admin_get_condominium_subscriptions
+-- Returns detailed arrears as a JSON array [ { period, expected, paid }, ... ]
+
+DROP FUNCTION IF EXISTS public.admin_get_condominium_subscriptions();
+
+CREATE OR REPLACE FUNCTION public.admin_get_condominium_subscriptions()
+RETURNS TABLE (
+  id BIGINT,
+  condominium_id BIGINT,
+  status TEXT,
+  custom_price_per_resident NUMERIC,
+  discount_percentage NUMERIC,
+  last_payment_date DATE,
+  next_due_date DATE,
+  created_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE,
+  condominium_name TEXT,
+  current_residents_count BIGINT,
+  payment_status TEXT,
+  months_in_arrears BIGINT,
+  missing_months_list TEXT,
+  arrears_details JSONB
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_today DATE := CURRENT_DATE;
+  v_current_period TEXT := TO_CHAR(CURRENT_DATE, 'YYYY-MM');
+  v_global_start DATE := '2025-01-01'::DATE;
+BEGIN
+  RETURN QUERY
+  WITH condo_counts AS (
+    -- Pre-calculate count of residents to use in pricing
+    SELECT c.id as c_id, COUNT(r.id)::BIGINT as res_count
+    FROM public.condominiums c
+    LEFT JOIN public.residents r ON c.id = r.condominium_id
+    GROUP BY c.id
+  ),
+  current_month_info AS (
+    SELECT 
+      p.condominium_id as cm_c_id,
+      CASE 
+        WHEN 'PAID' = ANY(ARRAY_AGG(p.status)) THEN 'PAID'
+        WHEN 'PARTIAL' = ANY(ARRAY_AGG(p.status)) THEN 'PARTIAL'
+        ELSE 'PENDING'
+      END as status
+    FROM public.subscription_payments p
+    WHERE p.reference_period = v_current_period
+    GROUP BY p.condominium_id
+  ),
+  arrears_calc AS (
+    -- Analyze every month for every condo
+    SELECT 
+      c.id as a_c_id,
+      COUNT(m.month)::BIGINT as total_gaps,
+      STRING_AGG(TO_CHAR(m.month, 'YYYY-MM'), ', ' ORDER BY m.month DESC) as gaps_list,
+      JSONB_AGG(
+        JSONB_BUILD_OBJECT(
+          'period', TO_CHAR(m.month, 'YYYY-MM'),
+          'expected', (
+             -- Pricing Logic inside the loop
+             COALESCE(s.custom_price_per_resident, (
+               SELECT pr.price_per_resident 
+               FROM public.app_pricing_rules pr 
+               WHERE COALESCE(cc.res_count, 0) BETWEEN pr.min_residents AND COALESCE(pr.max_residents, 999999) 
+               LIMIT 1
+             ), 0) * COALESCE(cc.res_count, 0) * (1 - COALESCE(s.discount_percentage, 0) / 100.0)
+          ),
+          'paid', COALESCE((
+            SELECT SUM(p2.amount) 
+            FROM public.subscription_payments p2 
+            WHERE p2.condominium_id = c.id AND p2.reference_period = TO_CHAR(m.month, 'YYYY-MM') AND p2.status != 'FAILED'
+          ), 0)
+        ) ORDER BY m.month DESC
+      ) as details
+    FROM public.condominiums c
+    LEFT JOIN public.condominium_subscriptions s ON c.id = s.condominium_id
+    LEFT JOIN condo_counts cc ON c.id = cc.c_id
+    CROSS JOIN LATERAL generate_series(
+      v_global_start,
+      DATE_TRUNC('month', v_today),
+      '1 month'::interval
+    ) AS m(month)
+    -- A month is in arrears if there is NO 'PAID' status record
+    LEFT JOIN public.subscription_payments p ON c.id = p.condominium_id 
+      AND p.reference_period = TO_CHAR(m.month, 'YYYY-MM') 
+      AND p.status = 'PAID'
+    WHERE p.id IS NULL
+    GROUP BY c.id
+  )
+  SELECT 
+    COALESCE(s.id, (-c.id))::BIGINT as id, 
+    c.id::BIGINT as condominium_id, 
+    COALESCE(s.status, 'ACTIVE')::TEXT as status, 
+    s.custom_price_per_resident::NUMERIC, 
+    COALESCE(s.discount_percentage, 0)::NUMERIC as discount_percentage,
+    (SELECT MAX(p.payment_date) FROM public.subscription_payments p WHERE p.condominium_id = c.id AND p.status IN ('PAID', 'PARTIAL'))::DATE as last_payment_date, 
+    s.next_due_date::DATE, 
+    s.created_at::TIMESTAMP WITH TIME ZONE, 
+    s.updated_at::TIMESTAMP WITH TIME ZONE,
+    c.name::TEXT as condominium_name,
+    COALESCE(cc.res_count, 0)::BIGINT as current_residents_count,
+    COALESCE(cms.status, 'PENDING')::TEXT as payment_status,
+    COALESCE(ac.total_gaps, 0)::BIGINT as months_in_arrears,
+    COALESCE(ac.gaps_list, '')::TEXT as missing_months_list,
+    COALESCE(ac.details, '[]'::jsonb) as arrears_details
+  FROM public.condominiums c
+  LEFT JOIN public.condominium_subscriptions s ON c.id = s.condominium_id
+  LEFT JOIN condo_counts cc ON c.id = cc.c_id
+  LEFT JOIN current_month_info cms ON c.id = cms.cm_c_id
+  LEFT JOIN arrears_calc ac ON c.id = ac.a_c_id
+  ORDER BY c.name ASC;
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- FILE: add_date_filters_to_subscription_rpcs.sql
+-- ------------------------------------------------------------
+-- Update admin_get_condominium_subscriptions to accept p_year and p_month optionally
+-- Calculates arrears up to the specified year and month, or up to the current date if not specified.
+
+DROP FUNCTION IF EXISTS public.admin_get_condominium_subscriptions(INTEGER, INTEGER);
+DROP FUNCTION IF EXISTS public.admin_get_condominium_subscriptions();
+
+CREATE OR REPLACE FUNCTION public.admin_get_condominium_subscriptions(
+  p_year INTEGER DEFAULT NULL,
+  p_month INTEGER DEFAULT NULL
+)
+RETURNS TABLE (
+  id BIGINT,
+  condominium_id BIGINT,
+  status TEXT,
+  custom_price_per_resident NUMERIC,
+  discount_percentage NUMERIC,
+  last_payment_date DATE,
+  next_due_date DATE,
+  created_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE,
+  condominium_name TEXT,
+  current_residents_count BIGINT,
+  payment_status TEXT,
+  months_in_arrears BIGINT,
+  missing_months_list TEXT,
+  arrears_details JSONB
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_today DATE := CURRENT_DATE;
+  v_target_date DATE := CURRENT_DATE;
+  v_current_period TEXT;
+  v_global_start DATE := '2025-01-01'::DATE;
+BEGIN
+  IF p_year IS NOT NULL AND p_month IS NOT NULL THEN
+    v_target_date := MAKE_DATE(p_year, p_month, 1);
+    v_current_period := TO_CHAR(v_target_date, 'YYYY-MM');
+  ELSE
+    v_current_period := TO_CHAR(v_today, 'YYYY-MM');
+  END IF;
+
+  RETURN QUERY
+  WITH condo_counts AS (
+    -- Pre-calculate count of residents to use in pricing
+    SELECT c.id as c_id, COUNT(r.id)::BIGINT as res_count
+    FROM public.condominiums c
+    LEFT JOIN public.residents r ON c.id = r.condominium_id
+    GROUP BY c.id
+  ),
+  current_month_info AS (
+    SELECT 
+      p.condominium_id as cm_c_id,
+      CASE 
+        WHEN 'PAID' = ANY(ARRAY_AGG(p.status)) THEN 'PAID'
+        WHEN 'PARTIAL' = ANY(ARRAY_AGG(p.status)) THEN 'PARTIAL'
+        ELSE 'PENDING'
+      END as status
+    FROM public.subscription_payments p
+    WHERE p.reference_period = v_current_period
+    GROUP BY p.condominium_id
+  ),
+  arrears_calc AS (
+    -- Analyze every month for every condo up to the target date
+    SELECT 
+      c.id as a_c_id,
+      COUNT(m.month)::BIGINT as total_gaps,
+      STRING_AGG(TO_CHAR(m.month, 'YYYY-MM'), ', ' ORDER BY m.month DESC) as gaps_list,
+      JSONB_AGG(
+        JSONB_BUILD_OBJECT(
+          'period', TO_CHAR(m.month, 'YYYY-MM'),
+          'expected', (
+             -- Pricing Logic inside the loop
+             COALESCE(s.custom_price_per_resident, (
+               SELECT pr.price_per_resident 
+               FROM public.app_pricing_rules pr 
+               WHERE COALESCE(cc.res_count, 0) BETWEEN pr.min_residents AND COALESCE(pr.max_residents, 999999) 
+               LIMIT 1
+             ), 0) * COALESCE(cc.res_count, 0) * (1 - COALESCE(s.discount_percentage, 0) / 100.0)
+          ),
+          'paid', COALESCE((
+            SELECT SUM(p2.amount) 
+            FROM public.subscription_payments p2 
+            WHERE p2.condominium_id = c.id AND p2.reference_period = TO_CHAR(m.month, 'YYYY-MM') AND p2.status != 'FAILED'
+          ), 0)
+        ) ORDER BY m.month DESC
+      ) as details
+    FROM public.condominiums c
+    LEFT JOIN public.condominium_subscriptions s ON c.id = s.condominium_id
+    LEFT JOIN condo_counts cc ON c.id = cc.c_id
+    CROSS JOIN LATERAL generate_series(
+      v_global_start,
+      DATE_TRUNC('month', v_target_date),
+      '1 month'::interval
+    ) AS m(month)
+    -- A month is in arrears if there is NO 'PAID' status record
+    LEFT JOIN public.subscription_payments p ON c.id = p.condominium_id 
+      AND p.reference_period = TO_CHAR(m.month, 'YYYY-MM') 
+      AND p.status = 'PAID'
+    WHERE p.id IS NULL
+    GROUP BY c.id
+  )
+  SELECT 
+    COALESCE(s.id, (-c.id))::BIGINT as id, 
+    c.id::BIGINT as condominium_id, 
+    COALESCE(s.status, 'ACTIVE')::TEXT as status, 
+    s.custom_price_per_resident::NUMERIC, 
+    COALESCE(s.discount_percentage, 0)::NUMERIC as discount_percentage,
+    (SELECT MAX(p.payment_date) FROM public.subscription_payments p WHERE p.condominium_id = c.id AND p.status IN ('PAID', 'PARTIAL'))::DATE as last_payment_date, 
+    s.next_due_date::DATE, 
+    s.created_at::TIMESTAMP WITH TIME ZONE, 
+    s.updated_at::TIMESTAMP WITH TIME ZONE,
+    c.name::TEXT as condominium_name,
+    COALESCE(cc.res_count, 0)::BIGINT as current_residents_count,
+    COALESCE(cms.status, 'PENDING')::TEXT as payment_status,
+    COALESCE(ac.total_gaps, 0)::BIGINT as months_in_arrears,
+    COALESCE(ac.gaps_list, '')::TEXT as missing_months_list,
+    COALESCE(ac.details, '[]'::jsonb) as arrears_details
+  FROM public.condominiums c
+  LEFT JOIN public.condominium_subscriptions s ON c.id = s.condominium_id
+  LEFT JOIN condo_counts cc ON c.id = cc.c_id
+  LEFT JOIN current_month_info cms ON c.id = cms.cm_c_id
+  LEFT JOIN arrears_calc ac ON c.id = ac.a_c_id
+  ORDER BY c.name ASC;
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- FILE: update_subscription_alerts_ui.sql
+-- ------------------------------------------------------------
+-- update_subscription_alerts_ui.sql
+-- Update the admin_get_condominium_subscriptions RPC to include alerts_sent count
+
+DROP FUNCTION IF EXISTS public.admin_get_condominium_subscriptions();
+
+CREATE OR REPLACE FUNCTION public.admin_get_condominium_subscriptions()
+RETURNS TABLE (
+  id BIGINT,
+  condominium_id BIGINT,
+  status TEXT,
+  custom_price_per_resident NUMERIC,
+  discount_percentage NUMERIC,
+  last_payment_date DATE,
+  next_due_date DATE,
+  created_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE,
+  condominium_name TEXT,
+  current_residents_count BIGINT,
+  payment_status TEXT,
+  months_in_arrears BIGINT,
+  missing_months_list TEXT,
+  arrears_details JSONB,
+  alerts_sent BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_today DATE := CURRENT_DATE;
+  v_current_period TEXT := TO_CHAR(CURRENT_DATE, 'YYYY-MM');
+  v_global_start DATE := '2025-01-01'::DATE;
+BEGIN
+  RETURN QUERY
+  WITH condo_counts AS (
+    SELECT c.id as c_id, COUNT(r.id)::BIGINT as res_count
+    FROM public.condominiums c
+    LEFT JOIN public.residents r ON c.id = r.condominium_id
+    GROUP BY c.id
+  ),
+  current_month_info AS (
+    SELECT 
+      p.condominium_id as cm_c_id,
+      CASE 
+        WHEN 'PAID' = ANY(ARRAY_AGG(p.status)) THEN 'PAID'
+        WHEN 'PARTIAL' = ANY(ARRAY_AGG(p.status)) THEN 'PARTIAL'
+        ELSE 'PENDING'
+      END as status
+    FROM public.subscription_payments p
+    WHERE p.reference_period = v_current_period
+    GROUP BY p.condominium_id
+  ),
+  alerts_count AS (
+    SELECT condominium_id as al_c_id, COUNT(*)::BIGINT as count
+    FROM public.subscription_alerts
+    GROUP BY condominium_id
+  ),
+  arrears_calc AS (
+    SELECT 
+      c.id as a_c_id,
+      COUNT(m.month)::BIGINT as total_gaps,
+      STRING_AGG(TO_CHAR(m.month, 'YYYY-MM'), ', ' ORDER BY m.month DESC) as gaps_list,
+      JSONB_AGG(
+        JSONB_BUILD_OBJECT(
+          'period', TO_CHAR(m.month, 'YYYY-MM'),
+          'expected', (
+             COALESCE(s.custom_price_per_resident, (
+               SELECT pr.price_per_resident 
+               FROM public.app_pricing_rules pr 
+               WHERE COALESCE(cc.res_count, 0) BETWEEN pr.min_residents AND COALESCE(pr.max_residents, 999999) 
+               LIMIT 1
+             ), 0) * COALESCE(cc.res_count, 0) * (1 - COALESCE(s.discount_percentage, 0) / 100.0)
+          ),
+          'paid', COALESCE((
+            SELECT SUM(p2.amount) 
+            FROM public.subscription_payments p2 
+            WHERE p2.condominium_id = c.id AND p2.reference_period = TO_CHAR(m.month, 'YYYY-MM') AND p2.status != 'FAILED'
+          ), 0)
+        ) ORDER BY m.month DESC
+      ) as details
+    FROM public.condominiums c
+    LEFT JOIN public.condominium_subscriptions s ON c.id = s.condominium_id
+    LEFT JOIN condo_counts cc ON c.id = cc.c_id
+    CROSS JOIN LATERAL generate_series(
+      v_global_start,
+      DATE_TRUNC('month', v_today),
+      '1 month'::interval
+    ) AS m(month)
+    LEFT JOIN public.subscription_payments p ON c.id = p.condominium_id 
+      AND p.reference_period = TO_CHAR(m.month, 'YYYY-MM') 
+      AND p.status = 'PAID'
+    WHERE p.id IS NULL
+    GROUP BY c.id
+  )
+  SELECT 
+    COALESCE(s.id, (-c.id))::BIGINT as id, 
+    c.id::BIGINT as condominium_id, 
+    COALESCE(s.status, 'ACTIVE')::TEXT as status, 
+    s.custom_price_per_resident::NUMERIC, 
+    COALESCE(s.discount_percentage, 0)::NUMERIC as discount_percentage,
+    (SELECT MAX(p.payment_date) FROM public.subscription_payments p WHERE p.condominium_id = c.id AND p.status IN ('PAID', 'PARTIAL'))::DATE as last_payment_date, 
+    s.next_due_date::DATE, 
+    s.created_at::TIMESTAMP WITH TIME ZONE, 
+    s.updated_at::TIMESTAMP WITH TIME ZONE,
+    c.name::TEXT as condominium_name,
+    COALESCE(cc.res_count, 0)::BIGINT as current_residents_count,
+    COALESCE(cms.status, 'PENDING')::TEXT as payment_status,
+    COALESCE(ac.total_gaps, 0)::BIGINT as months_in_arrears,
+    COALESCE(ac.gaps_list, '')::TEXT as missing_months_list,
+    COALESCE(ac.details, '[]'::jsonb) as arrears_details,
+    COALESCE(al.count, 0)::BIGINT as alerts_sent
+  FROM public.condominiums c
+  LEFT JOIN public.condominium_subscriptions s ON c.id = s.condominium_id
+  LEFT JOIN condo_counts cc ON c.id = cc.c_id
+  LEFT JOIN current_month_info cms ON c.id = cms.cm_c_id
+  LEFT JOIN arrears_calc ac ON c.id = ac.a_c_id
+  LEFT JOIN alerts_count al ON c.id = al.al_c_id
+  ORDER BY c.name ASC;
+END;
+$$;
+
+-- ------------------------------------------------------------
+-- FILE: add_get_residents_by_unit_rpc.sql
+-- ------------------------------------------------------------
+-- RPC: get_residents_by_unit_id
+-- Returns all residents belonging to a given unit.
+-- Used by the Guard PWA to look up residents before placing a phone or video call.
+
+CREATE OR REPLACE FUNCTION get_residents_by_unit_id(p_unit_id INT)
+RETURNS SETOF residents
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+AS $$
+  SELECT *
+  FROM residents
+  WHERE unit_id = p_unit_id;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_residents_by_unit_id(INT) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_residents_by_unit_id(INT) TO service_role;
+
+CREATE INDEX IF NOT EXISTS idx_residents_unit_id ON residents(unit_id);
+
+-- ------------------------------------------------------------
+-- FILE: add_visit_events_to_rpcs.sql
+-- ------------------------------------------------------------
+-- Migration: add visit_events insert to status-change RPCs
+-- Ensures every status change creates a visit_event record,
+-- regardless of whether the change comes from guard app, resident app, or admin.
+
+-- 1. update_visit_status: used by guard app and admin for all status changes
+CREATE OR REPLACE FUNCTION public.update_visit_status(p_id integer, p_status text)
+ RETURNS visits
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_row public.visits;
+BEGIN
+  UPDATE public.visits
+  SET status = p_status
+  WHERE id = p_id
+  RETURNING * INTO v_row;
+
+  INSERT INTO public.visit_events (visit_id, status, event_at)
+  VALUES (v_row.id, p_status, now());
+
+  RETURN v_row;
+END;
+$function$;
+
+-- 2. approve_visit: used by resident app (PENDENTE -> AUTORIZADO)
+CREATE OR REPLACE FUNCTION public.approve_visit(p_visit_id integer, p_approval_mode text DEFAULT 'app'::text)
+ RETURNS SETOF visits
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_row public.visits;
+BEGIN
+  UPDATE public.visits
+  SET
+    status = 'AUTORIZADO',
+    approved_at = now(),
+    approval_mode = p_approval_mode
+  WHERE id = p_visit_id
+  RETURNING * INTO v_row;
+
+  INSERT INTO public.visit_events (visit_id, status, event_at)
+  VALUES (v_row.id, 'AUTORIZADO', now());
+
+  RETURN NEXT v_row;
+END;
+$function$;
+
+-- 3. checkout_visit: used to mark exit (-> SAIU / LEFT)
+CREATE OR REPLACE FUNCTION public.checkout_visit(p_id integer)
+ RETURNS visits
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_row public.visits;
+BEGIN
+  UPDATE public.visits
+  SET
+    status = 'LEFT',
+    check_out_at = COALESCE(check_out_at, now())
+  WHERE id = p_id
+  RETURNING * INTO v_row;
+
+  INSERT INTO public.visit_events (visit_id, status, event_at)
+  VALUES (v_row.id, 'LEFT', COALESCE(v_row.check_out_at, now()));
+
+  RETURN v_row;
+END;
+$function$;
