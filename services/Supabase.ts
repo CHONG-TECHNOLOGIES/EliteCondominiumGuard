@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondoSetupSettings, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment, VideoCallSession, VideoCallStatus } from '../types';
+import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondoSetupSettings, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment, VideoCallNotificationPayload, VideoCallSession, VideoCallStatus } from '../types';
 import { buildIncidentActionHistoryIndex } from '../utils/incidentHistory';
 import { logger, ErrorCategory } from '@/services/logger';
 
@@ -99,6 +99,28 @@ const mapAuditLogRows = (rows: any[]): AuditLog[] => (
   target_id: row.target_id,
   details: row.details
 }));
+
+interface VideoCallPushFunctionResponse {
+  success?: boolean;
+  error?: string;
+  delivered_count?: number;
+  failed_count?: number;
+  invalid_token_count?: number;
+  invalid_tokens?: string[];
+  ticket_ids?: string[];
+  details?: unknown;
+}
+
+const parseResponseBody = async (response: Response): Promise<unknown> => {
+  const bodyText = await response.text();
+  if (!bodyText) return null;
+
+  try {
+    return JSON.parse(bodyText) as unknown;
+  } catch {
+    return bodyText;
+  }
+};
 
 /**
  * Serviço Real de API Supabase
@@ -3023,8 +3045,16 @@ export const SupabaseService = {
       });
       if (error) throw error;
       return data as VideoCallSession;
-    } catch (err: any) {
-      logger.error('Error creating video call session', err.message);
+    } catch (err) {
+      logger.error('Error creating video call session', err, ErrorCategory.NETWORK, {
+        condominiumId: params.condominium_id,
+        deviceId: params.device_id ?? null,
+        guardId: params.guard_id,
+        residentId: params.resident_id ?? null,
+        rpc: 'create_video_call_session',
+        unitId: params.unit_id ?? null,
+        visitId: params.visit_id
+      });
       return null;
     }
   },
@@ -3042,8 +3072,13 @@ export const SupabaseService = {
         p_rejection_reason: rejectionReason ?? null
       });
       if (error) throw error;
-    } catch (err: any) {
-      logger.error('Error updating video call session status', err.message);
+    } catch (err) {
+      logger.error('Error updating video call session status', err, ErrorCategory.NETWORK, {
+        rejectionReason: rejectionReason ?? null,
+        rpc: 'update_video_call_session_status',
+        sessionId,
+        status
+      });
     }
   },
 
@@ -3055,8 +3090,30 @@ export const SupabaseService = {
         p_offer_sdp: offerSdp
       });
       if (error) throw error;
-    } catch (err: any) {
-      logger.error('Error saving video call offer SDP', err.message, ErrorCategory.NETWORK);
+    } catch (err) {
+      logger.error('Error saving video call offer SDP', err, ErrorCategory.NETWORK, {
+        offerSdpLength: offerSdp.length,
+        rpc: 'update_video_call_session_offer',
+        sessionId
+      });
+    }
+  },
+
+  async getVideoCallSessionOffer(sessionId: string): Promise<string | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase.rpc('get_video_call_session_offer', {
+        p_session_id: sessionId
+      });
+      if (error) throw error;
+      return typeof data === 'string' && data.trim() ? data : null;
+    } catch (err) {
+      logger.error('Error fetching video call offer SDP', err, ErrorCategory.NETWORK, {
+        rpc: 'get_video_call_session_offer',
+        sessionId
+      });
+      return null;
     }
   },
 
@@ -3084,6 +3141,15 @@ export const SupabaseService = {
       const body = params.unit_block && params.unit_number
         ? `${params.visitor_name} aguarda na portaria. Guarda ${params.guard_name} quer mostrar o visitante. (${params.unit_block} ${params.unit_number})`
         : `${params.visitor_name} aguarda na portaria. Guarda ${params.guard_name} quer mostrar o visitante.`;
+      const notificationPayload: VideoCallNotificationPayload = {
+        session_id: params.session_id,
+        visit_id: params.visit_id,
+        visitor_name: params.visitor_name,
+        visitor_photo_url: params.visitor_photo_url ?? null,
+        guard_name: params.guard_name,
+        unit_number: params.unit_number ?? null,
+        unit_block: params.unit_block ?? null
+      };
 
       const { error } = await supabase.rpc('create_notification', {
         p_resident_id: params.resident_id,
@@ -3092,23 +3158,15 @@ export const SupabaseService = {
         p_title: 'Chamada de vídeo',
         p_body: body,
         p_type: 'VIDEO_CALL_REQUEST',
-        p_data: {
-          session_id: params.session_id,
-          visit_id: params.visit_id,
-          visitor_name: params.visitor_name,
-          visitor_photo_url: params.visitor_photo_url ?? null,
-          guard_name: params.guard_name,
-          unit_number: params.unit_number ?? null,
-          unit_block: params.unit_block ?? null
-        }
+        p_data: notificationPayload
       });
       if (error) throw error;
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-      let pushData: { success?: boolean; error?: string; delivered_count?: number } | null = null;
-      let pushError: { message: string } | null = null;
+      let pushData: VideoCallPushFunctionResponse | null = null;
+      let pushError: Record<string, unknown> | null = null;
 
       try {
         const pushResp = await fetch(`${supabaseUrl}/functions/v1/send-video-call-push`, {
@@ -3119,30 +3177,39 @@ export const SupabaseService = {
             'apikey': supabaseAnonKey,
           },
           body: JSON.stringify({
-            session_id: params.session_id,
-            visit_id: params.visit_id,
             resident_id: params.resident_id,
-            visitor_name: params.visitor_name,
-            visitor_photo_url: params.visitor_photo_url ?? null,
-            guard_name: params.guard_name,
-            unit_number: params.unit_number ?? null,
-            unit_block: params.unit_block ?? null
+            ...notificationPayload
           })
         });
 
-        pushData = await pushResp.json().catch(() => null);
+        const responseBody = await parseResponseBody(pushResp);
+        pushData = (responseBody && typeof responseBody === 'object')
+          ? responseBody as VideoCallPushFunctionResponse
+          : null;
+
         if (!pushResp.ok) {
-          pushError = { message: `HTTP ${pushResp.status}` };
+          pushError = {
+            functionName: 'send-video-call-push',
+            message: `HTTP ${pushResp.status}`,
+            responseBody,
+            status: pushResp.status,
+            statusText: pushResp.statusText
+          };
         }
-      } catch (fetchErr: unknown) {
-        pushError = { message: fetchErr instanceof Error ? fetchErr.message : 'fetch failed' };
+      } catch (fetchErr) {
+        pushError = {
+          error: fetchErr,
+          functionName: 'send-video-call-push',
+          message: fetchErr instanceof Error ? fetchErr.message : 'fetch failed'
+        };
       }
 
       if (pushError) {
-        logger.error('Video call push invoke failed', {
-          error: pushError.message,
+        logger.error('Video call push invoke failed', pushError, ErrorCategory.NETWORK, {
+          functionName: 'send-video-call-push',
           residentId: params.resident_id,
-          sessionId: params.session_id
+          sessionId: params.session_id,
+          visitId: params.visit_id
         });
         return {
           notificationCreated: true,
@@ -3154,10 +3221,11 @@ export const SupabaseService = {
       const pushResult = pushData;
 
       if (!pushResult?.success) {
-        logger.error('Video call push returned unsuccessful result', {
+        logger.error('Video call push returned unsuccessful result', pushResult, ErrorCategory.NETWORK, {
+          functionName: 'send-video-call-push',
           residentId: params.resident_id,
           sessionId: params.session_id,
-          pushResult
+          visitId: params.visit_id
         });
         return {
           notificationCreated: true,
@@ -3172,7 +3240,12 @@ export const SupabaseService = {
         deliveredCount: pushResult.delivered_count ?? 0
       };
     } catch (err) {
-      logger.error('Error creating video call notification', err);
+      logger.error('Error creating video call notification', err, ErrorCategory.NETWORK, {
+        residentId: params.resident_id,
+        rpc: 'create_notification',
+        sessionId: params.session_id,
+        visitId: params.visit_id
+      });
       return {
         notificationCreated: false,
         pushSent: false,

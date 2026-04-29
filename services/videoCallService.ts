@@ -66,7 +66,7 @@ class VideoCallService {
       });
       logger.info('[VCALL] media acquired', { sessionId: session.id });
     } catch (err) {
-      logger.error('[VCALL] media access denied', err);
+      logger.error('[VCALL] media access denied', err, undefined, { sessionId: session.id });
       this.setState('FAILED', { error: 'Permita acesso a camera e microfone nas definicoes do browser.' });
       return;
     }
@@ -124,7 +124,7 @@ class VideoCallService {
           this.setState('CONNECTED');
           logger.info('[VCALL] CONNECTED', { sessionId: session.id });
         } catch (err) {
-          logger.error('[VCALL] failed to set remote description from answer', err);
+          logger.error('[VCALL] failed to set remote description from answer', err, undefined, { sessionId: session.id });
         }
       })
       .on('broadcast', { event: 'ice-candidate' }, async ({ payload }: { payload: SignalingMessage }) => {
@@ -141,7 +141,7 @@ class VideoCallService {
           await this.pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
           logger.debug('[VCALL] ICE candidate applied', { sessionId: session.id });
         } catch (err) {
-          logger.error('[VCALL] failed to add ICE candidate', err);
+          logger.error('[VCALL] failed to add ICE candidate', err, undefined, { sessionId: session.id });
         }
       })
       .on('broadcast', { event: 'reject' }, ({ payload }: { payload: { reason?: string } }) => {
@@ -174,7 +174,7 @@ class VideoCallService {
     } catch (err) {
       this.cleanup();
       this.setState('FAILED', { error: 'Nao foi possivel estabelecer a ligacao de sinalizacao.' });
-      logger.error('[VCALL] channel subscription failed', err);
+      logger.error('[VCALL] channel subscription failed', err, undefined, { sessionId: session.id });
       return;
     }
 
@@ -192,7 +192,7 @@ class VideoCallService {
       logger.info('[VCALL] offer_sdp persisted to DB', { sessionId: session.id });
     } catch (err) {
       this.setState('FAILED', { error: 'Nao foi possivel iniciar a chamada. Verifique a sua ligacao.' });
-      logger.error('[VCALL] failed to create/persist offer', err);
+      logger.error('[VCALL] failed to create/persist offer', err, undefined, { sessionId: session.id });
       return;
     }
 

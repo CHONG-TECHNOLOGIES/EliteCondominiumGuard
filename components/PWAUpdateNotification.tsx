@@ -30,13 +30,20 @@ export const PWAUpdateNotification: React.FC = () => {
           registration.update().then(() => {
             logger.debug('Update check completed');
           }).catch((error) => {
-            logger.error('Update check failed', error, ErrorCategory.PWA);
+            logger.error('Update check failed', error, ErrorCategory.PWA, {
+              hasActiveWorker: !!registration.active,
+              installingWorkerState: registration.installing?.state ?? null,
+              scope: registration.scope,
+              waitingWorkerState: registration.waiting?.state ?? null
+            });
           });
         }, 5 * 60 * 1000); // 5 minutes
       }
     },
     onRegisterError(error) {
-      logger.error('Service Worker registration error', error, ErrorCategory.PWA);
+      logger.error('Service Worker registration error', error, ErrorCategory.PWA, {
+        route: window.location.href
+      });
     },
     onNeedRefresh() {
       logger.info('New version available, showing update prompt');
