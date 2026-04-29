@@ -3162,82 +3162,10 @@ export const SupabaseService = {
       });
       if (error) throw error;
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-
-      let pushData: VideoCallPushFunctionResponse | null = null;
-      let pushError: Record<string, unknown> | null = null;
-
-      try {
-        const pushResp = await fetch(`${supabaseUrl}/functions/v1/send-video-call-push`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-            'apikey': supabaseAnonKey,
-          },
-          body: JSON.stringify({
-            resident_id: params.resident_id,
-            ...notificationPayload
-          })
-        });
-
-        const responseBody = await parseResponseBody(pushResp);
-        pushData = (responseBody && typeof responseBody === 'object')
-          ? responseBody as VideoCallPushFunctionResponse
-          : null;
-
-        if (!pushResp.ok) {
-          pushError = {
-            functionName: 'send-video-call-push',
-            message: `HTTP ${pushResp.status}`,
-            responseBody,
-            status: pushResp.status,
-            statusText: pushResp.statusText
-          };
-        }
-      } catch (fetchErr) {
-        pushError = {
-          error: fetchErr,
-          functionName: 'send-video-call-push',
-          message: fetchErr instanceof Error ? fetchErr.message : 'fetch failed'
-        };
-      }
-
-      if (pushError) {
-        logger.error('Video call push invoke failed', pushError, ErrorCategory.NETWORK, {
-          functionName: 'send-video-call-push',
-          residentId: params.resident_id,
-          sessionId: params.session_id,
-          visitId: params.visit_id
-        });
-        return {
-          notificationCreated: true,
-          pushSent: false,
-          message: 'O alerta push falhou. O morador pode não receber a chamada.'
-        };
-      }
-
-      const pushResult = pushData;
-
-      if (!pushResult?.success) {
-        logger.error('Video call push returned unsuccessful result', pushResult, ErrorCategory.NETWORK, {
-          functionName: 'send-video-call-push',
-          residentId: params.resident_id,
-          sessionId: params.session_id,
-          visitId: params.visit_id
-        });
-        return {
-          notificationCreated: true,
-          pushSent: false,
-          message: pushResult?.error || 'O alerta push falhou. O morador pode não receber a chamada.'
-        };
-      }
-
+      // Push is triggered server-side via pg_net inside create_notification — no browser fetch needed
       return {
         notificationCreated: true,
-        pushSent: true,
-        deliveredCount: pushResult.delivered_count ?? 0
+        pushSent: true
       };
     } catch (err) {
       logger.error('Error creating video call notification', err, ErrorCategory.NETWORK, {

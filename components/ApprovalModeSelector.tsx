@@ -29,6 +29,7 @@ interface ApprovalModeSelectorProps {
   unit?: Unit;
   condominium?: Pick<Condominium, 'intercom_approval_enabled' | 'guard_manual_approval_enabled'> | null;
   visitorPhone?: string;
+  onCallMade?: () => void;
 }
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -78,7 +79,8 @@ export default function ApprovalModeSelector({
   isOnline,
   unit,
   condominium,
-  visitorPhone
+  visitorPhone,
+  onCallMade
 }: ApprovalModeSelectorProps) {
   const [calling, setCalling] = useState(false);
   const { showToast, showConfirm } = useToast();
@@ -130,6 +132,7 @@ export default function ApprovalModeSelector({
         approvalMode: ApprovalMode.PHONE,
         context: 'approval_mode_selector'
       });
+      onCallMade?.();
       setTimeout(() => setCalling(false), 2000);
     });
   };
