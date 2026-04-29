@@ -421,6 +421,16 @@ export interface SignalingMessage {
   candidate?: RTCIceCandidateInit;
 }
 
+export interface VideoCallNotificationPayload {
+  session_id: string;
+  visit_id: number;
+  visitor_name: string;
+  visitor_photo_url?: string | null;
+  guard_name: string;
+  unit_number?: string | null;
+  unit_block?: string | null;
+}
+
 export interface VideoCallSession {
   id: string;
   visit_id: number;

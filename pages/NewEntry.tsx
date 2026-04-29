@@ -8,6 +8,7 @@ import { Unit, VisitType, ApprovalMode, VisitStatus, VisitTypeConfig, ServiceTyp
 import CameraCapture from '../components/CameraCapture';
 import ErrorBoundary from '../components/ErrorBoundary';
 import ApprovalModeSelector from '../components/ApprovalModeSelector';
+import { unitHasAppInstalled } from '@/utils/approvalModes';
 import {
   QrCode, User, Truck, Wrench, GraduationCap, Save, ArrowLeft, Phone,
   CheckCircle, Search, Building, Briefcase,
@@ -46,6 +47,7 @@ export default function NewEntry() {
   const [qrValidation, setQrValidation] = useState<QrValidationResult | null>(null);
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>(ApprovalMode.APP);
   const [qrConfirmed, setQrConfirmed] = useState(false);
+  const [callMade, setCallMade] = useState(false);
 
   const handlePhotoCapture = (photoDataUrl: string) => {
     setPhoto(photoDataUrl);
@@ -80,6 +82,10 @@ export default function NewEntry() {
   // QR Validation State
   const [qrValidating, setQrValidating] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCallMade(false);
+  }, [unitId, approvalMode]);
 
   useEffect(() => {
     if (user?.condominium_id) {
@@ -828,6 +834,7 @@ export default function NewEntry() {
                   unit={selectedUnit}
                   condominium={deviceCondo}
                   visitorPhone={visitorPhone}
+                  onCallMade={() => setCallMade(true)}
                 />
               )}
             </div>
@@ -839,7 +846,8 @@ export default function NewEntry() {
                 disabled={
                   (visitorPhotoEnabled && !photoConsentGiven) ||
                   (visitorPhotoEnabled && !photo && approvalMode !== ApprovalMode.QR_SCAN) ||
-                  (approvalMode === ApprovalMode.QR_SCAN && !qrConfirmed)
+                  (approvalMode === ApprovalMode.QR_SCAN && !qrConfirmed) ||
+                  (!unitHasAppInstalled(selectedUnit) && approvalMode === ApprovalMode.PHONE && !callMade)
                 }
                 className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:text-slate-500 text-white rounded-xl font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
               >

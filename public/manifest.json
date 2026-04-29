@@ -61,21 +61,21 @@
       "name": "Nova Entrada",
       "short_name": "Entrada",
       "description": "Registrar nova visita ou entrega",
-      "url": "/new-entry",
+      "url": "/#/new-entry",
       "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
     },
     {
       "name": "Lista Diária",
       "short_name": "Lista",
       "description": "Ver atividades do dia",
-      "url": "/day-list",
+      "url": "/#/day-list",
       "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
     },
     {
       "name": "Incidentes",
       "short_name": "Incidentes",
       "description": "Reportar incidente",
-      "url": "/incidents",
+      "url": "/#/incidents",
       "icons": [{ "src": "/icon.svg", "sizes": "192x192" }]
     }
   ],
