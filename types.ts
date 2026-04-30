@@ -18,7 +18,8 @@ export enum VisitStatus {
   DENIED = 'NEGADO',
   INSIDE = 'NO INTERIOR',
   LEFT = 'SAIU',
-  WITHOUT_RESPONSE = 'SEM RESPOSTA'
+  WITHOUT_RESPONSE = 'SEM RESPOSTA',
+  VIDEO_CHAMADA = 'VIDEOCHAMADA'
 }
 
 export enum SyncStatus {

@@ -9,9 +9,10 @@ interface Props {
   residentPhotoUrl?: string;
   residentName?: string;
   onClose: () => void;
+  onEnded?: () => void;
 }
 
-export function VideoCallModal({ session, visit, residentPhotoUrl, residentName, onClose }: Props) {
+export function VideoCallModal({ session, visit, residentPhotoUrl, residentName, onClose, onEnded }: Props) {
   const [state, setState] = useState<VideoCallState>('IDLE');
   const [detail, setDetail] = useState<{ rejectionReason?: string; error?: string }>({});
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -63,6 +64,7 @@ export function VideoCallModal({ session, visit, residentPhotoUrl, residentName,
 
     if (newState === 'ENDED') {
       if (timerRef.current) clearInterval(timerRef.current);
+      onEnded?.();
       onClose();
     }
   }, [onClose]);

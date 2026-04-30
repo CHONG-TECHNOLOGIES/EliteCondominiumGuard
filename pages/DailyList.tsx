@@ -93,6 +93,7 @@ export default function DailyList() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeVideoCall, setActiveVideoCall] = useState<{ session: VideoCallSession; visit: Visit; residentPhotoUrl?: string; residentName?: string } | null>(null);
+  const [postCallVisitId, setPostCallVisitId] = useState<number | null>(null);
   const [photoModal, setPhotoModal] = useState<{ url: string; name: string } | null>(null);
   const [eventModal, setEventModal] = useState<{
     isOpen: boolean;
@@ -148,6 +149,16 @@ export default function DailyList() {
   const handleApprove = async (id: number) => {
     await api.updateVisitStatus(id, VisitStatus.APPROVED);
     loadVisits();
+  };
+
+  const handleApproveAndEnter = (id: number) => {
+    showConfirm('Confirmar entrada do visitante?', async () => {
+      await api.updateVisitStatus(id, VisitStatus.APPROVED);
+      await api.updateVisitStatus(id, VisitStatus.INSIDE);
+      setPostCallVisitId(null);
+      loadVisits();
+      showToast('success', 'Visitante autorizado e marcado como interior!');
+    });
   };
 
   const handleContactResident = useCallback(async (visit: Visit) => {
@@ -267,6 +278,7 @@ export default function DailyList() {
       case VisitStatus.LEFT: return <span className="bg-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs md:text-sm font-bold">{status}</span>;
       case VisitStatus.DENIED: return <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs md:text-sm font-bold">{status}</span>;
       case VisitStatus.WITHOUT_RESPONSE: return <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-xs md:text-sm font-bold">{status}</span>;
+      case VisitStatus.VIDEO_CHAMADA: return <span className="bg-cyan-100 text-cyan-800 px-3 py-1 rounded-full text-xs md:text-sm font-bold">{status}</span>;
       default: return null;
     }
   };
@@ -285,6 +297,8 @@ export default function DailyList() {
         return 'bg-slate-500';
       case VisitStatus.WITHOUT_RESPONSE:
         return 'bg-orange-500';
+      case VisitStatus.VIDEO_CHAMADA:
+        return 'bg-cyan-500';
       default:
         return 'bg-slate-400';
     }
@@ -400,8 +414,15 @@ export default function DailyList() {
                 </div>
 
                 <div className="flex justify-end gap-2 mt-2">
-                  {/* PENDING: Contact buttons visible after 7 minutes */}
-                  {visit.status === VisitStatus.PENDING && (
+                  {/* PENDING: post-call approval OR normal contact buttons */}
+                  {visit.status === VisitStatus.PENDING && postCallVisitId === visit.id ? (
+                    <button
+                      onClick={() => handleApproveAndEnter(visit.id)}
+                      className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm flex justify-center items-center gap-2 hover:bg-emerald-700 transition-colors animate-pulse ring-2 ring-emerald-400 ring-offset-1"
+                    >
+                      <ShieldCheck size={16} /> Aprovar Entrada
+                    </button>
+                  ) : visit.status === VisitStatus.PENDING && (
                     <ContactButtons
                       visit={visit}
                       onPhone={handleContactResident}
@@ -507,8 +528,15 @@ export default function DailyList() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex justify-end gap-2">
-                        {/* PENDING: Contact buttons visible after 7 minutes */}
-                        {visit.status === VisitStatus.PENDING && (
+                        {/* PENDING: post-call approval OR normal contact buttons */}
+                        {visit.status === VisitStatus.PENDING && postCallVisitId === visit.id ? (
+                          <button
+                            onClick={() => handleApproveAndEnter(visit.id)}
+                            className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 flex items-center gap-2 transition-colors animate-pulse ring-2 ring-emerald-400 ring-offset-1"
+                          >
+                            <ShieldCheck size={16} /> Aprovar Entrada
+                          </button>
+                        ) : visit.status === VisitStatus.PENDING && (
                           <ContactButtons
                             visit={visit}
                             onPhone={handleContactResident}
@@ -577,6 +605,10 @@ export default function DailyList() {
           residentPhotoUrl={activeVideoCall.residentPhotoUrl}
           residentName={activeVideoCall.residentName}
           onClose={() => setActiveVideoCall(null)}
+          onEnded={async () => {
+            await api.logVideoCallEvent(activeVideoCall.visit.id);
+            setPostCallVisitId(activeVideoCall.visit.id);
+          }}
         />
       )}
 

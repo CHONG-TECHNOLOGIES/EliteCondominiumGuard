@@ -1971,6 +1971,10 @@ class DataService {
     }
   }
 
+  async logVideoCallEvent(visitId: number): Promise<void> {
+    await this.createVisitEvent(visitId, VisitStatus.VIDEO_CHAMADA, new Date().toISOString());
+  }
+
   async checkAndTransitionStaleVisits(): Promise<void> {
     const STALE_MS = 30 * 60 * 1000;
     const cutoff = new Date(Date.now() - STALE_MS).toISOString();

@@ -645,21 +645,14 @@ export default function NewEntry() {
             {photoConsentGiven ? (
               /* Consent ACCEPTED — show camera */
               <>
-                {approvalMode === ApprovalMode.QR_SCAN && !isScanningQr && !qrConfirmed ? (
-                  <div className="flex flex-col items-center justify-center h-80 w-full bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400">
-                    <QrCode size={48} className="mb-4 opacity-20" />
-                    <p className="font-medium">Câmara em espera...</p>
-                  </div>
-                ) : (
-                  <ErrorBoundary>
-                    <CameraCapture
-                      onCapture={handlePhotoCapture}
-                      mode={approvalMode === ApprovalMode.QR_SCAN && !qrConfirmed ? 'scan' : 'photo'}
-                      onQrScanned={handleQrScanned}
-                      photoQuality={photoQuality}
-                    />
-                  </ErrorBoundary>
-                )}
+                <ErrorBoundary>
+                  <CameraCapture
+                    onCapture={handlePhotoCapture}
+                    mode={approvalMode === ApprovalMode.QR_SCAN && isScanningQr ? 'scan' : 'photo'}
+                    onQrScanned={handleQrScanned}
+                    photoQuality={photoQuality}
+                  />
+                </ErrorBoundary>
               </>
             ) : (
               /* Consent NOT given — blocked */
