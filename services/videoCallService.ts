@@ -80,9 +80,13 @@ class VideoCallService {
     this.remoteStream = new MediaStream();
     this.pc.ontrack = (event) => {
       logger.info('[VCALL] remote track received', { sessionId: session.id });
-      event.streams[0]?.getTracks().forEach(track => {
-        this.remoteStream!.addTrack(track);
-      });
+      if (event.streams && event.streams.length > 0) {
+        event.streams[0].getTracks().forEach(track => {
+          this.remoteStream!.addTrack(track);
+        });
+      } else {
+        this.remoteStream!.addTrack(event.track);
+      }
     };
 
     this.pc.oniceconnectionstatechange = () => {

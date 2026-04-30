@@ -46,15 +46,6 @@ export function VideoCallModal({ session, visit, residentPhotoUrl, residentName,
       if (timerRef.current) clearInterval(timerRef.current);
       setConnectedSeconds(0);
       timerRef.current = setInterval(() => setConnectedSeconds(s => s + 1), 1000);
-
-      if (localVideoRef.current) {
-        const stream = videoCallService.getLocalStream();
-        if (stream) localVideoRef.current.srcObject = stream;
-      }
-      if (remoteVideoRef.current) {
-        const stream = videoCallService.getRemoteStream();
-        if (stream) remoteVideoRef.current.srcObject = stream;
-      }
     }
 
     if (newState === 'REJECTED' || newState === 'MISSED') {
@@ -68,6 +59,19 @@ export function VideoCallModal({ session, visit, residentPhotoUrl, residentName,
       onClose();
     }
   }, [onClose]);
+
+  // Assign streams after React mounts the video elements (refs are null until CONNECTED renders)
+  useEffect(() => {
+    if (state !== 'CONNECTED') return;
+    if (localVideoRef.current) {
+      const stream = videoCallService.getLocalStream();
+      if (stream) localVideoRef.current.srcObject = stream;
+    }
+    if (remoteVideoRef.current) {
+      const stream = videoCallService.getRemoteStream();
+      if (stream) remoteVideoRef.current.srcObject = stream;
+    }
+  }, [state]);
 
   useEffect(() => {
     videoCallService.startCall(session, handleStateChange);
