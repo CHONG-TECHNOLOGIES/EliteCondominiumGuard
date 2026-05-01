@@ -15,6 +15,14 @@ export interface SyncEventDetail {
   error?: string;
 }
 
+export const VISITS_CHANGED_EVENT = 'visits:changed';
+
+export interface VisitsChangedDetail {
+  visitId: number;
+  status: VisitStatus;
+  checkOutAt?: string;
+}
+
 const DEFAULT_CONDO_SETUP_SETTINGS: CondoSetupSettings = {
   visitor_photo_enabled: true,
   intercom_approval_enabled: true,
@@ -44,6 +52,43 @@ class DataService {
    */
   private emitSyncEvent(type: SyncEventType, detail: SyncEventDetail = {}) {
     window.dispatchEvent(new CustomEvent(type, { detail }));
+  }
+
+  private emitVisitsChanged(detail: VisitsChangedDetail) {
+    window.dispatchEvent(new CustomEvent(VISITS_CHANGED_EVENT, { detail }));
+  }
+
+  private getVisitStatusPriority(status: VisitStatus): number {
+    switch (status) {
+      case VisitStatus.PENDING:
+        return 0;
+      case VisitStatus.APPROVED:
+        return 1;
+      case VisitStatus.INSIDE:
+        return 2;
+      case VisitStatus.LEFT:
+      case VisitStatus.DENIED:
+      case VisitStatus.WITHOUT_RESPONSE:
+        return 3;
+      default:
+        return -1;
+    }
+  }
+
+  private shouldPreferLocalVisit(localVisit: Visit, backendVisit: Visit): boolean {
+    if (localVisit.sync_status === SyncStatus.PENDING_SYNC) {
+      return true;
+    }
+
+    if (localVisit.check_out_at && localVisit.check_out_at !== backendVisit.check_out_at) {
+      return true;
+    }
+
+    if (localVisit.status !== backendVisit.status) {
+      return this.getVisitStatusPriority(localVisit.status) > this.getVisitStatusPriority(backendVisit.status);
+    }
+
+    return false;
   }
 
   private async init() {
@@ -1610,16 +1655,17 @@ class DataService {
         }
 
         // Merge: backend visits + any pending local changes + local-only synced visits not returned yet
-        const pendingLocalVisits = localVisits.filter(v => v.sync_status === SyncStatus.PENDING_SYNC);
         const merged = new Map<number, Visit>();
         backendVisits.forEach(v => merged.set(v.id, v));
-        pendingLocalVisits.forEach(v => merged.set(v.id, v));
-        localVisits
-          .filter(v => v.sync_status === SyncStatus.SYNCED && !merged.has(v.id))
-          .forEach(v => merged.set(v.id, v));
+        localVisits.forEach(localVisit => {
+          const currentVisit = merged.get(localVisit.id);
+          if (!currentVisit || this.shouldPreferLocalVisit(localVisit, currentVisit)) {
+            merged.set(localVisit.id, localVisit);
+          }
+        });
         const allVisits = Array.from(merged.values());
 
-        logger.info('Returning backend visits + pending local', { backendCount: backendVisits.length, pendingCount: pendingLocalVisits.length });
+        logger.info('Returning merged visits for today', { backendCount: backendVisits.length, localCount: localVisits.length });
 
         return allVisits.sort((a, b) =>
           new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime()
@@ -1946,6 +1992,7 @@ class DataService {
     // Update locally
     await db.visits.put(visit);
     await this.createVisitEvent(visitId, status, eventAt);
+    this.emitVisitsChanged({ visitId, status, checkOutAt: visit.check_out_at });
     await this.logAudit({
       action: 'UPDATE',
       target_table: 'visits',

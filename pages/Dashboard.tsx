@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useContext, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus, List, AlertTriangle, RefreshCw, MessageSquare, Send, X, Clock, LogOut, User, MapPin, ShieldCheck, ChevronRight, Phone, Search, Newspaper, Video } from 'lucide-react';
-import { api } from '../services/dataService';
+import { api, VISITS_CHANGED_EVENT } from '../services/dataService';
 import { SupabaseService } from '../services/Supabase';
 import { askConcierge } from '../services/geminiService';
 import { CondominiumNews, Visit, VisitStatus, VideoCallSession } from '../types';
@@ -104,7 +104,8 @@ export default function Dashboard() {
   const [latestNews, setLatestNews] = useState<CondominiumNews[]>([]);
   const [newsLoading, setNewsLoading] = useState(true);
 
-  const loadQuickActions = async () => {
+  const loadQuickActions = useCallback(async () => {
+    await api.checkAndTransitionStaleVisits();
     const data = await api.getTodaysVisits();
     setTodaysVisitsCount(data.length); // Total count for the day
 
@@ -114,7 +115,7 @@ export default function Dashboard() {
     ).sort((a, b) => new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime());
 
     setActiveVisits(actionable);
-  };
+  }, []);
 
   const playAlertSound = () => {
     const played = audioService.playAlertSound();
@@ -206,11 +207,20 @@ export default function Dashboard() {
     };
     checkAudio(); // Initial check
 
-    loadQuickActions();
+    const refreshQuickActions = () => {
+      void loadQuickActions();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void loadQuickActions();
+      }
+    };
+
+    void loadQuickActions();
     loadIncidentsCount();
     loadLatestNews();
     const interval = setInterval(() => {
-      loadQuickActions();
+      refreshQuickActions();
       loadIncidentsCount();
       checkAudio(); // Check audio status
     }, 10000); // Refresh every 10s
@@ -221,13 +231,20 @@ export default function Dashboard() {
       }
     }, 60000);
 
+    window.addEventListener(VISITS_CHANGED_EVENT, refreshQuickActions);
+    window.addEventListener('focus', refreshQuickActions);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       window.removeEventListener('online', checkStatus);
       window.removeEventListener('offline', checkStatus);
+      window.removeEventListener(VISITS_CHANGED_EVENT, refreshQuickActions);
+      window.removeEventListener('focus', refreshQuickActions);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(interval);
       clearInterval(newsInterval);
     };
-  }, []);
+  }, [loadQuickActions]);
 
   const handleSync = async () => {
     if (!isOnline) return;

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../services/dataService';
+import { api, VISITS_CHANGED_EVENT } from '../services/dataService';
 import { SupabaseService } from '../services/Supabase';
 import { Visit, VisitEvent, VisitStatus, SyncStatus, VideoCallSession } from '../types';
 import { initiatePhoneCall } from '@/utils/approvalModes';
@@ -102,17 +102,35 @@ export default function DailyList() {
     loading: boolean;
   }>({ isOpen: false, visit: null, events: [], loading: false });
 
-  const loadVisits = async () => {
+  const loadVisits = useCallback(async () => {
     await api.checkAndTransitionStaleVisits();
     const data = await api.getTodaysVisits();
     setVisits(data.sort((a, b) => new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime()));
-  };
+  }, []);
 
   useEffect(() => {
-    loadVisits();
-    const interval = setInterval(loadVisits, 30000); // Auto refresh list
-    return () => clearInterval(interval);
-  }, []);
+    const refreshVisits = () => {
+      void loadVisits();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void loadVisits();
+      }
+    };
+
+    void loadVisits();
+    const interval = window.setInterval(refreshVisits, 30000); // Auto refresh list
+    window.addEventListener(VISITS_CHANGED_EVENT, refreshVisits);
+    window.addEventListener('focus', refreshVisits);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener(VISITS_CHANGED_EVENT, refreshVisits);
+      window.removeEventListener('focus', refreshVisits);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loadVisits]);
 
   const filteredVisits = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();

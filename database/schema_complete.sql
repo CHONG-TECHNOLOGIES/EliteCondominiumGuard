@@ -6458,3 +6458,218 @@ BEGIN
   RETURN v_row;
 END;
 $function$;
+
+-- Add VIDEOCHAMADA to visit_events status check constraint.
+-- Safe to run whether or not the constraint already exists.
+ALTER TABLE visit_events DROP CONSTRAINT IF EXISTS visit_events_status_check;
+ALTER TABLE visit_events ADD CONSTRAINT visit_events_status_check
+  CHECK (status IN (
+    'PENDENTE', 'AUTORIZADO', 'NEGADO', 'NO INTERIOR', 'SAIU', 'SEM RESPOSTA', 'VIDEOCHAMADA'
+  ));
+
+
+-- ============================================================
+-- 18. Visitor Blacklist
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.visitor_blacklist (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  condominium_id integer NOT NULL REFERENCES public.condominiums(id) ON DELETE CASCADE,
+  resident_id integer REFERENCES public.residents(id) ON DELETE SET NULL,
+  unit_id integer REFERENCES public.units(id) ON DELETE SET NULL,
+  scope text NOT NULL DEFAULT 'unit' CHECK (scope IN ('unit', 'condominium')),
+  visitor_name text NOT NULL,
+  visitor_phone text,
+  visitor_doc text,
+  reason text,
+  blocked_at timestamp with time zone DEFAULT now(),
+  blocked_by_name text,
+  is_active boolean DEFAULT true,
+  unblocked_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_visitor_blacklist_phone
+  ON public.visitor_blacklist(condominium_id, visitor_phone)
+  WHERE is_active = true AND visitor_phone IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_visitor_blacklist_doc
+  ON public.visitor_blacklist(condominium_id, visitor_doc)
+  WHERE is_active = true AND visitor_doc IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_visitor_blacklist_resident
+  ON public.visitor_blacklist(resident_id)
+  WHERE is_active = true;
+
+CREATE OR REPLACE FUNCTION public.add_to_blacklist(
+  p_condominium_id integer,
+  p_resident_id integer,
+  p_unit_id integer,
+  p_visitor_name text,
+  p_visitor_phone text DEFAULT NULL,
+  p_visitor_doc text DEFAULT NULL,
+  p_reason text DEFAULT NULL,
+  p_scope text DEFAULT 'unit'
+)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_id uuid;
+  v_resident_name text;
+  v_normalized_phone text;
+  v_normalized_doc text;
+BEGIN
+  v_normalized_phone := NULLIF(REGEXP_REPLACE(COALESCE(p_visitor_phone, ''), '[^0-9]', '', 'g'), '');
+  v_normalized_doc := NULLIF(UPPER(REGEXP_REPLACE(COALESCE(p_visitor_doc, ''), '[^A-Za-z0-9]', '', 'g')), '');
+
+  IF v_normalized_phone IS NULL AND v_normalized_doc IS NULL THEN
+    RAISE EXCEPTION 'Phone or document number is required';
+  END IF;
+
+  SELECT name INTO v_resident_name
+  FROM public.residents
+  WHERE id = p_resident_id;
+
+  INSERT INTO public.visitor_blacklist (
+    condominium_id,
+    resident_id,
+    unit_id,
+    scope,
+    visitor_name,
+    visitor_phone,
+    visitor_doc,
+    reason,
+    blocked_by_name
+  ) VALUES (
+    p_condominium_id,
+    p_resident_id,
+    p_unit_id,
+    COALESCE(NULLIF(p_scope, ''), 'unit'),
+    p_visitor_name,
+    v_normalized_phone,
+    v_normalized_doc,
+    NULLIF(p_reason, ''),
+    v_resident_name
+  )
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.remove_from_blacklist(
+  p_id uuid,
+  p_resident_id integer
+)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  UPDATE public.visitor_blacklist
+  SET is_active = false,
+      unblocked_at = now(),
+      updated_at = now()
+  WHERE id = p_id
+    AND resident_id = p_resident_id
+    AND is_active = true;
+
+  RETURN FOUND;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_blacklist(p_resident_id integer)
+ RETURNS TABLE(
+   id uuid,
+   visitor_name text,
+   visitor_phone text,
+   visitor_doc text,
+   reason text,
+   scope text,
+   blocked_at timestamptz,
+   is_active boolean
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT b.id,
+         b.visitor_name,
+         b.visitor_phone,
+         b.visitor_doc,
+         b.reason,
+         b.scope,
+         b.blocked_at,
+         b.is_active
+  FROM public.visitor_blacklist b
+  WHERE b.resident_id = p_resident_id
+    AND b.is_active = true
+  ORDER BY b.blocked_at DESC;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.is_visitor_blacklisted(
+  p_condominium_id integer,
+  p_unit_id integer,
+  p_visitor_phone text DEFAULT NULL,
+  p_visitor_doc text DEFAULT NULL
+)
+ RETURNS TABLE(
+   is_blocked boolean,
+   blocked_by text,
+   reason text,
+   scope text,
+   blocked_at timestamptz
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_normalized_phone text;
+  v_normalized_doc text;
+  v_result RECORD;
+BEGIN
+  v_normalized_phone := NULLIF(REGEXP_REPLACE(COALESCE(p_visitor_phone, ''), '[^0-9]', '', 'g'), '');
+  v_normalized_doc := NULLIF(UPPER(REGEXP_REPLACE(COALESCE(p_visitor_doc, ''), '[^A-Za-z0-9]', '', 'g')), '');
+
+  SELECT INTO v_result
+    b.blocked_by_name,
+    b.reason,
+    b.scope,
+    b.blocked_at
+  FROM public.visitor_blacklist b
+  WHERE b.condominium_id = p_condominium_id
+    AND b.is_active = true
+    AND (
+      b.scope = 'condominium'
+      OR (b.scope = 'unit' AND b.unit_id = p_unit_id)
+    )
+    AND (
+      (v_normalized_phone IS NOT NULL AND b.visitor_phone = v_normalized_phone)
+      OR (v_normalized_doc IS NOT NULL AND b.visitor_doc = v_normalized_doc)
+    )
+  ORDER BY b.scope DESC, b.blocked_at DESC
+  LIMIT 1;
+
+  IF v_result IS NOT NULL THEN
+    RETURN QUERY
+    SELECT true,
+           v_result.blocked_by_name,
+           v_result.reason,
+           v_result.scope,
+           v_result.blocked_at;
+  ELSE
+    RETURN QUERY
+    SELECT false,
+           NULL::text,
+           NULL::text,
+           NULL::text,
+           NULL::timestamptz;
+  END IF;
+END;
+$function$;
+
