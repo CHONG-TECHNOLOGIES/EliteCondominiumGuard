@@ -8,6 +8,7 @@ import { exportIncidentsToCSV } from '../../utils/csvExport';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 import { getIncidentActionHistory, getIncidentActionLabel, getIncidentActorLabel } from '../../utils/incidentHistory';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatDateTime } from '@/utils/datetime';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -244,13 +245,7 @@ export default function AdminIncidents() {
     if (!dateTime) return null;
     const date = new Date(dateTime);
     if (Number.isNaN(date.getTime())) return null;
-    return date.toLocaleString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDateTime(date);
   };
 
   const renderGuardActionHistory = (incident: Incident) => {
@@ -286,16 +281,6 @@ export default function AdminIncidents() {
         ))}
       </div>
     );
-  };
-
-  const formatDateTime = (dateTime: string) => {
-    return new Date(dateTime).toLocaleString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   const filteredIncidents = incidents.filter(incident => {

@@ -575,6 +575,951 @@ BEGIN
 END;
 $function$;
 
+-- ============================================================
+-- SECTION: SYNCED FROM SUPABASE_RPC.sql
+-- Added to keep schema_complete.sql and SUPABASE_RPC.sql aligned
+-- ============================================================
+
+ALTER TABLE public.residents
+  ADD COLUMN IF NOT EXISTS preferred_language text DEFAULT 'pt-PT';
+
+UPDATE public.residents
+SET preferred_language = 'pt-PT'
+WHERE preferred_language IS NULL OR preferred_language = '';
+
+DO $$
+BEGIN
+  ALTER TABLE public.residents
+    ADD CONSTRAINT residents_preferred_language_check
+    CHECK (preferred_language IN ('pt-PT', 'en', 'fr'));
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE public.resident_qr_codes
+  ADD COLUMN IF NOT EXISTS consent boolean NOT NULL DEFAULT false;
+
+ALTER TABLE public.resident_qr_codes
+  DROP CONSTRAINT IF EXISTS resident_qr_codes_purpose_check;
+
+ALTER TABLE public.resident_qr_codes
+  ADD CONSTRAINT resident_qr_codes_purpose_check
+  CHECK (purpose IN ('guest', 'delivery', 'service', 'other'));
+
+DROP FUNCTION IF EXISTS public.get_visits_history(integer, timestamptz, timestamptz, integer);
+
+CREATE OR REPLACE FUNCTION public.get_visits_history(
+  p_unit_id integer,
+  p_start timestamp with time zone,
+  p_end timestamp with time zone,
+  p_limit integer DEFAULT 100,
+  p_visitor_name text DEFAULT NULL,
+  p_visitor_phone text DEFAULT NULL
+)
+ RETURNS SETOF visits
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT * FROM public.visits
+  WHERE unit_id = p_unit_id
+    AND created_at >= p_start AND created_at <= p_end
+    AND (p_visitor_name IS NULL OR visitor_name ILIKE '%' || p_visitor_name || '%')
+    AND (
+      p_visitor_phone IS NULL
+      OR REGEXP_REPLACE(visitor_phone, '[^0-9]', '', 'g')
+         LIKE '%' || REGEXP_REPLACE(p_visitor_phone, '[^0-9]', '', 'g') || '%'
+    )
+  ORDER BY created_at DESC
+  LIMIT p_limit;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_unique_visitors(p_unit_id integer, p_limit integer DEFAULT 100)
+ RETURNS TABLE(
+   visitor_name text,
+   visitor_phone text,
+   visit_count integer,
+   last_visit_at timestamp with time zone,
+   first_visit_at timestamp with time zone
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT
+    v.visitor_name,
+    v.visitor_phone,
+    COUNT(*)::integer,
+    MAX(v.created_at),
+    MIN(v.created_at)
+  FROM public.visits v
+  WHERE v.unit_id = p_unit_id
+    AND v.visitor_name IS NOT NULL
+  GROUP BY v.visitor_name, v.visitor_phone
+  ORDER BY COUNT(*) DESC, MAX(v.created_at) DESC
+  LIMIT p_limit;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.verify_resident_login(
+  p_phone text,
+  p_pin_cleartext text,
+  p_device_token text DEFAULT NULL::text
+)
+ RETURNS TABLE(
+   id integer,
+   condominium_id integer,
+   unit_id integer,
+   name text,
+   phone text,
+   email text,
+   has_app_installed boolean,
+   pin_hash text,
+   avatar_url text,
+   preferred_language text
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_resident RECORD;
+BEGIN
+  IF p_phone IS NULL OR LENGTH(TRIM(p_phone)) = 0 THEN
+    RAISE EXCEPTION 'Telefone é obrigatório';
+  END IF;
+
+  IF p_pin_cleartext IS NULL OR LENGTH(TRIM(p_pin_cleartext)) = 0 THEN
+    RAISE EXCEPTION 'PIN é obrigatório';
+  END IF;
+
+  p_phone := REGEXP_REPLACE(p_phone, '[^0-9]', '', 'g');
+
+  SELECT * INTO v_resident
+  FROM residents r
+  WHERE r.phone = p_phone
+  LIMIT 1;
+
+  IF v_resident.id IS NULL THEN
+    RAISE EXCEPTION 'Telefone não encontrado';
+  END IF;
+
+  IF v_resident.pin_hash IS NULL OR v_resident.pin_hash = '' THEN
+    RAISE EXCEPTION 'PIN não cadastrado. Realize o primeiro acesso.';
+  END IF;
+
+  IF NOT (v_resident.pin_hash = crypt(p_pin_cleartext, v_resident.pin_hash)) THEN
+    RAISE EXCEPTION 'PIN incorreto';
+  END IF;
+
+  UPDATE residents
+  SET
+    app_last_seen_at = NOW(),
+    device_token = COALESCE(p_device_token, device_token)
+  WHERE residents.id = v_resident.id;
+
+  RETURN QUERY
+  SELECT
+    v_resident.id,
+    v_resident.condominium_id,
+    v_resident.unit_id,
+    v_resident.name,
+    v_resident.phone,
+    v_resident.email,
+    v_resident.has_app_installed,
+    v_resident.pin_hash,
+    v_resident.avatar_url,
+    COALESCE(v_resident.preferred_language, 'pt-PT');
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.register_resident_pin(
+  p_phone text,
+  p_pin_cleartext text,
+  p_device_token text DEFAULT NULL::text
+)
+ RETURNS TABLE(
+   id integer,
+   condominium_id integer,
+   unit_id integer,
+   name text,
+   phone text,
+   email text,
+   has_app_installed boolean,
+   preferred_language text
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_resident_id INTEGER;
+  v_pin_hash TEXT;
+BEGIN
+  IF LENGTH(p_pin_cleartext) < 4 OR LENGTH(p_pin_cleartext) > 6 THEN
+    RAISE EXCEPTION 'PIN deve ter entre 4 e 6 dígitos';
+  END IF;
+
+  IF p_phone IS NULL OR LENGTH(TRIM(p_phone)) = 0 THEN
+    RAISE EXCEPTION 'Telefone é obrigatório';
+  END IF;
+
+  p_phone := REGEXP_REPLACE(p_phone, '[^0-9]', '', 'g');
+
+  SELECT r.id INTO v_resident_id
+  FROM residents r
+  WHERE r.phone = p_phone
+    AND (r.pin_hash IS NULL OR r.pin_hash = '')
+  LIMIT 1;
+
+  IF v_resident_id IS NULL THEN
+    RAISE EXCEPTION 'Telefone não encontrado ou já possui PIN cadastrado. Entre em contato com a administração.';
+  END IF;
+
+  v_pin_hash := crypt(p_pin_cleartext, gen_salt('bf', 10));
+
+  UPDATE residents
+  SET
+    pin_hash = v_pin_hash,
+    has_app_installed = TRUE,
+    device_token = p_device_token,
+    app_first_login_at = NOW(),
+    app_last_seen_at = NOW()
+  WHERE residents.id = v_resident_id;
+
+  RETURN QUERY
+  SELECT
+    re.id,
+    re.condominium_id,
+    re.unit_id,
+    re.name,
+    re.phone,
+    re.email,
+    re.has_app_installed,
+    COALESCE(re.preferred_language, 'pt-PT')
+  FROM residents re
+  WHERE re.id = v_resident_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.reset_resident_pin(
+  p_resident_id integer,
+  p_current_pin text,
+  p_new_pin text
+)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_resident RECORD;
+BEGIN
+  IF p_current_pin IS NULL OR LENGTH(TRIM(p_current_pin)) = 0 THEN
+    RAISE EXCEPTION 'PIN atual é obrigatório';
+  END IF;
+
+  IF p_new_pin IS NULL OR LENGTH(p_new_pin) < 4 OR LENGTH(p_new_pin) > 6 THEN
+    RAISE EXCEPTION 'Novo PIN deve ter entre 4 e 6 dígitos';
+  END IF;
+
+  SELECT id, pin_hash INTO v_resident
+  FROM residents
+  WHERE id = p_resident_id
+  LIMIT 1;
+
+  IF v_resident.id IS NULL THEN
+    RAISE EXCEPTION 'Residente não encontrado';
+  END IF;
+
+  IF v_resident.pin_hash IS NULL OR v_resident.pin_hash = '' THEN
+    RAISE EXCEPTION 'PIN não cadastrado';
+  END IF;
+
+  IF NOT (v_resident.pin_hash = crypt(p_current_pin, v_resident.pin_hash)) THEN
+    RAISE EXCEPTION 'PIN atual incorreto';
+  END IF;
+
+  UPDATE residents
+  SET pin_hash = crypt(p_new_pin, gen_salt('bf', 10))
+  WHERE id = p_resident_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_resident_by_id(p_resident_id integer)
+ RETURNS TABLE(
+   id integer,
+   name text,
+   phone text,
+   email text,
+   avatar_url text,
+   preferred_language text,
+   condominium_id integer,
+   unit_id integer,
+   created_at timestamp with time zone
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT
+    r.id,
+    r.name,
+    r.phone,
+    r.email,
+    r.avatar_url,
+    COALESCE(r.preferred_language, 'pt-PT'),
+    r.condominium_id,
+    r.unit_id,
+    r.created_at
+  FROM public.residents r
+  WHERE r.id = p_resident_id
+  LIMIT 1;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.update_resident(
+  p_resident_id integer,
+  p_name text DEFAULT NULL::text,
+  p_phone text DEFAULT NULL::text,
+  p_email text DEFAULT NULL::text,
+  p_avatar_url text DEFAULT NULL::text,
+  p_push_token text DEFAULT NULL::text,
+  p_preferred_language text DEFAULT NULL::text,
+  p_notification_preferences jsonb DEFAULT NULL::jsonb
+)
+ RETURNS TABLE(
+   id integer,
+   name text,
+   phone text,
+   email text,
+   avatar_url text,
+   preferred_language text,
+   condominium_id integer,
+   unit_id integer,
+   created_at timestamp with time zone
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  UPDATE public.residents r
+  SET
+    name = COALESCE(p_name, r.name),
+    phone = COALESCE(p_phone, r.phone),
+    email = COALESCE(p_email, r.email),
+    avatar_url = COALESCE(p_avatar_url, r.avatar_url),
+    push_token = COALESCE(p_push_token, r.push_token),
+    preferred_language = COALESCE(p_preferred_language, r.preferred_language),
+    notification_preferences = COALESCE(p_notification_preferences, r.notification_preferences)
+  WHERE r.id = p_resident_id
+  RETURNING
+    r.id,
+    r.name,
+    r.phone,
+    r.email,
+    r.avatar_url,
+    r.preferred_language,
+    r.condominium_id,
+    r.unit_id,
+    r.created_at;
+END;
+$function$;
+
+CREATE TABLE IF NOT EXISTS public.resident_frequent_visitors (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  resident_id integer NOT NULL REFERENCES public.residents(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  phone text NOT NULL,
+  purpose text DEFAULT 'guest' CHECK (purpose IN ('guest', 'delivery', 'service', 'other')),
+  notes text,
+  avatar_url text,
+  use_count integer DEFAULT 0,
+  last_used_at timestamp with time zone,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_frequent_visitors_resident_id
+  ON public.resident_frequent_visitors(resident_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_frequent_visitors_unique
+  ON public.resident_frequent_visitors(resident_id, phone);
+
+CREATE OR REPLACE FUNCTION public.get_frequent_visitors(p_resident_id integer)
+ RETURNS TABLE(
+   id uuid,
+   name text,
+   phone text,
+   purpose text,
+   notes text,
+   avatar_url text,
+   use_count integer,
+   last_used_at timestamptz,
+   created_at timestamptz
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT
+    fv.id,
+    fv.name,
+    fv.phone,
+    fv.purpose,
+    fv.notes,
+    fv.avatar_url,
+    fv.use_count,
+    fv.last_used_at,
+    fv.created_at
+  FROM public.resident_frequent_visitors fv
+  WHERE fv.resident_id = p_resident_id
+  ORDER BY fv.use_count DESC, fv.last_used_at DESC NULLS LAST;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.upsert_frequent_visitor(
+  p_resident_id integer,
+  p_name text,
+  p_phone text,
+  p_purpose text DEFAULT 'guest',
+  p_notes text DEFAULT NULL
+)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_id uuid;
+BEGIN
+  INSERT INTO public.resident_frequent_visitors (resident_id, name, phone, purpose, notes)
+  VALUES (p_resident_id, p_name, p_phone, p_purpose, p_notes)
+  ON CONFLICT (resident_id, phone)
+  DO UPDATE SET
+    name = EXCLUDED.name,
+    purpose = EXCLUDED.purpose,
+    notes = COALESCE(EXCLUDED.notes, resident_frequent_visitors.notes),
+    updated_at = now()
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.increment_frequent_visitor_usage(
+  p_resident_id integer,
+  p_phone text
+)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  UPDATE public.resident_frequent_visitors
+  SET
+    use_count = use_count + 1,
+    last_used_at = now(),
+    updated_at = now()
+  WHERE resident_id = p_resident_id
+    AND phone = p_phone;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.delete_frequent_visitor(
+  p_id uuid,
+  p_resident_id integer
+)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  DELETE FROM public.resident_frequent_visitors
+  WHERE id = p_id
+    AND resident_id = p_resident_id;
+
+  RETURN FOUND;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.update_frequent_visitor(
+  p_id uuid,
+  p_resident_id integer,
+  p_name text DEFAULT NULL,
+  p_phone text DEFAULT NULL,
+  p_purpose text DEFAULT NULL,
+  p_notes text DEFAULT NULL
+)
+ RETURNS SETOF resident_frequent_visitors
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  UPDATE public.resident_frequent_visitors
+  SET
+    name = COALESCE(p_name, name),
+    phone = COALESCE(p_phone, phone),
+    purpose = COALESCE(p_purpose, purpose),
+    notes = COALESCE(p_notes, notes),
+    updated_at = now()
+  WHERE id = p_id
+    AND resident_id = p_resident_id
+  RETURNING *;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_resident_stats(
+  p_resident_id integer,
+  p_unit_id integer,
+  p_period text DEFAULT 'month'
+)
+ RETURNS TABLE(
+   period_label text,
+   visits_total integer,
+   visits_approved integer,
+   visits_denied integer,
+   visits_by_type jsonb,
+   qr_codes_generated integer,
+   qr_codes_active integer,
+   incidents_reported integer,
+   top_visitors jsonb,
+   busiest_day_of_week text,
+   busiest_hour integer,
+   prev_period_visits integer
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_start timestamptz;
+  v_end timestamptz := now();
+  v_prev_start timestamptz;
+  v_prev_end timestamptz;
+BEGIN
+  CASE p_period
+    WHEN 'week' THEN
+      v_start := date_trunc('week', now());
+      v_prev_start := v_start - interval '1 week';
+      v_prev_end := v_start;
+    WHEN 'month' THEN
+      v_start := date_trunc('month', now());
+      v_prev_start := v_start - interval '1 month';
+      v_prev_end := v_start;
+    WHEN 'year' THEN
+      v_start := date_trunc('year', now());
+      v_prev_start := v_start - interval '1 year';
+      v_prev_end := v_start;
+    ELSE
+      v_start := '1970-01-01'::timestamptz;
+      v_prev_start := v_start;
+      v_prev_end := v_start;
+  END CASE;
+
+  RETURN QUERY
+  SELECT
+    p_period,
+    (SELECT COUNT(*)::integer FROM visits WHERE unit_id = p_unit_id AND created_at >= v_start),
+    (SELECT COUNT(*)::integer FROM visits WHERE unit_id = p_unit_id AND created_at >= v_start AND status = 'AUTORIZADO'),
+    (SELECT COUNT(*)::integer FROM visits WHERE unit_id = p_unit_id AND created_at >= v_start AND status = 'NEGADO'),
+    (
+      SELECT COALESCE(jsonb_object_agg(type_name, cnt), '{}'::jsonb)
+      FROM (
+        SELECT vt.name AS type_name, COUNT(*)::integer AS cnt
+        FROM visits v
+        LEFT JOIN visit_types vt ON v.visit_type_id = vt.id
+        WHERE v.unit_id = p_unit_id
+          AND v.created_at >= v_start
+        GROUP BY vt.name
+      ) sub
+    ),
+    (SELECT COUNT(*)::integer FROM resident_qr_codes WHERE resident_id = p_resident_id AND created_at >= v_start),
+    (
+      SELECT COUNT(*)::integer
+      FROM resident_qr_codes
+      WHERE resident_id = p_resident_id
+        AND status = 'active'
+        AND (expires_at IS NULL OR expires_at > NOW())
+    ),
+    (SELECT COUNT(*)::integer FROM incidents WHERE resident_id = p_resident_id AND reported_at >= v_start),
+    (
+      SELECT COALESCE(
+        jsonb_agg(jsonb_build_object('name', visitor_name, 'phone', visitor_phone, 'count', cnt)),
+        '[]'::jsonb
+      )
+      FROM (
+        SELECT visitor_name, visitor_phone, COUNT(*)::integer AS cnt
+        FROM visits
+        WHERE unit_id = p_unit_id
+          AND created_at >= v_start
+          AND visitor_name IS NOT NULL
+        GROUP BY visitor_name, visitor_phone
+        ORDER BY cnt DESC
+        LIMIT 5
+      ) top
+    ),
+    (
+      SELECT TO_CHAR(created_at, 'FMDay')
+      FROM visits
+      WHERE unit_id = p_unit_id
+        AND created_at >= v_start
+      GROUP BY TO_CHAR(created_at, 'FMDay')
+      ORDER BY COUNT(*) DESC
+      LIMIT 1
+    ),
+    (
+      SELECT EXTRACT(HOUR FROM created_at)::integer
+      FROM visits
+      WHERE unit_id = p_unit_id
+        AND created_at >= v_start
+      GROUP BY EXTRACT(HOUR FROM created_at)
+      ORDER BY COUNT(*) DESC
+      LIMIT 1
+    ),
+    (
+      SELECT COUNT(*)::integer
+      FROM visits
+      WHERE unit_id = p_unit_id
+        AND created_at >= v_prev_start
+        AND created_at < v_prev_end
+    );
+END;
+$function$;
+
+CREATE TABLE IF NOT EXISTS public.condominium_events (
+  id serial PRIMARY KEY,
+  condominium_id integer NOT NULL REFERENCES public.condominiums(id) ON DELETE CASCADE,
+  title text NOT NULL,
+  description text,
+  location text,
+  category text DEFAULT 'general' CHECK (category IN ('meeting', 'maintenance', 'social', 'sports', 'closure', 'general')),
+  start_at timestamp with time zone NOT NULL,
+  end_at timestamp with time zone,
+  is_all_day boolean DEFAULT false,
+  requires_rsvp boolean DEFAULT false,
+  max_attendees integer,
+  created_by integer REFERENCES public.staff(id),
+  is_active boolean DEFAULT true,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_condo_date
+  ON public.condominium_events(condominium_id, start_at)
+  WHERE is_active = true;
+
+CREATE TABLE IF NOT EXISTS public.event_rsvps (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  event_id integer NOT NULL REFERENCES public.condominium_events(id) ON DELETE CASCADE,
+  resident_id integer NOT NULL REFERENCES public.residents(id) ON DELETE CASCADE,
+  status text DEFAULT 'going' CHECK (status IN ('going', 'maybe', 'not_going')),
+  created_at timestamp with time zone DEFAULT now(),
+  UNIQUE(event_id, resident_id)
+);
+
+CREATE OR REPLACE FUNCTION public.get_condominium_events(
+  p_condominium_id integer,
+  p_start_date date,
+  p_end_date date
+)
+ RETURNS TABLE(
+   id integer,
+   title text,
+   description text,
+   location text,
+   category text,
+   start_at timestamptz,
+   end_at timestamptz,
+   is_all_day boolean,
+   requires_rsvp boolean,
+   max_attendees integer,
+   rsvp_count integer
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT
+    e.id,
+    e.title,
+    e.description,
+    e.location,
+    e.category,
+    e.start_at,
+    e.end_at,
+    e.is_all_day,
+    e.requires_rsvp,
+    e.max_attendees,
+    (SELECT COUNT(*)::integer FROM event_rsvps r WHERE r.event_id = e.id AND r.status = 'going')
+  FROM condominium_events e
+  WHERE e.condominium_id = p_condominium_id
+    AND e.is_active = true
+    AND e.start_at::date BETWEEN p_start_date AND p_end_date
+  ORDER BY e.start_at ASC;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_event_dates(
+  p_condominium_id integer,
+  p_month integer,
+  p_year integer
+)
+ RETURNS TABLE(event_date date, event_count integer, has_meeting boolean)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT
+    e.start_at::date,
+    COUNT(*)::integer,
+    bool_or(e.category = 'meeting')
+  FROM condominium_events e
+  WHERE e.condominium_id = p_condominium_id
+    AND e.is_active = true
+    AND EXTRACT(MONTH FROM e.start_at) = p_month
+    AND EXTRACT(YEAR FROM e.start_at) = p_year
+  GROUP BY e.start_at::date;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.rsvp_to_event(
+  p_event_id integer,
+  p_resident_id integer,
+  p_status text DEFAULT 'going'
+)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_event RECORD;
+  v_current_count integer;
+BEGIN
+  SELECT * INTO v_event
+  FROM condominium_events
+  WHERE id = p_event_id
+    AND is_active = true;
+
+  IF v_event.id IS NULL THEN
+    RAISE EXCEPTION 'Evento nao encontrado';
+  END IF;
+
+  IF p_status = 'going' AND v_event.max_attendees IS NOT NULL THEN
+    SELECT COUNT(*) INTO v_current_count
+    FROM event_rsvps
+    WHERE event_id = p_event_id
+      AND status = 'going';
+
+    IF v_current_count >= v_event.max_attendees THEN
+      RAISE EXCEPTION 'Evento lotado';
+    END IF;
+  END IF;
+
+  INSERT INTO event_rsvps (event_id, resident_id, status)
+  VALUES (p_event_id, p_resident_id, p_status)
+  ON CONFLICT (event_id, resident_id)
+  DO UPDATE SET status = EXCLUDED.status;
+
+  RETURN true;
+END;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.get_resident_rsvp(
+  p_event_id integer,
+  p_resident_id integer
+)
+ RETURNS TABLE(status text)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT r.status
+  FROM event_rsvps r
+  WHERE r.event_id = p_event_id
+    AND r.resident_id = p_resident_id;
+END;
+$function$;
+
+-- ----------------------------------------
+-- Function: admin_get_all_condominium_events
+-- ----------------------------------------
+CREATE OR REPLACE FUNCTION public.admin_get_all_condominium_events(
+  p_condominium_id integer DEFAULT NULL::integer,
+  p_limit integer DEFAULT NULL::integer,
+  p_search text DEFAULT NULL::text,
+  p_category text DEFAULT NULL::text,
+  p_date_from date DEFAULT NULL::date,
+  p_date_to date DEFAULT NULL::date,
+  p_include_inactive boolean DEFAULT false
+)
+ RETURNS TABLE(
+  id integer,
+  condominium_id integer,
+  title text,
+  description text,
+  location text,
+  category text,
+  start_at timestamptz,
+  end_at timestamptz,
+  is_all_day boolean,
+  requires_rsvp boolean,
+  max_attendees integer,
+  created_by integer,
+  is_active boolean,
+  created_at timestamptz,
+  updated_at timestamptz,
+  rsvp_count integer
+ )
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT
+    e.id,
+    e.condominium_id,
+    e.title,
+    e.description,
+    e.location,
+    e.category,
+    e.start_at,
+    e.end_at,
+    e.is_all_day,
+    e.requires_rsvp,
+    e.max_attendees,
+    e.created_by,
+    e.is_active,
+    e.created_at,
+    e.updated_at,
+    COALESCE((
+      SELECT COUNT(*)::integer
+      FROM public.event_rsvps r
+      WHERE r.event_id = e.id
+        AND r.status = 'going'
+    ), 0) AS rsvp_count
+  FROM public.condominium_events e
+  WHERE
+    (p_condominium_id IS NULL OR e.condominium_id = p_condominium_id)
+    AND (COALESCE(p_include_inactive, false) = true OR e.is_active = true)
+    AND (
+      p_search IS NULL
+      OR e.title ILIKE '%' || p_search || '%'
+      OR COALESCE(e.description, '') ILIKE '%' || p_search || '%'
+      OR COALESCE(e.location, '') ILIKE '%' || p_search || '%'
+    )
+    AND (p_category IS NULL OR e.category = p_category)
+    AND (p_date_from IS NULL OR e.start_at::date >= p_date_from)
+    AND (p_date_to IS NULL OR e.start_at::date <= p_date_to)
+  ORDER BY e.start_at DESC, e.id DESC
+  LIMIT COALESCE(p_limit, 1000);
+END;
+$function$;
+
+-- ----------------------------------------
+-- Function: admin_create_condominium_event
+-- ----------------------------------------
+CREATE OR REPLACE FUNCTION public.admin_create_condominium_event(p_data jsonb)
+ RETURNS condominium_events
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_event condominium_events;
+BEGIN
+  INSERT INTO public.condominium_events (
+    condominium_id,
+    title,
+    description,
+    location,
+    category,
+    start_at,
+    end_at,
+    is_all_day,
+    requires_rsvp,
+    max_attendees,
+    created_by,
+    is_active,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    (p_data->>'condominium_id')::INT4,
+    p_data->>'title',
+    p_data->>'description',
+    p_data->>'location',
+    COALESCE(p_data->>'category', 'general'),
+    (p_data->>'start_at')::timestamptz,
+    NULLIF(p_data->>'end_at', '')::timestamptz,
+    COALESCE((p_data->>'is_all_day')::boolean, false),
+    COALESCE((p_data->>'requires_rsvp')::boolean, false),
+    NULLIF(p_data->>'max_attendees', '')::INT4,
+    NULLIF(p_data->>'created_by', '')::INT4,
+    COALESCE((p_data->>'is_active')::boolean, true),
+    NOW(),
+    NOW()
+  )
+  RETURNING * INTO v_event;
+
+  RETURN v_event;
+END;
+$function$;
+
+-- ----------------------------------------
+-- Function: admin_update_condominium_event
+-- ----------------------------------------
+CREATE OR REPLACE FUNCTION public.admin_update_condominium_event(p_id integer, p_data jsonb)
+ RETURNS condominium_events
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  v_event condominium_events;
+BEGIN
+  UPDATE public.condominium_events
+  SET
+    title = CASE WHEN p_data ? 'title' THEN p_data->>'title' ELSE title END,
+    description = CASE WHEN p_data ? 'description' THEN p_data->>'description' ELSE description END,
+    location = CASE WHEN p_data ? 'location' THEN p_data->>'location' ELSE location END,
+    category = CASE WHEN p_data ? 'category' THEN p_data->>'category' ELSE category END,
+    start_at = CASE WHEN p_data ? 'start_at' THEN (p_data->>'start_at')::timestamptz ELSE start_at END,
+    end_at = CASE WHEN p_data ? 'end_at' THEN NULLIF(p_data->>'end_at', '')::timestamptz ELSE end_at END,
+    is_all_day = CASE WHEN p_data ? 'is_all_day' THEN COALESCE((p_data->>'is_all_day')::boolean, false) ELSE is_all_day END,
+    requires_rsvp = CASE WHEN p_data ? 'requires_rsvp' THEN COALESCE((p_data->>'requires_rsvp')::boolean, false) ELSE requires_rsvp END,
+    max_attendees = CASE WHEN p_data ? 'max_attendees' THEN NULLIF(p_data->>'max_attendees', '')::INT4 ELSE max_attendees END,
+    is_active = CASE WHEN p_data ? 'is_active' THEN COALESCE((p_data->>'is_active')::boolean, true) ELSE is_active END,
+    updated_at = NOW()
+  WHERE id = p_id
+  RETURNING * INTO v_event;
+
+  RETURN v_event;
+END;
+$function$;
+
+-- ----------------------------------------
+-- Function: admin_delete_condominium_event
+-- ----------------------------------------
+CREATE OR REPLACE FUNCTION public.admin_delete_condominium_event(p_id integer)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+BEGIN
+  UPDATE public.condominium_events
+  SET is_active = false,
+      updated_at = NOW()
+  WHERE id = p_id;
+
+  RETURN FOUND;
+END;
+$function$;
+
 -- ------------------------------------------------------------
 -- FILE: add_video_call_offer_sdp.sql
 -- ------------------------------------------------------------

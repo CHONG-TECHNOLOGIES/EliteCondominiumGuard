@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast';
 import { exportAuditLogsToCSV } from '../../utils/csvExport';
 import { AuthContext } from '../../App';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatDateTimeWithSeconds } from '@/utils/datetime';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -249,17 +250,6 @@ export default function AdminAuditLogs() {
     );
   };
 
-  const formatDateTime = (dateTime: string) => {
-    return new Date(dateTime).toLocaleString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  };
-
   const filteredLogs = logs.filter(log => {
     if (!searchTerm) return true;
 
@@ -475,7 +465,7 @@ export default function AdminAuditLogs() {
                   {filteredLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-bg-root transition-colors">
                       <td className="px-4 py-3 text-sm text-text-main whitespace-nowrap">
-                        {formatDateTime(log.created_at)}
+                        {formatDateTimeWithSeconds(log.created_at)}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {getActionBadge(log.action)}

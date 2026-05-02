@@ -1,7 +1,7 @@
 
 
 import { supabase } from './supabaseClient';
-import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondoSetupSettings, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment, VideoCallNotificationPayload, VideoCallSession, VideoCallStatus } from '../types';
+import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondoSetupSettings, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, CondominiumEvent, CondominiumEventCategory, CondominiumEventInput, AppPricingRule, CondominiumSubscription, SubscriptionPayment, VideoCallNotificationPayload, VideoCallSession, VideoCallStatus } from '../types';
 import { buildIncidentActionHistoryIndex } from '../utils/incidentHistory';
 import { logger, ErrorCategory } from '@/services/logger';
 
@@ -346,6 +346,112 @@ export const SupabaseService = {
     } catch (err: any) {
       logger.error('Error getting sports', err, ErrorCategory.NETWORK);
       return [];
+    }
+  },
+
+  // --- Condominium Events ---
+  async adminGetAllCondominiumEvents(
+    condominiumId?: number,
+    limit?: number | null,
+    search?: string | null,
+    category?: CondominiumEventCategory | null,
+    dateFrom?: string | null,
+    dateTo?: string | null,
+    includeInactive: boolean = false
+  ): Promise<CondominiumEvent[]> {
+    if (!supabase) return [];
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_get_all_condominium_events', {
+          p_condominium_id: condominiumId ?? null,
+          p_limit: limit ?? null,
+          p_search: search ?? null,
+          p_category: category ?? null,
+          p_date_from: dateFrom ?? null,
+          p_date_to: dateTo ?? null,
+          p_include_inactive: includeInactive
+        });
+
+      if (error) throw error;
+      return (data as CondominiumEvent[]) || [];
+    } catch (err: any) {
+      logger.error('Error getting condominium events', err, ErrorCategory.NETWORK);
+      return [];
+    }
+  },
+
+  async adminCreateCondominiumEvent(event: CondominiumEventInput): Promise<CondominiumEvent | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_create_condominium_event', {
+          p_data: {
+            condominium_id: event.condominium_id,
+            title: event.title,
+            description: event.description,
+            location: event.location,
+            category: event.category,
+            start_at: event.start_at,
+            end_at: event.end_at ?? null,
+            is_all_day: event.is_all_day ?? false,
+            requires_rsvp: event.requires_rsvp ?? false,
+            max_attendees: event.max_attendees ?? null,
+            created_by: event.created_by ?? null,
+            is_active: event.is_active ?? true
+          }
+        });
+
+      if (error) throw error;
+      return data as CondominiumEvent;
+    } catch (err: any) {
+      logger.error('Error creating condominium event', err, ErrorCategory.NETWORK);
+      return null;
+    }
+  },
+
+  async adminUpdateCondominiumEvent(id: number, event: CondominiumEventInput): Promise<CondominiumEvent | null> {
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_update_condominium_event', {
+          p_id: id,
+          p_data: {
+            title: event.title,
+            description: event.description,
+            location: event.location,
+            category: event.category,
+            start_at: event.start_at,
+            end_at: event.end_at ?? null,
+            is_all_day: event.is_all_day,
+            requires_rsvp: event.requires_rsvp,
+            max_attendees: event.max_attendees ?? null,
+            is_active: event.is_active
+          }
+        });
+
+      if (error) throw error;
+      return data as CondominiumEvent;
+    } catch (err: any) {
+      logger.error('Error updating condominium event', err, ErrorCategory.NETWORK);
+      return null;
+    }
+  },
+
+  async adminDeleteCondominiumEvent(id: number): Promise<boolean> {
+    if (!supabase) return false;
+
+    try {
+      const { data, error } = await supabase
+        .rpc('admin_delete_condominium_event', { p_id: id });
+
+      if (error) throw error;
+      return data === true;
+    } catch (err: any) {
+      logger.error('Error deleting condominium event', err, ErrorCategory.NETWORK);
+      return false;
     }
   },
 
@@ -748,11 +854,11 @@ export const SupabaseService = {
     }
   },
 
-  async updateVisitStatus(visitId: number, status: string, checkOutAt?: string): Promise<boolean> {
+  async updateVisitStatus(visitId: number, status: VisitStatus | string, checkOutAt?: string): Promise<boolean> {
     if (!supabase) return false;
 
     try {
-      if (checkOutAt || status === 'LEFT') {
+      if (checkOutAt || status === VisitStatus.LEFT || status === 'LEFT') {
         const { error } = await supabase
           .rpc('checkout_visit', { p_id: visitId });
         if (error) throw error;

@@ -14,8 +14,13 @@ import { VideoCallModal } from '../components/VideoCallModal';
 import { getDeviceIdentifier } from '@/services/deviceUtils';
 import { initiatePhoneCall } from '@/utils/approvalModes';
 import { findResidentForPhone, findResidentForVideoCall, visitHasResidentWithApp } from '@/utils/residentLookup';
+import { formatTime } from '@/utils/datetime';
 
 const CONTACT_DELAY_MS = 7 * 60 * 1000;
+
+const canMarkExit = (visit: Visit): boolean => (
+  visit.status === VisitStatus.INSIDE && !visit.check_out_at
+);
 
 function useContactButtonsVisible(visit: Visit): boolean {
   const [visible, setVisible] = useState(
@@ -75,7 +80,7 @@ function DashContactButtons({
           disabled={!isOnline}
           className={`flex-1 md:flex-none h-12 px-5 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all ${isOnline ? 'bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-600/20 animate-pulse ring-2 ring-amber-400 ring-offset-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'}`}
         >
-          <Video size={18} /> Vídeo
+          <Video size={18} /> Video Chamada
         </button>
       )}
     </>
@@ -111,7 +116,7 @@ export default function Dashboard() {
 
     // Filter for actionable items: Pending (Needs approval) or Inside/Approved (Needs checkout)
     const actionable = data.filter(v =>
-      [VisitStatus.PENDING, VisitStatus.APPROVED, VisitStatus.INSIDE].includes(v.status)
+      v.status === VisitStatus.PENDING || v.status === VisitStatus.APPROVED || canMarkExit(v)
     ).sort((a, b) => new Date(b.check_in_at).getTime() - new Date(a.check_in_at).getTime());
 
     setActiveVisits(actionable);
@@ -617,7 +622,7 @@ export default function Dashboard() {
                           {visit.restaurant_name || visit.sport_name || (visit.unit_block && visit.unit_number ? `${visit.unit_block} - ${visit.unit_number}` : `Uni. ${visit.unit_id}`)}
                         </span>
                         <span className="flex items-center gap-1"><User size={14} className="text-slate-400" /> {visit.visit_type}</span>
-                        <span className="flex items-center gap-1"><Clock size={14} className="text-slate-400" /> {new Date(visit.check_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="flex items-center gap-1"><Clock size={14} className="text-slate-400" /> {formatTime(visit.check_in_at)}</span>
                       </div>
                     </div>
                   </div>
@@ -645,7 +650,7 @@ export default function Dashboard() {
                     )}
 
                     {/* INSIDE: Show "Mark Exit" */}
-                    {visit.status === VisitStatus.INSIDE && (
+                    {canMarkExit(visit) && (
                       <button
                         onClick={() => handleQuickAction(visit, 'CHECKOUT')}
                         className="flex-1 md:flex-none h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"

@@ -5,6 +5,7 @@ import { api } from '../services/dataService';
 import { CondominiumNews } from '../types';
 import { useToast } from '../components/Toast';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatDate } from '@/utils/datetime';
 
 export default function News() {
   const navigate = useNavigate();
@@ -69,14 +70,7 @@ export default function News() {
   };
 
   const formatFullDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDate(dateStr);
   };
 
   return (

@@ -38,6 +38,7 @@ const AdminUnits = React.lazy(() => import('./pages/admin/AdminUnits'));
 const AdminResidents = React.lazy(() => import('./pages/admin/AdminResidents'));
 const AdminRestaurants = React.lazy(() => import('./pages/admin/AdminRestaurants'));
 const AdminSports = React.lazy(() => import('./pages/admin/AdminSports'));
+const AdminEvents = React.lazy(() => import('./pages/admin/AdminEvents'));
 const AdminVisits = React.lazy(() => import('./pages/admin/AdminVisits'));
 const AdminIncidents = React.lazy(() => import('./pages/admin/AdminIncidents'));
 const AdminVisitTypes = React.lazy(() => import('./pages/admin/AdminVisitTypes'));
@@ -587,6 +588,7 @@ export default function App() {
                 <Route path="/admin/residents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminResidents /></AdminLayout></AdminRoute></ConfigGuard>} />
                 <Route path="/admin/restaurants" element={<ConfigGuard><AdminRoute><AdminLayout><AdminRestaurants /></AdminLayout></AdminRoute></ConfigGuard>} />
                 <Route path="/admin/sports" element={<ConfigGuard><AdminRoute><AdminLayout><AdminSports /></AdminLayout></AdminRoute></ConfigGuard>} />
+                <Route path="/admin/events" element={<ConfigGuard><AdminRoute><AdminLayout><AdminEvents /></AdminLayout></AdminRoute></ConfigGuard>} />
                 <Route path="/admin/visits" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisits /></AdminLayout></AdminRoute></ConfigGuard>} />
                 <Route path="/admin/incidents" element={<ConfigGuard><AdminRoute><AdminLayout><AdminIncidents /></AdminLayout></AdminRoute></ConfigGuard>} />
                 <Route path="/admin/config/visit-types" element={<ConfigGuard><AdminRoute><AdminLayout><AdminVisitTypes /></AdminLayout></AdminRoute></ConfigGuard>} />

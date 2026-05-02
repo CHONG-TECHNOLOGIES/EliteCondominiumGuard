@@ -4,6 +4,7 @@ import { api } from '../../services/dataService';
 import { DeviceRegistrationError } from '../../types';
 import { useToast } from '../../components/Toast';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatDateTimeWithSeconds } from '@/utils/datetime';
 
 export default function AdminDeviceRegistrationErrors() {
   const { showToast } = useToast();
@@ -48,17 +49,6 @@ export default function AdminDeviceRegistrationErrors() {
     setEndDate('');
     setSearchTerm('');
     setCurrentPage(1);
-  };
-
-  const formatDateTime = (dateTime: string) => {
-    return new Date(dateTime).toLocaleString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
   };
 
   const filteredErrors = errors.filter((entry) => {
@@ -184,7 +174,7 @@ export default function AdminDeviceRegistrationErrors() {
                   {filteredErrors.map((entry) => (
                     <tr key={entry.id} className="hover:bg-bg-root transition-colors">
                       <td className="px-4 py-3 text-sm text-text-main whitespace-nowrap">
-                        {formatDateTime(entry.created_at)}
+                        {formatDateTimeWithSeconds(entry.created_at)}
                       </td>
                       <td className="px-4 py-3 text-sm text-text-main font-mono">
                         {entry.device_identifier || <span className="text-slate-400">-</span>}

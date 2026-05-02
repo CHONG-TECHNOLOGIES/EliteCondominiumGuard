@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast';
 import ImportResidentsModal from '../../components/ImportResidentsModal';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatDate as formatAngolaDate } from '@/utils/datetime';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -441,13 +442,7 @@ export default function AdminResidents() {
 
   const formatDate = (dateString?: string): string => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatAngolaDate(dateString);
   };
 
   const getCondominiumName = (condoId: number) => {

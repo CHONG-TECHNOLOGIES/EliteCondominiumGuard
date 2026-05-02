@@ -5,6 +5,7 @@ import { Device, Condominium } from '../../types';
 import { useToast } from '../../components/Toast';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatDateTime } from '@/utils/datetime';
 
 interface DeviceStorageInfo {
   used: number;
@@ -318,7 +319,7 @@ export default function AdminDevices() {
                     </div>
                     {device.configured_at && (
                       <p className="text-xs text-slate-400 mt-2">
-                        Configurado: {new Date(device.configured_at).toLocaleString('pt-PT')}
+                        Configurado: {formatDateTime(device.configured_at)}
                       </p>
                     )}
                   </div>
@@ -496,7 +497,7 @@ export default function AdminDevices() {
                 <div className="bg-slate-100 rounded-lg p-4">
                   <p className="text-xs text-text-dim mb-1">Configurado em:</p>
                   <p className="text-sm font-semibold text-text-main">
-                    {new Date(selectedDevice.configured_at).toLocaleString('pt-PT')}
+                    {formatDateTime(selectedDevice.configured_at)}
                   </p>
                 </div>
               )}
@@ -504,7 +505,7 @@ export default function AdminDevices() {
                 <div className="bg-slate-100 rounded-lg p-4">
                   <p className="text-xs text-text-dim mb-1">Último contacto:</p>
                   <p className="text-sm font-semibold text-text-main">
-                    {new Date(selectedDevice.last_seen_at).toLocaleString('pt-PT')} ({formatLastSeen(selectedDevice.last_seen_at)})
+                    {formatDateTime(selectedDevice.last_seen_at)} ({formatLastSeen(selectedDevice.last_seen_at)})
                   </p>
                 </div>
               )}

@@ -9,12 +9,13 @@ import { supabase } from '../services/supabaseClient';
 import { audioService } from '../services/audioService';
 import { getIncidentActionHistory, getIncidentActionLabel, getIncidentActorLabel } from '../utils/incidentHistory';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatDateTime } from '@/utils/datetime';
 
 function formatActionDate(dateTime?: string) {
   if (!dateTime) return null;
   const date = new Date(dateTime);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleString('pt-PT');
+  return formatDateTime(date);
 }
 
 function renderGuardActionHistory(incident: Incident) {
@@ -454,17 +455,17 @@ export default function Incidents() {
                     {renderGuardActionHistory(inc)}
                     {inc.resolved_at && (
                       <p className="text-xs text-slate-400 mt-1">
-                        Fechado em: {new Date(inc.resolved_at).toLocaleString('pt-PT')}
+                        Fechado em: {formatDateTime(inc.resolved_at)}
                       </p>
                     )}
                   </div>
                 )}
 
                 <div className="flex flex-col gap-1 text-xs md:text-sm text-slate-400 mt-2">
-                  <p>Reportado em: {new Date(inc.reported_at).toLocaleString('pt-PT')}</p>
+                  <p>Reportado em: {formatDateTime(inc.reported_at)}</p>
                   {inc.acknowledged_at && (
                     <p className="text-green-600">
-                      Visto em: {new Date(inc.acknowledged_at).toLocaleString('pt-PT')}
+                      Visto em: {formatDateTime(inc.acknowledged_at)}
                     </p>
                   )}
                 </div>

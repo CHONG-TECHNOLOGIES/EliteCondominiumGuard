@@ -1,6 +1,6 @@
 import { SupabaseService } from './Supabase';
 import { db } from './db';
-import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondoSetupSettings, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, AppPricingRule, CondominiumSubscription, SubscriptionPayment } from '../types';
+import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRole, Unit, Incident, VisitTypeConfig, ServiceTypeConfig, Condominium, CondoSetupSettings, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, PhotoQuality, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, CondominiumEvent, CondominiumEventCategory, CondominiumEventInput, AppPricingRule, CondominiumSubscription, SubscriptionPayment } from '../types';
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 import { logger, ErrorCategory } from '@/services/logger';
@@ -1373,6 +1373,79 @@ class DataService {
     }
   }
 
+  // --- Admin Condominium Events ---
+  async adminGetAllCondominiumEvents(
+    condominiumId?: number,
+    limit?: number | null,
+    search?: string | null,
+    category?: CondominiumEventCategory | null,
+    dateFrom?: string | null,
+    dateTo?: string | null,
+    includeInactive: boolean = false
+  ): Promise<CondominiumEvent[]> {
+    const scopedCondoId = this.getAdminScopeCondoId();
+    const effectiveCondoId = scopedCondoId ?? condominiumId;
+    return await SupabaseService.adminGetAllCondominiumEvents(
+      effectiveCondoId,
+      limit ?? null,
+      search ?? null,
+      category ?? null,
+      dateFrom ?? null,
+      dateTo ?? null,
+      includeInactive
+    );
+  }
+
+  async adminCreateCondominiumEvent(event: CondominiumEventInput): Promise<CondominiumEvent | null> {
+    const created = await SupabaseService.adminCreateCondominiumEvent(event);
+    if (created) {
+      await this.logAudit({
+        action: 'CREATE',
+        target_table: 'condominium_events',
+        target_id: created.id,
+        condominium_id: created.condominium_id,
+        details: {
+          title: created.title,
+          category: created.category,
+          start_at: created.start_at
+        }
+      });
+    }
+    return created;
+  }
+
+  async adminUpdateCondominiumEvent(id: number, event: CondominiumEventInput, auditDetails?: any): Promise<CondominiumEvent | null> {
+    const updated = await SupabaseService.adminUpdateCondominiumEvent(id, event);
+    if (updated) {
+      await this.logAudit({
+        action: 'UPDATE',
+        target_table: 'condominium_events',
+        target_id: id,
+        condominium_id: updated.condominium_id,
+        details: auditDetails ?? {
+          title: updated.title,
+          category: updated.category,
+          start_at: updated.start_at
+        }
+      });
+    }
+    return updated;
+  }
+
+  async adminDeleteCondominiumEvent(id: number, eventDetails?: { condominium_id?: number; title?: string }): Promise<boolean> {
+    const result = await SupabaseService.adminDeleteCondominiumEvent(id);
+    if (result) {
+      await this.logAudit({
+        action: 'DELETE',
+        target_table: 'condominium_events',
+        target_id: id,
+        condominium_id: eventDetails?.condominium_id ?? this.getAdminScopeCondoId() ?? this.currentCondoId ?? null,
+        details: { title: eventDetails?.title }
+      });
+    }
+    return result;
+  }
+
   // --- Admin News Management ---
   async adminGetAllNews(
     condominiumId?: number,
@@ -1648,12 +1721,6 @@ class DataService {
           .between(`${today}T00:00:00`, `${today}T23:59:59`, true, true)
           .toArray();
 
-        // Cache fresh backend data
-        if (backendVisits.length > 0) {
-          await db.visits.bulkPut(backendVisits);
-          logger.info('Cached visits from backend', { length: backendVisits.length });
-        }
-
         // Merge: backend visits + any pending local changes + local-only synced visits not returned yet
         const merged = new Map<number, Visit>();
         backendVisits.forEach(v => merged.set(v.id, v));
@@ -1664,6 +1731,12 @@ class DataService {
           }
         });
         const allVisits = Array.from(merged.values());
+
+        // Cache only the resolved merge so stale backend rows cannot replace newer local status.
+        if (allVisits.length > 0) {
+          await db.visits.bulkPut(allVisits);
+          logger.info('Cached merged visits', { length: allVisits.length });
+        }
 
         logger.info('Returning merged visits for today', { backendCount: backendVisits.length, localCount: localVisits.length });
 
@@ -2011,7 +2084,8 @@ class DataService {
         await SupabaseService.updateVisitStatus(visitId, status, visit.check_out_at);
         visit.sync_status = SyncStatus.SYNCED;
         await db.visits.put(visit);
-      } catch (e) {
+        this.emitVisitsChanged({ visitId, status, checkOutAt: visit.check_out_at });
+      } catch {
         logger.warn('Visit status updated locally, will sync later');
         this.backendHealthScore--;
       }
