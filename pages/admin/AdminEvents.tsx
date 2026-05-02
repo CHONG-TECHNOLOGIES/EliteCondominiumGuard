@@ -6,6 +6,7 @@ import { api } from '../../services/dataService';
 import { logger, ErrorCategory } from '@/services/logger';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 import { Condominium, CondominiumEvent, CondominiumEventCategory, CondominiumEventInput, UserRole } from '../../types';
+import { formatDate, formatDateTime } from '@/utils/datetime';
 
 interface SearchableSelectProps {
   options: { value: number | string; label: string }[];
@@ -176,10 +177,7 @@ const formatDateTimeInput = (value?: string | null): string => {
 const formatDateTimeDisplay = (value?: string, isAllDay?: boolean): string => {
   if (!value) return '';
   const date = new Date(value);
-  return date.toLocaleString('pt-PT', isAllDay
-    ? { day: '2-digit', month: '2-digit', year: 'numeric' }
-    : { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }
-  );
+  return isAllDay ? formatDate(date) : formatDateTime(date);
 };
 
 export default function AdminEvents() {

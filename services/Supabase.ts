@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient';
 import { Staff, Visit, VisitEvent, VisitStatus, Unit, Incident, IncidentType, IncidentStatus, VisitTypeConfig, ServiceTypeConfig, Condominium, CondoSetupSettings, CondominiumStats, Device, Restaurant, Sport, AuditLog, DeviceRegistrationError, Street, Resident, ResidentQrCode, QrValidationResult, CondominiumNews, NewsCategory, CondominiumEvent, CondominiumEventCategory, CondominiumEventInput, AppPricingRule, CondominiumSubscription, SubscriptionPayment, VideoCallNotificationPayload, VideoCallSession, VideoCallStatus } from '../types';
 import { buildIncidentActionHistoryIndex } from '../utils/incidentHistory';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatTimestampLabel } from '@/utils/datetime';
 
 logger.setContext({ service: 'Supabase' });
 
@@ -1034,13 +1035,7 @@ export const SupabaseService = {
 
     try {
       // Concatenate new notes with existing notes to preserve history
-      const timestamp = new Date().toLocaleString('pt-PT', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      const timestamp = formatTimestampLabel();
 
       const formattedNewNote = `[${timestamp}] ${guardNotes}`;
 
@@ -2486,13 +2481,7 @@ export const SupabaseService = {
     if (!supabase) return null;
 
     try {
-      const timestamp = new Date().toLocaleString('pt-PT', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      const timestamp = formatTimestampLabel();
 
       const formattedNotes = notes ? `[${timestamp}] ${notes}` : null;
 
@@ -2836,14 +2825,8 @@ export const SupabaseService = {
     if (!supabase) return false;
 
     try {
-      // Get all residents of the unit
-      // Get all residents of the unit using admin_get_residents RPC and filtering
-      const { data: allResidents, error: residentError } = await supabase
-        .rpc('admin_get_residents', { p_condominium_id: visit.condominium_id });
-
-      if (residentError) throw residentError;
-
-      const residents = (allResidents || []).filter((r: any) => r.unit_id === visit.unit_id);
+      const { data: residents, error: residentError } = await supabase
+        .rpc('get_residents_by_unit_id', { p_unit_id: visit.unit_id });
 
       if (residentError) throw residentError;
       if (!residents || residents.length === 0) return false;
@@ -2883,14 +2866,8 @@ export const SupabaseService = {
     if (!supabase) return false;
 
     try {
-      // Get all residents of the unit
-      // Get all residents of the unit using admin_get_residents RPC and filtering
-      const { data: allResidents, error: residentError } = await supabase
-        .rpc('admin_get_residents', { p_condominium_id: visit.condominium_id });
-
-      if (residentError) throw residentError;
-
-      const residents = (allResidents || []).filter((r: any) => r.unit_id === visit.unit_id);
+      const { data: residents, error: residentError } = await supabase
+        .rpc('get_residents_by_unit_id', { p_unit_id: visit.unit_id });
 
       if (residentError) throw residentError;
       if (!residents || residents.length === 0) return false;

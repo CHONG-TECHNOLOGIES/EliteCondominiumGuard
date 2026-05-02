@@ -6,6 +6,7 @@
 import { Visit, Incident, AuditLog } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatDateTimeWithSeconds, formatTimestampLabel } from './datetime';
 
 /**
  * Convert array of objects to CSV string
@@ -59,14 +60,7 @@ function downloadCSV(csvContent: string, filename: string): void {
  */
 function formatDateTime(dateTime: string | null | undefined): string {
   if (!dateTime) return '';
-  return new Date(dateTime).toLocaleString('pt-PT', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  });
+  return formatDateTimeWithSeconds(dateTime);
 }
 
 /**
@@ -210,13 +204,7 @@ export function exportVisitsToPDF(visits: Visit[], filename?: string): void {
   // Date range info
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  const dateStr = new Date().toLocaleString('pt-PT', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  const dateStr = formatTimestampLabel();
   doc.text(`Gerado em: ${dateStr}`, 14, 22);
   doc.text(`Total de registos: ${visits.length}`, 14, 27);
 
