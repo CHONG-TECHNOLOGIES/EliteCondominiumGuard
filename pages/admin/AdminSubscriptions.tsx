@@ -26,6 +26,7 @@ import {
   X
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
+import { formatDate, formatMonthName, formatMonthYear } from '@/utils/datetime';
 
 // --- Searchable Select Component (matches app-wide pattern) ---
 interface SearchableSelectProps {
@@ -799,7 +800,7 @@ export default function AdminSubscriptions() {
                         </td>
                         <td className="px-6 py-4 text-center">
                           <div className="text-sm text-slate-600 dark:text-slate-400">
-                            {sub.last_payment_date ? new Date(sub.last_payment_date).toLocaleDateString('pt-AO') : 'N/A'}
+                            {sub.last_payment_date ? formatDate(sub.last_payment_date) : 'N/A'}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center">
@@ -975,7 +976,7 @@ export default function AdminSubscriptions() {
               >
                 <option value="ALL">Todos os Meses</option>
                 {Array.from({length: 12}, (_, i) => i + 1).map(m => (
-                  <option key={m} value={m}>{new Date(2000, m - 1).toLocaleString('pt-AO', { month: 'long' })}</option>
+                  <option key={m} value={m}>{formatMonthName(new Date(2000, m - 1))}</option>
                 ))}
               </select>
             </div>
@@ -1045,7 +1046,7 @@ export default function AdminSubscriptions() {
                   {payments.length > 0 ? payments.map(p => (
                     <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">
-                        {new Date(p.payment_date).toLocaleDateString('pt-AO')}
+                        {formatDate(p.payment_date)}
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-300">
                         {p.condominium_name}
@@ -1162,7 +1163,7 @@ export default function AdminSubscriptions() {
               >
                 <option value="ALL">Todos os Meses</option>
                 {Array.from({length: 12}, (_, i) => i + 1).map(m => (
-                  <option key={m} value={m}>{new Date(2000, m - 1).toLocaleString('pt-AO', { month: 'long' })}</option>
+                  <option key={m} value={m}>{formatMonthName(new Date(2000, m - 1))}</option>
                 ))}
               </select>
             </div>
@@ -1649,7 +1650,7 @@ export default function AdminSubscriptions() {
                       {selectedArrearsSub.arrears_details?.map((item: any) => (
                         <tr key={item.period} className="hover:bg-bg-root transition-colors">
                           <td className="px-4 py-3 font-semibold text-text-main">
-                            {new Date(item.period + '-01').toLocaleString('pt-AO', { month: 'short', year: 'numeric' })}
+                            {formatMonthYear(`${item.period}-01`)}
                           </td>
                           <td className="px-4 py-3 text-right text-text-dim">
                             {Number(item.expected).toLocaleString()} AOA

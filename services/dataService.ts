@@ -4,6 +4,7 @@ import { ApprovalMode, Visit, VisitEvent, VisitStatus, SyncStatus, Staff, UserRo
 import bcrypt from 'bcryptjs';
 import { getDeviceIdentifier, getDeviceMetadata } from './deviceUtils';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatTimestampLabel } from '@/utils/datetime';
 
 // Sync event types for UI integration
 export type SyncEventType = 'sync:start' | 'sync:progress' | 'sync:complete' | 'sync:error';
@@ -2096,15 +2097,23 @@ class DataService {
     await this.createVisitEvent(visitId, VisitStatus.VIDEO_CHAMADA, new Date().toISOString());
   }
 
+  private isCheckingStaleVisits = false;
+
   async checkAndTransitionStaleVisits(): Promise<void> {
-    const STALE_MS = 30 * 60 * 1000;
-    const cutoff = new Date(Date.now() - STALE_MS).toISOString();
-    const stale = await db.visits
-      .where('status').equals(VisitStatus.PENDING)
-      .filter(v => v.check_in_at < cutoff)
-      .toArray();
-    for (const visit of stale) {
-      await this.updateVisitStatus(visit.id, VisitStatus.WITHOUT_RESPONSE);
+    if (this.isCheckingStaleVisits) return;
+    this.isCheckingStaleVisits = true;
+    try {
+      const STALE_MS = 30 * 60 * 1000;
+      const cutoff = new Date(Date.now() - STALE_MS).toISOString();
+      const stale = await db.visits
+        .where('status').equals(VisitStatus.PENDING)
+        .filter(v => v.check_in_at < cutoff)
+        .toArray();
+      for (const visit of stale) {
+        await this.updateVisitStatus(visit.id, VisitStatus.WITHOUT_RESPONSE);
+      }
+    } finally {
+      this.isCheckingStaleVisits = false;
     }
   }
 
@@ -2451,13 +2460,7 @@ class DataService {
     const previousNotes = incident.guard_notes ?? null;
 
     // Concatenate new notes with existing notes to preserve history
-    const timestamp = new Date().toLocaleString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const timestamp = formatTimestampLabel();
 
     const formattedNewNote = `[${timestamp}] ${guardNotes}`;
 

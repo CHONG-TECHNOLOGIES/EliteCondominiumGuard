@@ -1212,6 +1212,15 @@ CREATE INDEX IF NOT EXISTS idx_events_condo_date
   ON public.condominium_events(condominium_id, start_at)
   WHERE is_active = true;
 
+-- SUPER_ADMIN full listing (no condo filter) and inactive-included queries
+CREATE INDEX IF NOT EXISTS idx_events_start_at
+  ON public.condominium_events(start_at DESC);
+
+-- Category filter combined with condo (used by both ADMIN and SUPER_ADMIN)
+CREATE INDEX IF NOT EXISTS idx_events_condo_category
+  ON public.condominium_events(condominium_id, category, start_at)
+  WHERE is_active = true;
+
 CREATE TABLE IF NOT EXISTS public.event_rsvps (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   event_id integer NOT NULL REFERENCES public.condominium_events(id) ON DELETE CASCADE,
@@ -4120,7 +4129,7 @@ DECLARE
 BEGIN
   UPDATE public.visits
   SET
-    status = 'LEFT',
+    status = 'SAIU',
     check_out_at = COALESCE(check_out_at, now())
   WHERE id = p_id
   RETURNING * INTO v_row;
@@ -7380,7 +7389,7 @@ BEGIN
 END;
 $function$;
 
--- 3. checkout_visit: used to mark exit (-> SAIU / LEFT)
+-- 3. checkout_visit: used to mark exit (-> SAIU)
 CREATE OR REPLACE FUNCTION public.checkout_visit(p_id integer)
  RETURNS visits
  LANGUAGE plpgsql
@@ -7392,13 +7401,13 @@ DECLARE
 BEGIN
   UPDATE public.visits
   SET
-    status = 'LEFT',
+    status = 'SAIU',
     check_out_at = COALESCE(check_out_at, now())
   WHERE id = p_id
   RETURNING * INTO v_row;
 
   INSERT INTO public.visit_events (visit_id, status, event_at)
-  VALUES (v_row.id, 'LEFT', COALESCE(v_row.check_out_at, now()));
+  VALUES (v_row.id, 'SAIU', COALESCE(v_row.check_out_at, now()));
 
   RETURN v_row;
 END;
@@ -7618,3 +7627,11 @@ BEGIN
 END;
 $function$;
 
+-- SUPER_ADMIN full listing (no condo filter) and inactive-included queries
+CREATE INDEX IF NOT EXISTS idx_events_start_at
+  ON public.condominium_events(start_at DESC);
+
+-- Category filter combined with condo
+CREATE INDEX IF NOT EXISTS idx_events_condo_category
+  ON public.condominium_events(condominium_id, category, start_at)
+  WHERE is_active = true;
