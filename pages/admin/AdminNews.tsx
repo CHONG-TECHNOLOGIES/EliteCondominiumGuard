@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast';
 import { buildAuditChanges, hasAuditChanges } from '../../utils/auditDiff';
 import { logger, ErrorCategory } from '@/services/logger';
 import { AuthContext } from '../../App';
+import { formatDate as formatAngolaDate } from '@/utils/datetime';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -529,13 +530,7 @@ export default function AdminNews() {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatAngolaDate(dateString);
   };
 
   return (

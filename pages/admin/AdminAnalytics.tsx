@@ -6,6 +6,7 @@ import { api } from '../../services/dataService';
 import { CondominiumStats } from '../../types';
 import { useToast } from '../../components/Toast';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatTimeWithSeconds } from '@/utils/datetime';
 
 export default function AdminAnalytics() {
   const { showToast } = useToast();
@@ -68,14 +69,6 @@ export default function AdminAnalytics() {
     } finally {
       setRefreshing(false);
     }
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('pt-PT', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
   };
 
   // Create custom marker icon with badge showing counts
@@ -262,7 +255,7 @@ export default function AdminAnalytics() {
             <div>
               <p className="text-sm text-text-dim">Última Atualização</p>
               <p className="text-sm font-bold text-text-main">
-                {lastUpdated ? formatTime(lastUpdated) : '--:--:--'}
+                {lastUpdated ? formatTimeWithSeconds(lastUpdated) : '--:--:--'}
               </p>
             </div>
           </div>

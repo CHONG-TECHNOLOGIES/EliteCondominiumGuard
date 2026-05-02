@@ -32,6 +32,7 @@ import {
   Palette,
   Moon,
   Sparkles,
+  CalendarDays,
   Newspaper,
   BookOpen
 } from 'lucide-react';
@@ -130,6 +131,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           label: 'Desportos',
           path: '/admin/sports',
           icon: <Dumbbell size={18} />
+        },
+        {
+          label: 'Eventos',
+          path: '/admin/events',
+          icon: <CalendarDays size={18} />
         },
         {
           label: 'Notícias',

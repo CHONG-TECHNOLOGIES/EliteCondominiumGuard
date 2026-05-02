@@ -325,6 +325,48 @@ export interface CondominiumStats {
   status: 'ACTIVE' | 'INACTIVE';
 }
 
+export type CondominiumEventCategory =
+  | 'meeting'
+  | 'maintenance'
+  | 'social'
+  | 'sports'
+  | 'closure'
+  | 'general';
+
+export interface CondominiumEvent {
+  id: number;
+  condominium_id: number;
+  title: string;
+  description?: string;
+  location?: string;
+  category: CondominiumEventCategory;
+  start_at: string;
+  end_at?: string;
+  is_all_day?: boolean;
+  requires_rsvp?: boolean;
+  max_attendees?: number;
+  created_by?: number | null;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  rsvp_count?: number;
+}
+
+export interface CondominiumEventInput {
+  condominium_id?: number;
+  title?: string;
+  description?: string;
+  location?: string;
+  category?: CondominiumEventCategory;
+  start_at?: string;
+  end_at?: string | null;
+  is_all_day?: boolean;
+  requires_rsvp?: boolean;
+  max_attendees?: number | null;
+  created_by?: number | null;
+  is_active?: boolean;
+}
+
 export interface NewsCategory {
   id: number;
   name: string;

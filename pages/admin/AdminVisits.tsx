@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast';
 import { exportVisitsToCSV, exportVisitsToPDF } from '../../utils/csvExport';
 import { AuthContext } from '../../App';
 import { logger, ErrorCategory } from '@/services/logger';
+import { formatDateTime } from '@/utils/datetime';
 
 // Searchable Select Component
 interface SearchableSelectProps {
@@ -332,16 +333,6 @@ export default function AdminVisits() {
       default:
         return 'bg-slate-400';
     }
-  };
-
-  const formatDateTime = (dateTime: string) => {
-    return new Date(dateTime).toLocaleString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
   };
 
   // Check if selected visit type requires service type

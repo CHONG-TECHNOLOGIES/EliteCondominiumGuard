@@ -11,8 +11,13 @@ import { useToast } from '../components/Toast';
 import { VideoCallModal } from '../components/VideoCallModal';
 import { AuthContext } from '../App';
 import { findResidentForPhone, findResidentForVideoCall, visitHasResidentWithApp } from '@/utils/residentLookup';
+import { formatDateTime, formatTime } from '@/utils/datetime';
 
 const CONTACT_DELAY_MS = 7 * 60 * 1000;
+
+const canMarkExit = (visit: Visit): boolean => (
+  visit.status === VisitStatus.INSIDE && !visit.check_out_at
+);
 
 function useContactButtonsVisible(visit: Visit): boolean {
   const [visible, setVisible] = useState(
@@ -78,7 +83,7 @@ function ContactButtons({
           disabled={!isOnline}
           className={`${baseBtn} ${isOnline ? 'bg-violet-600 text-white hover:bg-violet-700 animate-pulse ring-2 ring-amber-400 ring-offset-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed opacity-60'}`}
         >
-          <Video size={16} /> Vídeo
+          <Video size={16} /> Video Chamada
         </button>
       )}
     </>
@@ -322,16 +327,6 @@ export default function DailyList() {
     }
   };
 
-  const formatDateTime = (dateTime: string) => {
-    return new Date(dateTime).toLocaleString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto pb-20 md:pb-6">
       <div className="flex items-center gap-4 mb-6">
@@ -411,7 +406,7 @@ export default function DailyList() {
                       <p className="font-bold text-slate-800">{visit.visitor_name}</p>
                       <div className="flex items-center gap-1 text-xs text-slate-500">
                         <Clock size={12} />
-                        {new Date(visit.check_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatTime(visit.check_in_at)}
                       </div>
                     </div>
                   </div>
@@ -461,7 +456,7 @@ export default function DailyList() {
                   )}
 
                   {/* INSIDE: Mark Exit (visitor leaves) */}
-                  {visit.status === VisitStatus.INSIDE && (
+                  {canMarkExit(visit) && (
                     <button
                       onClick={() => handleCheckout(visit.id)}
                       className="flex-1 px-3 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm flex justify-center items-center gap-2 hover:bg-emerald-700 transition-colors"
@@ -538,7 +533,7 @@ export default function DailyList() {
                     <td className="p-4">
                       <div className="flex items-center gap-2 text-slate-600">
                         <Clock size={16} />
-                        {new Date(visit.check_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatTime(visit.check_in_at)}
                       </div>
                     </td>
                     <td className="p-4">
@@ -574,7 +569,7 @@ export default function DailyList() {
                         )}
 
                         {/* INSIDE: Mark Exit (visitor leaves) */}
-                        {visit.status === VisitStatus.INSIDE && (
+                        {canMarkExit(visit) && (
                           <button
                             onClick={() => handleCheckout(visit.id)}
                             className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 flex items-center gap-2 transition-colors"
