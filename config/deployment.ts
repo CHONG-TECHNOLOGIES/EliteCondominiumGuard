@@ -21,26 +21,25 @@ const getAppUrl = (): string => {
   return 'http://localhost:3000';
 };
 
+// Resolve which environment we're running in:
+//   - local dev:        import.meta.env.DEV === true
+//   - Vercel preview:   VITE_VERCEL_ENV === 'preview'  (set VITE_VERCEL_ENV=${VERCEL_ENV} in Vercel dashboard)
+//   - Vercel production: VITE_VERCEL_ENV === 'production'
+const resolveEnvironment = (): DeploymentConfig['environment'] => {
+  if (import.meta.env.DEV) return 'development';
+  const vercelEnv = import.meta.env.VITE_VERCEL_ENV;
+  if (vercelEnv === 'preview') return 'staging';
+  return 'production';
+};
+
 // Environment variables with fallbacks
 const getConfig = (): DeploymentConfig => {
-  // In development
-  if (import.meta.env.DEV) {
-    return {
-      appUrl: getAppUrl(),
-      supabaseUrl: import.meta.env.VITE_SUPABASE_URL || '',
-      supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-      geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY || '',
-      environment: 'development'
-    };
-  }
-
-  // In production (Vercel, Netlify, or any hosting)
   return {
     appUrl: getAppUrl(),
     supabaseUrl: import.meta.env.VITE_SUPABASE_URL || '',
     supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
     geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY || '',
-    environment: 'production'
+    environment: resolveEnvironment(),
   };
 };
 

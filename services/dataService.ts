@@ -138,7 +138,7 @@ class DataService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://nfuglaftnaohzacilike.supabase.co';
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const headers: Record<string, string> = {};
       if (SUPABASE_ANON_KEY) {
