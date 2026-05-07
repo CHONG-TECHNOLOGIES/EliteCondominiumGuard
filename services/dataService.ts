@@ -30,6 +30,47 @@ const DEFAULT_CONDO_SETUP_SETTINGS: CondoSetupSettings = {
   guard_manual_approval_enabled: true,
 };
 
+export type LoginErrorCode =
+  | 'DEVICE_NOT_CONFIGURED'
+  | 'CONDO_MISMATCH'
+  | 'INVALID_CREDENTIALS'
+  | 'ONLINE_ERROR'
+  | 'OFFLINE_MODE'
+  | 'OFFLINE_USER_NOT_FOUND'
+  | 'OFFLINE_INVALID_PIN';
+
+export class LoginError extends Error {
+  constructor(
+    public readonly code: LoginErrorCode,
+    public readonly userMessage: string
+  ) {
+    super(userMessage);
+    this.name = `LoginError:${code}`;
+  }
+}
+
+const normalizeLoginName = (value: string): string => value.normalize('NFC').trim();
+
+const loginMessageForCode = (code: LoginErrorCode, fallback?: string | null): string => {
+  switch (code) {
+    case 'DEVICE_NOT_CONFIGURED':
+      return 'Dispositivo não configurado.';
+    case 'CONDO_MISMATCH':
+      return fallback || 'Acesso negado: utilizador pertence a outro condomínio.';
+    case 'ONLINE_ERROR':
+      return 'Falha ao autenticar online. Tente novamente.';
+    case 'OFFLINE_MODE':
+      return 'Sem ligação ao servidor.';
+    case 'OFFLINE_USER_NOT_FOUND':
+      return 'Sem dados offline para este utilizador. Faça login online primeiro.';
+    case 'OFFLINE_INVALID_PIN':
+      return 'PIN inválido (offline).';
+    case 'INVALID_CREDENTIALS':
+    default:
+      return 'Nome, apelido ou PIN incorreto.';
+  }
+};
+
 class DataService {
   private isOnline: boolean = navigator.onLine;
   private backendHealthScore: number = 3; // Health score
@@ -213,7 +254,13 @@ class DataService {
       } else {
         logger.info('Persistent storage already granted');
       }
+    } catch (err) {
+      logger.warn('Persistent storage request unavailable or rejected by browser', {
+        error: err instanceof Error ? err.message : String(err)
+      });
+    }
 
+    try {
       // Log storage quota info
       const estimate = await navigator.storage.estimate();
       const usedMB = (estimate.usage || 0) / 1024 / 1024;
@@ -226,7 +273,9 @@ class DataService {
         percentage: `${percentUsed}%`
       });
     } catch (err) {
-      logger.error('Error requesting persistent storage', err, ErrorCategory.STORAGE);
+      logger.warn('Storage quota estimate unavailable or rejected by browser', {
+        error: err instanceof Error ? err.message : String(err)
+      });
     }
   }
 
@@ -1011,15 +1060,20 @@ class DataService {
   async login(firstName: string, lastName: string, pin: string): Promise<Staff | null> {
     await this.verifyConnectivity();
 
+    const normalizedFirstName = normalizeLoginName(firstName);
+    const normalizedLastName = normalizeLoginName(lastName);
+
     const deviceCondoDetails = await this.getDeviceCondoDetails();
     const deviceCondoId = deviceCondoDetails?.id;
-    if (!deviceCondoId) throw new Error("Dispositivo não configurado");
+    if (!deviceCondoId) {
+      throw new LoginError('DEVICE_NOT_CONFIGURED', loginMessageForCode('DEVICE_NOT_CONFIGURED'));
+    }
 
-    let failureCode: string | null = null;
+    let failureCode: LoginErrorCode | null = null;
     let failureReason: string | null = null;
     let failureStage: 'online' | 'offline' | null = null;
 
-    const setFailure = (code: string, reason: string, stage: 'online' | 'offline') => {
+    const setFailure = (code: LoginErrorCode, reason: string, stage: 'online' | 'offline') => {
       if (!failureCode || failureCode === 'OFFLINE_MODE') {
         failureCode = code;
         failureReason = reason;
@@ -1027,9 +1081,31 @@ class DataService {
       }
     };
 
+    const throwLoginFailure = async (): Promise<never> => {
+      await this.logAudit({
+        condominium_id: deviceCondoId,
+        actor_id: null,
+        action: 'LOGIN_FAILED',
+        target_table: 'staff',
+        target_id: null,
+        details: {
+          first_name: normalizedFirstName,
+          last_name: normalizedLastName,
+          offline: !this.isBackendHealthy,
+          device_identifier: getDeviceIdentifier(),
+          failure_code: failureCode,
+          failure_reason: failureReason,
+          failure_stage: failureStage
+        }
+      });
+
+      const code = failureCode || 'INVALID_CREDENTIALS';
+      throw new LoginError(code, loginMessageForCode(code, failureReason));
+    };
+
     if (this.isBackendHealthy) {
       try {
-        const staff = await SupabaseService.verifyStaffLogin(firstName, lastName, pin);
+        const staff = await SupabaseService.verifyStaffLogin(normalizedFirstName, normalizedLastName, pin);
         if (staff) {
           if (staff.role !== UserRole.SUPER_ADMIN) {
             if (String(staff.condominium_id) !== String(deviceCondoId)) {
@@ -1045,7 +1121,7 @@ class DataService {
                 `Acesso negado: utilizador é de ${staffCondoLabel}, dispositivo está em ${deviceCondoLabel}.`,
                 'online'
               );
-              throw new Error(`Acesso Negado: Utilizador pertence ao condomínio ${staffCondoLabel}, mas o tablet está no ${deviceCondoLabel}.`);
+              await throwLoginFailure();
             }
           }
           await db.staff.put(staff); // Cache verified staff (with pin_hash) before syncStaff overwrites
@@ -1065,23 +1141,38 @@ class DataService {
           });
           return staff;
         }
-        setFailure('INVALID_CREDENTIALS', 'Credenciais inválidas.', 'online');
+        setFailure('INVALID_CREDENTIALS', loginMessageForCode('INVALID_CREDENTIALS'), 'online');
       } catch (e) {
+        if (e instanceof LoginError) {
+          throw e;
+        }
         logger.error('Login online falhou, tentando offline', e, ErrorCategory.AUTH);
         if (!failureCode) {
-          setFailure('ONLINE_ERROR', 'Falha ao autenticar online.', 'online');
+          setFailure('ONLINE_ERROR', loginMessageForCode('ONLINE_ERROR'), 'online');
         }
         this.backendHealthScore--;
       }
     } else {
-      setFailure('OFFLINE_MODE', 'Sem ligação ao servidor.', 'offline');
+      setFailure('OFFLINE_MODE', loginMessageForCode('OFFLINE_MODE'), 'offline');
     }
 
     // --- OFFLINE FALLBACK ---
-    const localStaff = await db.staff.where({ first_name: firstName, last_name: lastName }).first();
+    const localStaff = (await db.staff.toArray()).find(staff =>
+      normalizeLoginName(staff.first_name) === normalizedFirstName
+      && normalizeLoginName(staff.last_name) === normalizedLastName
+    );
     if (localStaff?.pin_hash) {
       const isValid = await bcrypt.compare(pin, localStaff.pin_hash);
       if (isValid) {
+        if (localStaff.role !== UserRole.SUPER_ADMIN && String(localStaff.condominium_id) !== String(deviceCondoId)) {
+          setFailure(
+            'CONDO_MISMATCH',
+            'Acesso negado: utilizador pertence a outro condomínio.',
+            'offline'
+          );
+          await throwLoginFailure();
+        }
+
         logger.warn('Login OFFLINE bem-sucedido.');
         await this.logAudit({
           condominium_id: localStaff.condominium_id ?? deviceCondoId,
@@ -1097,28 +1188,12 @@ class DataService {
         });
         return localStaff;
       }
-      setFailure('OFFLINE_INVALID_PIN', 'PIN inválido (offline).', 'offline');
+      setFailure('OFFLINE_INVALID_PIN', loginMessageForCode('OFFLINE_INVALID_PIN'), 'offline');
     } else {
-      setFailure('OFFLINE_USER_NOT_FOUND', 'Utilizador não encontrado no cache offline.', 'offline');
+      setFailure('OFFLINE_USER_NOT_FOUND', loginMessageForCode('OFFLINE_USER_NOT_FOUND'), 'offline');
     }
 
-    await this.logAudit({
-      condominium_id: deviceCondoId,
-      actor_id: null,
-      action: 'LOGIN_FAILED',
-      target_table: 'staff',
-      target_id: null,
-      details: {
-        first_name: firstName,
-        last_name: lastName,
-        offline: !this.isBackendHealthy,
-        device_identifier: getDeviceIdentifier(),
-        failure_code: failureCode,
-        failure_reason: failureReason,
-        failure_stage: failureStage
-      }
-    });
-    throw new Error("Credenciais inválidas ou sem acesso offline.");
+    await throwLoginFailure();
   }
 
   // --- QR Code Validation (Online Only) ---

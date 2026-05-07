@@ -55,7 +55,10 @@ export default function Login() {
 
   const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!firstName || !lastName || pin.length < 3) {
+    const normalizedFirstName = firstName.normalize('NFC').trim();
+    const normalizedLastName = lastName.normalize('NFC').trim();
+
+    if (!normalizedFirstName || !normalizedLastName || pin.length < 3) {
       setError("Preencha todos os campos.");
       return;
     }
@@ -64,7 +67,7 @@ export default function Login() {
     setError('');
 
     try {
-      const staff = await api.login(firstName, lastName, pin);
+      const staff = await api.login(normalizedFirstName, normalizedLastName, pin);
       if (staff) {
         login(staff);
 
