@@ -5,6 +5,7 @@ import { logger, ErrorCategory } from '@/services/logger';
 
 const UPDATE_REMINDER_INTERVAL = 30 * 60 * 1000; // 30 minutes
 const UPDATE_CRITICAL_TIME = 24 * 60 * 60 * 1000; // 24 hours
+const UPDATE_CHECK_INTERVAL = 60 * 1000; // 1 minute
 const STORAGE_KEY = 'pwa_update_detected_at';
 const DISMISS_COUNT_KEY = 'pwa_update_dismiss_count';
 
@@ -22,10 +23,12 @@ export const PWAUpdateNotification: React.FC = () => {
     onRegistered(registration) {
       logger.info('Service Worker registered', { registration: !!registration });
 
-      // Check for updates every 5 minutes
       if (registration) {
-        logger.info('Update checker initialized (checking every 5 minutes)');
-        setInterval(() => {
+        const checkForUpdates = () => {
+          if (document.visibilityState === 'hidden' || !navigator.onLine) {
+            return;
+          }
+
           logger.debug('Checking for updates');
           registration.update().then(() => {
             logger.debug('Update check completed');
@@ -37,7 +40,31 @@ export const PWAUpdateNotification: React.FC = () => {
               waitingWorkerState: registration.waiting?.state ?? null
             });
           });
-        }, 5 * 60 * 1000); // 5 minutes
+        };
+
+        logger.info('Update checker initialized (checking every 1 minute)');
+
+        checkForUpdates();
+        const updateInterval = window.setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL);
+
+        const handleOnline = () => checkForUpdates();
+        const handleFocus = () => checkForUpdates();
+        const handleVisibilityChange = () => {
+          if (document.visibilityState === 'visible') {
+            checkForUpdates();
+          }
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+          window.clearInterval(updateInterval);
+          window.removeEventListener('online', handleOnline);
+          window.removeEventListener('focus', handleFocus);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
       }
     },
     onRegisterError(error) {
