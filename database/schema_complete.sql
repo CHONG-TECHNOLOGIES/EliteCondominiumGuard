@@ -6613,8 +6613,8 @@ BEGIN
   INTO found_staff
   FROM staff s
   left JOIN condominiums c ON s.condominium_id = c.id
-  WHERE lower(s.first_name) = lower(p_first_name)
-    AND lower(s.last_name) = lower(p_last_name)
+  WHERE lower(btrim(s.first_name)) = lower(btrim(p_first_name))
+    AND lower(btrim(s.last_name)) = lower(btrim(p_last_name))
     AND s.pin_hash = crypt(p_pin, s.pin_hash) -- Comparação segura
     AND
     ( 
