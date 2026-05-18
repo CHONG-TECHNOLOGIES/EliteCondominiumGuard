@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ApprovalMode, Condominium, Unit } from '../types';
+import { ApprovalMode, Condominium, Resident, Unit } from '../types';
 import { api } from '../services/dataService';
 import {
   getAvailableApprovalModes,
@@ -8,6 +8,7 @@ import {
   getResidentPhones,
   unitHasAppInstalled
 } from '../utils/approvalModes';
+import { getResidentsForUnit } from '../utils/residentLookup';
 import { useToast } from './Toast';
 import {
   Smartphone,
@@ -83,10 +84,45 @@ export default function ApprovalModeSelector({
   onCallMade
 }: ApprovalModeSelectorProps) {
   const [calling, setCalling] = useState(false);
+  const [unitResidents, setUnitResidents] = useState<Resident[]>([]);
+  const [residentsLoading, setResidentsLoading] = useState(false);
   const { showToast, showConfirm } = useToast();
-  const availableModes = getAvailableApprovalModes(isOnline, unit, condominium); // Pass unit and condo for contextual logic
-  const residentPhones = unit ? getResidentPhones(unit) : [];
-  const hasAppInstalled = unit ? unitHasAppInstalled(unit) : false;
+
+  // Fetch residents fresh per-unit (mirrors DailyList's "Ligar" path) so the PHONE
+  // button never depends on a stale unit.residents snapshot from getUnitsWithResidents.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const unitId = unit?.id;
+      if (!unitId) {
+        if (!cancelled) {
+          setUnitResidents([]);
+          setResidentsLoading(false);
+        }
+        return;
+      }
+      if (!cancelled) setResidentsLoading(true);
+      try {
+        const list = await getResidentsForUnit(unitId, isOnline);
+        if (!cancelled) setUnitResidents(list);
+      } catch (err) {
+        logger.warn('ApprovalModeSelector: failed to fetch residents for unit', { unitId, error: String(err) });
+        if (!cancelled) setUnitResidents([]);
+      } finally {
+        if (!cancelled) setResidentsLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [unit?.id, isOnline]);
+
+  // Treat the unit as if its residents array was the freshly fetched list. This lets
+  // the existing util helpers (getAvailableApprovalModes, getResidentPhones,
+  // unitHasAppInstalled) operate on fresh data without changing their signatures.
+  const unitWithFreshResidents = unit ? { ...unit, residents: unitResidents } : undefined;
+  const availableModes = getAvailableApprovalModes(isOnline, unitWithFreshResidents, condominium);
+  const residentPhones = unitWithFreshResidents ? getResidentPhones(unitWithFreshResidents) : [];
+  const hasAppInstalled = unitWithFreshResidents ? unitHasAppInstalled(unitWithFreshResidents) : false;
   const preferredPhone = residentPhones[0] || visitorPhone || '';
   const preferredPhoneSource = residentPhones.length > 0 ? 'resident' : 'visitor';
   const unitLabel = unit ? `${unit.code_block || ''} ${unit.number}`.trim() : '';
@@ -233,7 +269,7 @@ export default function ApprovalModeSelector({
                   {config.mode === ApprovalMode.PHONE && (
                     <button
                       onClick={handlePhoneCall}
-                      disabled={calling || !preferredPhone}
+                      disabled={calling || residentsLoading || !preferredPhone}
                       className={`
                         w-full py-3 px-4 rounded-lg font-bold text-sm
                         flex items-center justify-center gap-2
@@ -245,8 +281,14 @@ export default function ApprovalModeSelector({
                         disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed
                       `}
                     >
-                      <PhoneOutgoing size={18} className={calling ? 'animate-pulse' : ''} />
-                      {calling ? 'Chamando...' : `Ligar: ${preferredPhone || 'N/A'}`}
+                      <PhoneOutgoing size={18} className={calling || residentsLoading ? 'animate-pulse' : ''} />
+                      {calling
+                        ? 'Chamando...'
+                        : residentsLoading
+                          ? 'Carregando...'
+                          : preferredPhone
+                            ? `Ligar: ${preferredPhone}`
+                            : 'Sem telefone registado'}
                     </button>
                   )}
 
