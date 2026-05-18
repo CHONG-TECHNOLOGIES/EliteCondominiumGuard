@@ -185,12 +185,16 @@ class DataService {
   }
 
   private setOnlineStatus(isOnline: boolean) {
+    const wasHealthy = this.isBackendHealthy;
     this.isOnline = isOnline;
     if (isOnline) {
       this.backendHealthScore = 3; // Reset health on reconnect
       void this.flushPendingAuditLogs();
     } else {
       this.backendHealthScore = 0; // Immediately mark as unhealthy when offline
+    }
+    if (!wasHealthy && this.isBackendHealthy) {
+      window.dispatchEvent(new CustomEvent('backend:healthy'));
     }
   }
 
@@ -207,6 +211,7 @@ class DataService {
 
           // If backend just recovered, sync pending items automatically
           if (wasUnhealthy) {
+            window.dispatchEvent(new CustomEvent('backend:healthy'));
             void this.flushPendingAuditLogs();
             logger.info('Backend recovered - auto-syncing pending items...');
             // syncPendingItems already emits all necessary events
@@ -235,7 +240,7 @@ class DataService {
     }, 300000); // Every 5 minutes
   }
 
-  private get isBackendHealthy(): boolean {
+  public get isBackendHealthy(): boolean {
     return this.isOnline && this.backendHealthScore > 0;
   }
 
@@ -1485,12 +1490,36 @@ class DataService {
     }
   }
 
+  // Rehydrate units with residents from the local Dexie cache (used as offline fallback).
+  // db.units stores units without the residents array (stripped before bulkPut to save space),
+  // so we join with db.residents which is populated by cacheResidentsFromUnits on every successful refresh.
+  private async getCachedUnitsWithResidents(condoId: number): Promise<Unit[]> {
+    const [units, residents] = await Promise.all([
+      db.units.where('condominium_id').equals(condoId).toArray(),
+      db.residents.where('condominium_id').equals(condoId).toArray()
+    ]);
+    const byUnit = new Map<number, Resident[]>();
+    for (const r of residents) {
+      if (r.unit_id == null) continue;
+      const list = byUnit.get(r.unit_id);
+      if (list) {
+        list.push(r);
+      } else {
+        byUnit.set(r.unit_id, [r]);
+      }
+    }
+    return units.map(u => ({ ...u, residents: byUnit.get(u.id) ?? [] }));
+  }
+
   // Fetch units with residents (online only)
   async getUnitsWithResidents(condoId?: number): Promise<Unit[]> {
     const targetCondoId = condoId ?? this.currentCondoId;
     if (!this.isBackendHealthy || !targetCondoId) {
-      // Offline: Return units without residents
-      return await this.getUnits();
+      // Offline / backend unhealthy: join cached units with cached residents so the UI
+      // never sees a residents-less unit.
+      return targetCondoId
+        ? await this.getCachedUnitsWithResidents(targetCondoId)
+        : await this.getUnits();
     }
 
     try {

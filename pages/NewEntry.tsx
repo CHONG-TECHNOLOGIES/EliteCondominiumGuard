@@ -88,23 +88,41 @@ export default function NewEntry() {
   }, [unitId, approvalMode]);
 
   useEffect(() => {
-    if (user?.condominium_id) {
-      // Fetch units with residents (online) or without residents (offline)
-      api.getUnitsWithResidents().then(setUnits);
-      api.getVisitTypes().then(setVisitTypes);
-      api.getServiceTypes().then(setServiceTypes);
-      api.getRestaurants().then(setRestaurants);
-      api.getSports().then(setSports);
-      // Load photo quality setting for data saving
-      api.getPhotoQuality().then(setPhotoQuality);
-      // Load visitor photo capture preference (set during device setup)
-      api.getVisitorPhotoEnabled().then(setVisitorPhotoEnabled);
-      // Load condominium-level approval permissions (set during device setup)
-      api.getDeviceCondoDetails().then(setDeviceCondo);
-    }
-    window.addEventListener('offline', () => setIsOffline(true));
-    window.addEventListener('online', () => setIsOffline(false));
+    if (!user?.condominium_id) return;
+
+    const fetchUnits = () => { void api.getUnitsWithResidents().then(setUnits); };
+
+    // Fetch units with residents (online) or without residents (offline)
+    fetchUnits();
+    api.getVisitTypes().then(setVisitTypes);
+    api.getServiceTypes().then(setServiceTypes);
+    api.getRestaurants().then(setRestaurants);
+    api.getSports().then(setSports);
+    // Load photo quality setting for data saving
+    api.getPhotoQuality().then(setPhotoQuality);
+    // Load visitor photo capture preference (set during device setup)
+    api.getVisitorPhotoEnabled().then(setVisitorPhotoEnabled);
+    // Load condominium-level approval permissions (set during device setup)
+    api.getDeviceCondoDetails().then(setDeviceCondo);
+
+    // Re-fetch units from the central DB the moment the backend gate flips open,
+    // so a stale residents-less cache snapshot can't get frozen in React state.
+    window.addEventListener('backend:healthy', fetchUnits);
+    return () => {
+      window.removeEventListener('backend:healthy', fetchUnits);
+    };
   }, [user]);
+
+  useEffect(() => {
+    const onOffline = () => setIsOffline(true);
+    const onOnline = () => setIsOffline(false);
+    window.addEventListener('offline', onOffline);
+    window.addEventListener('online', onOnline);
+    return () => {
+      window.removeEventListener('offline', onOffline);
+      window.removeEventListener('online', onOnline);
+    };
+  }, []);
 
   // --- Helpers ---
 
