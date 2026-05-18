@@ -79,15 +79,6 @@ async function getOfflineResidentsByVisit(visit: Visit): Promise<Resident[]> {
   return getCachedResidentsByUnitId(visit.unit_id);
 }
 
-export async function getResidentsForUnit(unitId: number, isOnline: boolean): Promise<Resident[]> {
-  if (isOnline) return syncResidentsByUnitId(unitId);
-  return getCachedResidentsByUnitId(unitId);
-}
-
-export function residentHasAppInstalled(resident?: Resident | null): boolean {
-  return residentHasApp(resident);
-}
-
 export async function findResidentForPhone(visit: Visit, isOnline: boolean): Promise<Resident | null> {
   const residents = isOnline
     ? await getOnlineResidentsByVisit(visit)

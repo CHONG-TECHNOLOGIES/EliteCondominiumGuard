@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ApprovalMode, Condominium, Resident, Unit } from '../types';
 import { api } from '../services/dataService';
+import { SupabaseService } from '../services/Supabase';
 import {
   getAvailableApprovalModes,
   initiatePhoneCall,
-  initiateIntercomCall,
-  getResidentPhones,
-  unitHasAppInstalled
+  initiateIntercomCall
 } from '../utils/approvalModes';
-import { getResidentsForUnit } from '../utils/residentLookup';
 import { useToast } from './Toast';
 import {
   Smartphone,
@@ -84,47 +82,40 @@ export default function ApprovalModeSelector({
   onCallMade
 }: ApprovalModeSelectorProps) {
   const [calling, setCalling] = useState(false);
-  const [unitResidents, setUnitResidents] = useState<Resident[]>([]);
+  const [residents, setResidents] = useState<Resident[]>([]);
   const [residentsLoading, setResidentsLoading] = useState(false);
   const { showToast, showConfirm } = useToast();
 
-  // Fetch residents fresh per-unit (mirrors DailyList's "Ligar" path) so the PHONE
-  // button never depends on a stale unit.residents snapshot from getUnitsWithResidents.
+  // One direct RPC call. No wrappers. Refetch when unit changes.
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const unitId = unit?.id;
-      if (!unitId) {
-        if (!cancelled) {
-          setUnitResidents([]);
-          setResidentsLoading(false);
-        }
+      if (!unit?.id) {
+        if (!cancelled) { setResidents([]); setResidentsLoading(false); }
         return;
       }
       if (!cancelled) setResidentsLoading(true);
-      try {
-        const list = await getResidentsForUnit(unitId, isOnline);
-        if (!cancelled) setUnitResidents(list);
-      } catch (err) {
-        logger.warn('ApprovalModeSelector: failed to fetch residents for unit', { unitId, error: String(err) });
-        if (!cancelled) setUnitResidents([]);
-      } finally {
-        if (!cancelled) setResidentsLoading(false);
-      }
+      const rows = await SupabaseService.getResidentsByUnitId(unit.id);
+      logger.info('ApprovalModeSelector residents fetched', {
+        unitId: unit.id,
+        unitIdType: typeof unit.id,
+        count: rows.length,
+        firstPhone: rows[0]?.phone ? 'present' : 'empty'
+      });
+      if (!cancelled) { setResidents(rows); setResidentsLoading(false); }
     };
     void load();
     return () => { cancelled = true; };
-  }, [unit?.id, isOnline]);
+  }, [unit?.id]);
 
-  // Treat the unit as if its residents array was the freshly fetched list. This lets
-  // the existing util helpers (getAvailableApprovalModes, getResidentPhones,
-  // unitHasAppInstalled) operate on fresh data without changing their signatures.
-  const unitWithFreshResidents = unit ? { ...unit, residents: unitResidents } : undefined;
-  const availableModes = getAvailableApprovalModes(isOnline, unitWithFreshResidents, condominium);
-  const residentPhones = unitWithFreshResidents ? getResidentPhones(unitWithFreshResidents) : [];
-  const hasAppInstalled = unitWithFreshResidents ? unitHasAppInstalled(unitWithFreshResidents) : false;
-  const preferredPhone = residentPhones[0] || visitorPhone || '';
-  const preferredPhoneSource = residentPhones.length > 0 ? 'resident' : 'visitor';
+  const phone = residents[0]?.phone || visitorPhone || '';
+  const phoneSource: 'resident' | 'visitor' = residents[0]?.phone ? 'resident' : 'visitor';
+  const hasAppInstalled = residents.some(r => r.has_app_installed === true || Boolean(r.device_token));
+  const availableModes = getAvailableApprovalModes(
+    isOnline,
+    unit ? { ...unit, residents } : undefined,
+    condominium
+  );
   const unitLabel = unit ? `${unit.code_block || ''} ${unit.number}`.trim() : '';
 
   // Auto-select appropriate mode when online/offline status changes or unit changes
@@ -146,7 +137,7 @@ export default function ApprovalModeSelector({
   }, [isOnline, unit, availableModes, selectedMode, onModeSelect, hasAppInstalled]);
 
   const handlePhoneCall = () => {
-    const phoneToCall = preferredPhone;
+    const phoneToCall = phone;
     if (!phoneToCall) {
       showToast('warning', 'Nenhum número de telefone disponível para esta unidade.');
       return;
@@ -162,7 +153,7 @@ export default function ApprovalModeSelector({
       initiatePhoneCall(phoneToCall);
       void api.logCallInitiated({
         phone: phoneToCall,
-        source: preferredPhoneSource,
+        source: phoneSource,
         unitId: unit?.id,
         unitLabel: unitLabel || undefined,
         approvalMode: ApprovalMode.PHONE,
@@ -269,7 +260,7 @@ export default function ApprovalModeSelector({
                   {config.mode === ApprovalMode.PHONE && (
                     <button
                       onClick={handlePhoneCall}
-                      disabled={calling || residentsLoading || !preferredPhone}
+                      disabled={calling || residentsLoading || !phone}
                       className={`
                         w-full py-3 px-4 rounded-lg font-bold text-sm
                         flex items-center justify-center gap-2
@@ -286,8 +277,8 @@ export default function ApprovalModeSelector({
                         ? 'Chamando...'
                         : residentsLoading
                           ? 'Carregando...'
-                          : preferredPhone
-                            ? `Ligar: ${preferredPhone}`
+                          : phone
+                            ? `Ligar: ${phone}`
                             : 'Sem telefone registado'}
                     </button>
                   )}
