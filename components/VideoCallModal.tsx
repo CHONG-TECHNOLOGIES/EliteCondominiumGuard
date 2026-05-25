@@ -9,7 +9,7 @@ interface Props {
   residentPhotoUrl?: string;
   residentName?: string;
   onClose: () => void;
-  onEnded?: () => void;
+  onEnded?: (result: { wasConnected: boolean }) => void;
 }
 
 export function VideoCallModal({ session, visit, residentPhotoUrl, residentName, onClose, onEnded }: Props) {
@@ -23,6 +23,7 @@ export function VideoCallModal({ session, visit, residentPhotoUrl, residentName,
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wasConnectedRef = useRef(false);
 
   const unitLabel = visit.unit_block && visit.unit_number
     ? `${visit.unit_block} ${visit.unit_number}`
@@ -43,6 +44,7 @@ export function VideoCallModal({ session, visit, residentPhotoUrl, residentName,
     }
 
     if (newState === 'CONNECTED') {
+      wasConnectedRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
       setConnectedSeconds(0);
       timerRef.current = setInterval(() => setConnectedSeconds(s => s + 1), 1000);
@@ -55,10 +57,10 @@ export function VideoCallModal({ session, visit, residentPhotoUrl, residentName,
 
     if (newState === 'ENDED') {
       if (timerRef.current) clearInterval(timerRef.current);
-      onEnded?.();
+      onEnded?.({ wasConnected: wasConnectedRef.current });
       onClose();
     }
-  }, [onClose]);
+  }, [onClose, onEnded]);
 
   // Assign streams after React mounts the video elements (refs are null until CONNECTED renders)
   useEffect(() => {

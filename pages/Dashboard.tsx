@@ -103,6 +103,7 @@ export default function Dashboard() {
   const [activeVisits, setActiveVisits] = useState<Visit[]>([]);
   const [todaysVisitsCount, setTodaysVisitsCount] = useState(0);
   const [activeVideoCall, setActiveVideoCall] = useState<{ session: VideoCallSession; visit: Visit; residentPhotoUrl?: string; residentName?: string } | null>(null);
+  const [postCallVisitId, setPostCallVisitId] = useState<number | null>(null);
   const [incidentsCount, setIncidentsCount] = useState(0);
   const previousIncidentCountRef = useRef<number>(-1);
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -298,6 +299,16 @@ export default function Dashboard() {
         showToast('success', 'Saída registada com sucesso!');
       }
     );
+  };
+
+  const handleApproveAndEnter = (visit: Visit) => {
+    showConfirm(`Confirmar entrada do visitante ${visit.visitor_name}?`, async () => {
+      await api.updateVisitStatus(visit.id, VisitStatus.APPROVED);
+      await api.updateVisitStatus(visit.id, VisitStatus.INSIDE);
+      setPostCallVisitId(null);
+      loadQuickActions();
+      showToast('success', 'Visitante autorizado e marcado como interior!');
+    });
   };
 
   const handleContactResident = useCallback(async (visit: Visit) => {
@@ -629,8 +640,15 @@ export default function Dashboard() {
 
                   {/* Quick Actions */}
                   <div className="w-full md:w-auto flex gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-slate-50 mt-2 md:mt-0">
-                    {/* PENDING: Contact buttons visible after 7 minutes */}
-                    {visit.status === VisitStatus.PENDING && (
+                    {/* PENDING: post-call approval OR contact buttons visible after 7 minutes */}
+                    {visit.status === VisitStatus.PENDING && postCallVisitId === visit.id ? (
+                      <button
+                        onClick={() => handleApproveAndEnter(visit)}
+                        className="flex-1 md:flex-none h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all animate-pulse ring-2 ring-emerald-400 ring-offset-1"
+                      >
+                        <ShieldCheck size={18} /> Aprovar Entrada
+                      </button>
+                    ) : visit.status === VisitStatus.PENDING && (
                       <DashContactButtons
                         visit={visit}
                         onPhone={handleContactResident}
@@ -687,6 +705,12 @@ export default function Dashboard() {
           residentPhotoUrl={activeVideoCall.residentPhotoUrl}
           residentName={activeVideoCall.residentName}
           onClose={() => setActiveVideoCall(null)}
+          onEnded={async ({ wasConnected }) => {
+            await api.logVideoCallEvent(activeVideoCall.visit.id);
+            if (wasConnected) {
+              setPostCallVisitId(activeVideoCall.visit.id);
+            }
+          }}
         />
       )}
     </div>

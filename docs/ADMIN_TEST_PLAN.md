@@ -2,6 +2,7 @@
 
 Este documento serve como um roteiro para validar todas as funcionalidades do Painel Administrativo do Elite Condo Guard. Utilize as caixas de seleção para marcar o progresso dos testes.
 
+--
 
 ## Gestão de Dispositivos (`AdminDevices`)
 
