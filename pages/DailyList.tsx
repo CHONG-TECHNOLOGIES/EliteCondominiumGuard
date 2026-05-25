@@ -618,11 +618,9 @@ export default function DailyList() {
           residentPhotoUrl={activeVideoCall.residentPhotoUrl}
           residentName={activeVideoCall.residentName}
           onClose={() => setActiveVideoCall(null)}
-          onEnded={async ({ wasConnected }) => {
+          onEnded={async () => {
             await api.logVideoCallEvent(activeVideoCall.visit.id);
-            if (wasConnected) {
-              setPostCallVisitId(activeVideoCall.visit.id);
-            }
+            setPostCallVisitId(activeVideoCall.visit.id);
           }}
         />
       )}
