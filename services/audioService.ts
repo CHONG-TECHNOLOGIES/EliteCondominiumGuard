@@ -10,10 +10,19 @@
 
 import { logger } from '@/services/logger';
 
+interface RingbackToneNodeSet {
+  oscillators: OscillatorNode[];
+  gainNode: GainNode;
+  cleanupTimer: ReturnType<typeof setTimeout>;
+}
+
 class AudioService {
   private audioContext: AudioContext | null = null;
   private readonly STORAGE_KEY = 'audio_permission_enabled';
   private fallbackAudio: HTMLAudioElement | null = null;
+  private ringbackInterval: ReturnType<typeof setInterval> | null = null;
+  private ringbackRequested = false;
+  private ringbackNodeSets: RingbackToneNodeSet[] = [];
 
   constructor() {
     // Auto-initialize if permission was previously granted
@@ -146,6 +155,150 @@ class AudioService {
   }
 
   /**
+   * Play a phone-like ringback tone while a video call is waiting for an answer.
+   */
+  playRingbackTone(): boolean {
+    this.ringbackRequested = true;
+    logger.debug('playRingbackTone() called', { state: this.audioContext?.state || 'null' });
+
+    if (this.ringbackInterval) {
+      return true;
+    }
+
+    if (!this.audioContext) {
+      logger.warn('AudioContext not initialized - attempting to initialize ringback tone');
+      this.initialize().then(success => {
+        if (success && this.ringbackRequested) {
+          this.playRingbackTone();
+        }
+      });
+      return false;
+    }
+
+    if (this.audioContext.state === 'suspended') {
+      logger.warn('AudioContext suspended - attempting to resume ringback tone');
+      this.audioContext.resume()
+        .then(() => {
+          if (this.ringbackRequested) {
+            this.playRingbackTone();
+          }
+        })
+        .catch(err => {
+          logger.warn('Failed to resume AudioContext for ringback tone', { error: String(err) });
+        });
+      return false;
+    }
+
+    if (this.audioContext.state !== 'running') {
+      logger.warn('AudioContext is not running for ringback tone', { state: this.audioContext.state });
+      return false;
+    }
+
+    try {
+      this.playRingbackPulse();
+      this.ringbackInterval = setInterval(() => {
+        this.playRingbackPulse();
+      }, 3000);
+      logger.debug('Ringback tone started');
+      return true;
+    } catch (err) {
+      logger.warn('Error starting ringback tone', { error: String(err) });
+      return false;
+    }
+  }
+
+  /**
+   * Stop the active video-call ringback tone immediately.
+   */
+  stopRingbackTone(): void {
+    this.ringbackRequested = false;
+
+    if (this.ringbackInterval) {
+      clearInterval(this.ringbackInterval);
+      this.ringbackInterval = null;
+    }
+
+    this.ringbackNodeSets.forEach(nodeSet => {
+      clearTimeout(nodeSet.cleanupTimer);
+      nodeSet.oscillators.forEach(oscillator => {
+        try {
+          oscillator.stop();
+        } catch {
+          // Oscillator may already have stopped naturally.
+        }
+        try {
+          oscillator.disconnect();
+        } catch {
+          // Node may already be disconnected.
+        }
+      });
+
+      try {
+        nodeSet.gainNode.disconnect();
+      } catch {
+        // Node may already be disconnected.
+      }
+    });
+
+    this.ringbackNodeSets = [];
+  }
+
+  private playRingbackPulse(): void {
+    if (!this.audioContext || this.audioContext.state !== 'running') return;
+
+    const context = this.audioContext;
+    const startTime = context.currentTime;
+    const stopTime = startTime + 1.2;
+    const gainNode = context.createGain();
+    const oscillators = [440, 480].map(frequency => {
+      const oscillator = context.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(frequency, startTime);
+      oscillator.connect(gainNode);
+      return oscillator;
+    });
+
+    const nodeSet: RingbackToneNodeSet = {
+      oscillators,
+      gainNode,
+      cleanupTimer: setTimeout(() => {
+        this.releaseRingbackNodeSet(nodeSet);
+      }, 1400)
+    };
+
+    gainNode.connect(context.destination);
+    gainNode.gain.setValueAtTime(0.0001, startTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.18, startTime + 0.05);
+    gainNode.gain.setValueAtTime(0.18, startTime + 1.0);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, stopTime);
+
+    this.ringbackNodeSets.push(nodeSet);
+
+    oscillators.forEach(oscillator => {
+      oscillator.start(startTime);
+      oscillator.stop(stopTime);
+    });
+  }
+
+  private releaseRingbackNodeSet(nodeSet: RingbackToneNodeSet): void {
+    nodeSet.oscillators.forEach(oscillator => {
+      try {
+        oscillator.disconnect();
+      } catch {
+        // Node may already be disconnected.
+      }
+    });
+
+    try {
+      nodeSet.gainNode.disconnect();
+    } catch {
+      // Node may already be disconnected.
+    }
+
+    this.ringbackNodeSets = this.ringbackNodeSets.filter(activeNodeSet => activeNodeSet !== nodeSet);
+  }
+
+  /**
    * Play alert sound (triple beep pattern repeated 4 times)
    * Returns true if sound was played, false if audio not initialized
    */
@@ -243,6 +396,7 @@ class AudioService {
    */
   reset(): void {
     this.savePermission(false);
+    this.stopRingbackTone();
     if (this.audioContext) {
       this.audioContext.close();
       this.audioContext = null;
