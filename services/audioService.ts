@@ -10,22 +10,22 @@
 
 import { logger } from '@/services/logger';
 
-interface RingbackToneNodeSet {
+interface RingbackToneHandle {
   oscillators: OscillatorNode[];
   gainNode: GainNode;
-  cleanupTimer: ReturnType<typeof setTimeout>;
+  modulationTimer: ReturnType<typeof setInterval>;
 }
 
-const RINGBACK_PULSE_SECONDS = 1.15;
-const RINGBACK_REPEAT_MS = 1200;
+const RINGBACK_VOLUME_LOW = 0.1;
+const RINGBACK_VOLUME_HIGH = 0.18;
+const RINGBACK_MODULATION_MS = 650;
 
 class AudioService {
   private audioContext: AudioContext | null = null;
   private readonly STORAGE_KEY = 'audio_permission_enabled';
   private fallbackAudio: HTMLAudioElement | null = null;
-  private ringbackInterval: ReturnType<typeof setInterval> | null = null;
   private ringbackRequested = false;
-  private ringbackNodeSets: RingbackToneNodeSet[] = [];
+  private ringbackTone: RingbackToneHandle | null = null;
 
   constructor() {
     // Auto-initialize if permission was previously granted
@@ -158,13 +158,13 @@ class AudioService {
   }
 
   /**
-   * Play a phone-like ringback tone while a video call is waiting for an answer.
+   * Play a continuous phone-like ringback tone while a video call waits for an answer.
    */
   playRingbackTone(): boolean {
     this.ringbackRequested = true;
     logger.debug('playRingbackTone() called', { state: this.audioContext?.state || 'null' });
 
-    if (this.ringbackInterval) {
+    if (this.ringbackTone) {
       return true;
     }
 
@@ -198,14 +198,7 @@ class AudioService {
     }
 
     try {
-      this.playRingbackPulse();
-      this.ringbackInterval = setInterval(() => {
-        if (!this.ringbackRequested) {
-          this.stopRingbackTone();
-          return;
-        }
-        this.playRingbackPulse();
-      }, RINGBACK_REPEAT_MS);
+      this.startPersistentRingbackTone();
       logger.debug('Ringback tone started');
       return true;
     } catch (err) {
@@ -220,75 +213,20 @@ class AudioService {
   stopRingbackTone(): void {
     this.ringbackRequested = false;
 
-    if (this.ringbackInterval) {
-      clearInterval(this.ringbackInterval);
-      this.ringbackInterval = null;
+    if (!this.ringbackTone) {
+      return;
     }
 
-    this.ringbackNodeSets.forEach(nodeSet => {
-      clearTimeout(nodeSet.cleanupTimer);
-      nodeSet.oscillators.forEach(oscillator => {
-        try {
-          oscillator.stop();
-        } catch {
-          // Oscillator may already have stopped naturally.
-        }
-        try {
-          oscillator.disconnect();
-        } catch {
-          // Node may already be disconnected.
-        }
-      });
+    const ringbackTone = this.ringbackTone;
+    this.ringbackTone = null;
+    clearInterval(ringbackTone.modulationTimer);
 
+    ringbackTone.oscillators.forEach(oscillator => {
       try {
-        nodeSet.gainNode.disconnect();
+        oscillator.stop();
       } catch {
-        // Node may already be disconnected.
+        // Oscillator may already have stopped naturally.
       }
-    });
-
-    this.ringbackNodeSets = [];
-  }
-
-  private playRingbackPulse(): void {
-    if (!this.audioContext || this.audioContext.state !== 'running') return;
-
-    const context = this.audioContext;
-    const startTime = context.currentTime;
-    const stopTime = startTime + RINGBACK_PULSE_SECONDS;
-    const gainNode = context.createGain();
-    const oscillators = [440, 480].map(frequency => {
-      const oscillator = context.createOscillator();
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(frequency, startTime);
-      oscillator.connect(gainNode);
-      return oscillator;
-    });
-
-    const nodeSet: RingbackToneNodeSet = {
-      oscillators,
-      gainNode,
-      cleanupTimer: setTimeout(() => {
-        this.releaseRingbackNodeSet(nodeSet);
-      }, RINGBACK_REPEAT_MS + 200)
-    };
-
-    gainNode.connect(context.destination);
-    gainNode.gain.setValueAtTime(0.0001, startTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.18, startTime + 0.05);
-    gainNode.gain.setValueAtTime(0.18, startTime + RINGBACK_PULSE_SECONDS - 0.2);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, stopTime);
-
-    this.ringbackNodeSets.push(nodeSet);
-
-    oscillators.forEach(oscillator => {
-      oscillator.start(startTime);
-      oscillator.stop(stopTime);
-    });
-  }
-
-  private releaseRingbackNodeSet(nodeSet: RingbackToneNodeSet): void {
-    nodeSet.oscillators.forEach(oscillator => {
       try {
         oscillator.disconnect();
       } catch {
@@ -297,12 +235,62 @@ class AudioService {
     });
 
     try {
-      nodeSet.gainNode.disconnect();
+      ringbackTone.gainNode.disconnect();
     } catch {
       // Node may already be disconnected.
     }
+  }
 
-    this.ringbackNodeSets = this.ringbackNodeSets.filter(activeNodeSet => activeNodeSet !== nodeSet);
+  private startPersistentRingbackTone(): void {
+    if (!this.audioContext || this.audioContext.state !== 'running') return;
+
+    const context = this.audioContext;
+    const startTime = context.currentTime;
+    const gainNode = context.createGain();
+    let useHighVolume = false;
+
+    gainNode.connect(context.destination);
+    gainNode.gain.setValueAtTime(0.0001, startTime);
+    gainNode.gain.exponentialRampToValueAtTime(RINGBACK_VOLUME_HIGH, startTime + 0.08);
+
+    const oscillators = [440, 480].map(frequency => {
+      const oscillator = context.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(frequency, startTime);
+      oscillator.connect(gainNode);
+      oscillator.start(startTime);
+      return oscillator;
+    });
+
+    const modulationTimer = setInterval(() => {
+      if (!this.ringbackRequested || !this.ringbackTone || !this.audioContext) {
+        this.stopRingbackTone();
+        return;
+      }
+
+      if (this.audioContext.state === 'suspended') {
+        this.audioContext.resume().catch(err => {
+          logger.warn('Failed to resume AudioContext while ringback tone is active', { error: String(err) });
+        });
+        return;
+      }
+
+      if (this.audioContext.state !== 'running') return;
+
+      const now = this.audioContext.currentTime;
+      const nextVolume = useHighVolume ? RINGBACK_VOLUME_HIGH : RINGBACK_VOLUME_LOW;
+      useHighVolume = !useHighVolume;
+
+      gainNode.gain.cancelScheduledValues(now);
+      gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+      gainNode.gain.linearRampToValueAtTime(nextVolume, now + 0.12);
+    }, RINGBACK_MODULATION_MS);
+
+    this.ringbackTone = {
+      oscillators,
+      gainNode,
+      modulationTimer
+    };
   }
 
   /**
