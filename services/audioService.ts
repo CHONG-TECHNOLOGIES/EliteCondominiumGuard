@@ -10,10 +10,22 @@
 
 import { logger } from '@/services/logger';
 
+interface RingbackToneHandle {
+  oscillators: OscillatorNode[];
+  gainNode: GainNode;
+  modulationTimer: ReturnType<typeof setInterval>;
+}
+
+const RINGBACK_VOLUME_LOW = 0.1;
+const RINGBACK_VOLUME_HIGH = 0.18;
+const RINGBACK_MODULATION_MS = 650;
+
 class AudioService {
   private audioContext: AudioContext | null = null;
   private readonly STORAGE_KEY = 'audio_permission_enabled';
   private fallbackAudio: HTMLAudioElement | null = null;
+  private ringbackRequested = false;
+  private ringbackTone: RingbackToneHandle | null = null;
 
   constructor() {
     // Auto-initialize if permission was previously granted
@@ -146,6 +158,142 @@ class AudioService {
   }
 
   /**
+   * Play a continuous phone-like ringback tone while a video call waits for an answer.
+   */
+  playRingbackTone(): boolean {
+    this.ringbackRequested = true;
+    logger.debug('playRingbackTone() called', { state: this.audioContext?.state || 'null' });
+
+    if (this.ringbackTone) {
+      return true;
+    }
+
+    if (!this.audioContext) {
+      logger.warn('AudioContext not initialized - attempting to initialize ringback tone');
+      this.initialize().then(success => {
+        if (success && this.ringbackRequested) {
+          this.playRingbackTone();
+        }
+      });
+      return false;
+    }
+
+    if (this.audioContext.state === 'suspended') {
+      logger.warn('AudioContext suspended - attempting to resume ringback tone');
+      this.audioContext.resume()
+        .then(() => {
+          if (this.ringbackRequested) {
+            this.playRingbackTone();
+          }
+        })
+        .catch(err => {
+          logger.warn('Failed to resume AudioContext for ringback tone', { error: String(err) });
+        });
+      return false;
+    }
+
+    if (this.audioContext.state !== 'running') {
+      logger.warn('AudioContext is not running for ringback tone', { state: this.audioContext.state });
+      return false;
+    }
+
+    try {
+      this.startPersistentRingbackTone();
+      logger.debug('Ringback tone started');
+      return true;
+    } catch (err) {
+      logger.warn('Error starting ringback tone', { error: String(err) });
+      return false;
+    }
+  }
+
+  /**
+   * Stop the active video-call ringback tone immediately.
+   */
+  stopRingbackTone(): void {
+    this.ringbackRequested = false;
+
+    if (!this.ringbackTone) {
+      return;
+    }
+
+    const ringbackTone = this.ringbackTone;
+    this.ringbackTone = null;
+    clearInterval(ringbackTone.modulationTimer);
+
+    ringbackTone.oscillators.forEach(oscillator => {
+      try {
+        oscillator.stop();
+      } catch {
+        // Oscillator may already have stopped naturally.
+      }
+      try {
+        oscillator.disconnect();
+      } catch {
+        // Node may already be disconnected.
+      }
+    });
+
+    try {
+      ringbackTone.gainNode.disconnect();
+    } catch {
+      // Node may already be disconnected.
+    }
+  }
+
+  private startPersistentRingbackTone(): void {
+    if (!this.audioContext || this.audioContext.state !== 'running') return;
+
+    const context = this.audioContext;
+    const startTime = context.currentTime;
+    const gainNode = context.createGain();
+    let useHighVolume = false;
+
+    gainNode.connect(context.destination);
+    gainNode.gain.setValueAtTime(0.0001, startTime);
+    gainNode.gain.exponentialRampToValueAtTime(RINGBACK_VOLUME_HIGH, startTime + 0.08);
+
+    const oscillators = [440, 480].map(frequency => {
+      const oscillator = context.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(frequency, startTime);
+      oscillator.connect(gainNode);
+      oscillator.start(startTime);
+      return oscillator;
+    });
+
+    const modulationTimer = setInterval(() => {
+      if (!this.ringbackRequested || !this.ringbackTone || !this.audioContext) {
+        this.stopRingbackTone();
+        return;
+      }
+
+      if (this.audioContext.state === 'suspended') {
+        this.audioContext.resume().catch(err => {
+          logger.warn('Failed to resume AudioContext while ringback tone is active', { error: String(err) });
+        });
+        return;
+      }
+
+      if (this.audioContext.state !== 'running') return;
+
+      const now = this.audioContext.currentTime;
+      const nextVolume = useHighVolume ? RINGBACK_VOLUME_HIGH : RINGBACK_VOLUME_LOW;
+      useHighVolume = !useHighVolume;
+
+      gainNode.gain.cancelScheduledValues(now);
+      gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+      gainNode.gain.linearRampToValueAtTime(nextVolume, now + 0.12);
+    }, RINGBACK_MODULATION_MS);
+
+    this.ringbackTone = {
+      oscillators,
+      gainNode,
+      modulationTimer
+    };
+  }
+
+  /**
    * Play alert sound (triple beep pattern repeated 4 times)
    * Returns true if sound was played, false if audio not initialized
    */
@@ -243,6 +391,7 @@ class AudioService {
    */
   reset(): void {
     this.savePermission(false);
+    this.stopRingbackTone();
     if (this.audioContext) {
       this.audioContext.close();
       this.audioContext = null;

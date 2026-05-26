@@ -3245,7 +3245,7 @@ export const SupabaseService = {
       });
       if (error) throw error;
 
-      // Push is triggered server-side via pg_net inside create_notification — no browser fetch needed
+      // Push is triggered server-side via pg_net inside create_notification
       return {
         notificationCreated: true,
         pushSent: true

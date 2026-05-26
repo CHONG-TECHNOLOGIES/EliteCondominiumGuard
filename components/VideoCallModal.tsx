@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { VideoCallSession, Visit } from '../types';
 import { videoCallService, VideoCallState } from '../services/videoCallService';
+import { audioService } from '../services/audioService';
 
 interface Props {
   session: VideoCallSession;
@@ -76,6 +77,18 @@ export function VideoCallModal({ session, visit, residentPhotoUrl, residentName,
   }, [state]);
 
   useEffect(() => {
+    if (state !== 'CALLING') {
+      audioService.stopRingbackTone();
+      return;
+    }
+
+    audioService.playRingbackTone();
+    return () => {
+      audioService.stopRingbackTone();
+    };
+  }, [state]);
+
+  useEffect(() => {
     videoCallService.startCall(session, handleStateChange);
 
     const beforeUnload = (e: BeforeUnloadEvent) => {
@@ -89,6 +102,7 @@ export function VideoCallModal({ session, visit, residentPhotoUrl, residentName,
     return () => {
       window.removeEventListener('beforeunload', beforeUnload);
       if (timerRef.current) clearInterval(timerRef.current);
+      audioService.stopRingbackTone();
       videoCallService.reset();
     };
   }, []);

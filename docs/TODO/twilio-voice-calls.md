@@ -1,504 +1,364 @@
-# 05. Twilio IVR Voice Calls — Guard Entry Approval
+# 05. Twilio Voice Calls
 
-**Priority:** High
-**Effort:** Medium
-**Status:** Designed — Ready for Implementation
-
----
+**Priority:** High  
+**Effort:** Medium  
+**Status:** Planned
 
 ## Context
 
-Guards at condo gates use tablets (no SIM card). The current "Telefone" approval mode uses a native `tel:` URI that silently fails on tablets without phone capability. This feature replaces it with a server-side Twilio IVR call:
+The Guard app already has SMS delivery documented through Supabase Edge Functions and Twilio. The next step is to add an equivalent voice-call function so the system can call a resident or visitor and play an automated message.
 
-1. Guard clicks "Ligar" on NewEntry step 3 (PHONE approval mode, no QR, no resident app)
-2. Twilio calls the resident's Angola (+244) number
-3. TTS message in Portuguese: *"Visitante [nome] aguarda na portaria. Para autorizar, pressione 1. Para recusar, pressione 2."*
-4. Resident presses 1 (sim) or 2 (não) via DTMF
-5. Guard's screen updates in real-time via Supabase Realtime:
-   - **1 pressed → APPROVED** → "Registar Entrada" button unlocks
-   - **2 pressed → DENIED** → button locked, retry available
-   - **No answer / timeout → NO_ANSWER** → retry available
+This is useful when SMS is not enough:
 
----
+- call a resident for urgent entry confirmation
+- call a visitor with access instructions
+- provide an audio fallback for users who do not reliably read SMS
+- support future emergency and incident workflows
 
-## Pricing (Angola +244)
+## Current State in Codebase
 
-| Destination | Rate |
-|---|---|
-| Angola Mobile (9XX) | ~$0.53 / min |
-| Angola Landline (2XX) | ~$0.81 / min |
-| Twilio phone number | ~$1.15 / month |
+**What already exists**
 
-Typical IVR interaction (~30 sec): **~$0.27–$0.53 per call attempt**.
+- SMS setup is documented in `src/docs/SUPABASE_AND_TWILIO.md`
+- Supabase Edge Functions are already used in this repo
+- Twilio credentials are expected as Supabase secrets:
+  - `TWILIO_ACCOUNT_SID`
+  - `TWILIO_AUTH_TOKEN`
+  - `TWILIO_PHONE_NUMBER`
+- The deployed `send-sms` function was verified successfully with Twilio
+- The repo currently has `supabase/functions/send-video-call-push/index.ts`
 
----
+**What is still missing**
 
-## Architecture
+- no `supabase/functions/send-call/index.ts`
+- no `send-call` documentation in the main Twilio doc
+- no frontend/service wrapper for voice calls
+- no admin/test screen action for triggering a voice-call test
+- no production policy for which flows are allowed to trigger calls
 
-```
-Guard clicks "Ligar"
-        │
-        ▼
-DataService.initiateResidentCall(params)
-        │
-        ▼
-Edge Function: send-call
-  • Inserts call_sessions row (status: CALLING)
-  • Calls Twilio REST API → Twilio dials resident's Angola number
-  • TwiML <Gather> plays PT message, action → twilio-call-webhook?type=gather&sessionId=X
-  • statusCallback → twilio-call-webhook?type=status&sessionId=X
-        │
-        ▼ (Twilio calls +244 resident)
-Resident hears:
-  "Visitante [nome] aguarda na portaria.
-   Para autorizar a entrada, pressione 1.
-   Para recusar, pressione 2."
-        │
-        ├── presses 1 → APPROVED
-        ├── presses 2 → DENIED
-        └── no answer / timeout → NO_ANSWER
-                │
-                ▼
-        Edge Function: twilio-call-webhook
-          • Updates call_sessions row
-          • Returns TwiML farewell
-                │
-                ▼
-        Supabase Realtime → Guard UI updates
+## Twilio Requirements
+
+Before implementing or testing outbound calls, confirm these settings in the Twilio Console.
+
+### 1. Account status
+
+Check whether the Twilio account is Trial or upgraded.
+
+Path:
+
+```text
+Twilio Console > Account/Billing
 ```
 
----
+If the account is Trial:
 
-## Pre-requisites (Twilio Console)
+- outbound calls can only be made to verified phone numbers
+- Twilio may play a trial message before the custom message
+- the Twilio `From` number must belong to the project or be a verified caller ID
+- international destinations may still need explicit permission
 
-1. **Upgrade Twilio account** from Trial — Trial only calls verified numbers, not enough for production
-2. **Buy a Twilio number with Voice capability** (~$1.15/month)
-   - Path: `Twilio Console > Phone Numbers > Manage > Active numbers`
-   - Confirm the `Voice` capability checkbox is enabled
-3. **Enable Angola geo permissions**
-   - Path: `Twilio Console > Voice > Settings > Geo permissions`
-   - Enable Angola / `+244` for outbound voice calls
-4. **Set Supabase secrets** (reuse same secrets as SMS):
-   ```bash
-   supabase secrets set TWILIO_ACCOUNT_SID=your_account_sid
-   supabase secrets set TWILIO_AUTH_TOKEN=your_auth_token
-   supabase secrets set TWILIO_PHONE_NUMBER=+1XXXXXXXXXX
-   ```
+### 2. Verified destination numbers for Trial accounts
 
-### Trial Account Testing
+For Trial accounts, add test numbers here:
 
-For Trial accounts, add test numbers here before going live:
-```
+```text
 Twilio Console > Phone Numbers > Manage > Verified Caller IDs
 ```
-Example: `+244933198143`
 
----
+Example test number:
 
-## Database Migration
-
-**File:** `src/database/call_sessions.sql`
-
-```sql
-CREATE TABLE call_sessions (
-  id                SERIAL PRIMARY KEY,
-
-  -- Context
-  -- visit_id is nullable: the call is made BEFORE the visit record is created.
-  -- Visit is created only when guard clicks "Registar Entrada". Updated post-submit.
-  visit_id          INTEGER REFERENCES visits(id) ON DELETE SET NULL,
-  condominium_id    INTEGER NOT NULL REFERENCES condominiums(id),
-  unit_id           INTEGER NOT NULL REFERENCES units(id),
-  resident_id       INTEGER REFERENCES residents(id),
-  guard_id          INTEGER NOT NULL REFERENCES staff(id),
-  device_id         TEXT REFERENCES devices(id),
-
-  -- Call details
-  resident_phone    TEXT NOT NULL,
-  status            TEXT NOT NULL DEFAULT 'CALLING',
-                    -- CALLING | APPROVED | DENIED | NO_ANSWER | FAILED
-  twilio_call_sid   TEXT,
-
-  -- Timestamps
-  initiated_at      TIMESTAMPTZ DEFAULT NOW(),
-  answered_at       TIMESTAMPTZ,
-  ended_at          TIMESTAMPTZ,
-  duration_seconds  INTEGER,
-
-  created_at        TIMESTAMPTZ DEFAULT NOW(),
-  updated_at        TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_call_sessions_visit_id       ON call_sessions(visit_id);
-CREATE INDEX idx_call_sessions_condominium_id ON call_sessions(condominium_id);
-CREATE INDEX idx_call_sessions_guard_id       ON call_sessions(guard_id);
-
--- RLS: guards read their own sessions (required for Realtime subscription via anon key)
--- Webhook writes via service role key (bypasses RLS automatically)
-ALTER TABLE call_sessions ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Guards can view own call sessions"
-  ON call_sessions FOR SELECT
-  USING (
-    guard_id IN (
-      SELECT id FROM staff WHERE id = auth.uid()::integer
-    )
-  );
-
-CREATE POLICY "Service role full access"
-  ON call_sessions FOR ALL
-  USING (auth.role() = 'service_role');
+```text
++244933198143
 ```
 
-Apply via `/db-migrate src/database/call_sessions.sql` or `mcp__supabase__apply_migration` (project: `nfuglaftnaohzacilike`).
+The user must receive a verification call or SMS from Twilio and enter the code in the Console.
 
-Also add `call_sessions` DDL to `src/database/schema_complete.sql`.
+### 3. Twilio number Voice capability
 
----
+The number configured as `TWILIO_PHONE_NUMBER` must support Voice.
 
-## TypeScript Types (`src/types.ts`)
+Path:
 
-```typescript
-export type CallStatus =
-  | 'CALLING'
-  | 'APPROVED'
-  | 'DENIED'
-  | 'NO_ANSWER'
-  | 'FAILED'
-
-export interface CallSession {
-  id: number
-  visit_id: number | null
-  condominium_id: number
-  unit_id: number
-  resident_id: number | null
-  guard_id: number
-  device_id: string | null
-  resident_phone: string
-  status: CallStatus
-  twilio_call_sid: string | null
-  initiated_at: string
-  answered_at: string | null
-  ended_at: string | null
-  duration_seconds: number | null
-  created_at: string
-  updated_at: string
-}
+```text
+Twilio Console > Phone Numbers > Manage > Active numbers
 ```
 
----
+Open the active number and confirm it has the `Voice` capability. If it only supports SMS, buy a new Twilio number with the Voice filter enabled.
 
-## Edge Functions
+### 4. Geographic permissions for Angola
 
-### `supabase/functions/send-call/index.ts`
+International voice calls may be blocked by Twilio geographic permissions.
 
-**Request body:**
+Path:
+
+```text
+Twilio Console > Voice > Settings > Geo permissions
+```
+
+Enable Angola / `+244` for outbound voice calls.
+
+## Supabase Secrets
+
+The voice-call function can reuse the same Twilio secrets as SMS:
+
+```bash
+supabase secrets set TWILIO_ACCOUNT_SID=your_account_sid
+supabase secrets set TWILIO_AUTH_TOKEN=your_auth_token
+supabase secrets set TWILIO_PHONE_NUMBER=+1234567890
+```
+
+No new secret is required for v1 if the same Twilio number supports both SMS and Voice.
+
+## Edge Function Contract
+
+Create:
+
+```text
+supabase/functions/send-call/index.ts
+```
+
+Request body:
+
 ```json
 {
-  "visit_id": null,
-  "resident_phone": "+244933198143",
-  "visitor_name": "Marcos",
-  "resident_id": 45,
-  "unit_id": 12,
-  "condominium_id": 3,
-  "guard_id": 7,
-  "device_id": "uuid-xxx"
+  "to": "+244933198143",
+  "message": "Teste de chamada do Elite CondoGuard."
 }
 ```
 
-**Success response:**
+Success response:
+
 ```json
-{ "success": true, "sessionId": 1, "callId": "CAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
+{
+  "success": true,
+  "callId": "CAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+}
 ```
 
-**Failure response:**
+Failure response:
+
 ```json
-{ "success": false, "error": "Twilio error message" }
+{
+  "success": false,
+  "error": "Twilio error message"
+}
 ```
 
-**Logic:**
-1. Validate required fields: `resident_phone`, `visitor_name`, `unit_id`, `condominium_id`, `guard_id`
-2. Normalize phone to E.164 via `normalizeAngolaPhone()`
-3. Insert `call_sessions` row → get `sessionId`
-4. Build webhook base URL from `Deno.env.get('SUPABASE_URL')` (auto-injected, resolves to `https://nfuglaftnaohzacilike.supabase.co`):
-   ```
-   ${supabaseUrl}/functions/v1/twilio-call-webhook
-   ```
-5. Build TwiML with `<Gather>`:
-   ```xml
-   <Response>
-     <Gather numDigits="1" timeout="10"
-       action="{webhookUrl}?type=gather&sessionId={sessionId}"
-       method="POST">
-       <Say language="pt-PT">
-         Olá. O visitante {visitorName} aguarda na portaria.
-         Para autorizar a entrada, pressione 1.
-         Para recusar, pressione 2.
-       </Say>
-     </Gather>
-     <Say language="pt-PT">Nenhuma resposta recebida. A visita ficará pendente.</Say>
-   </Response>
-   ```
-6. POST to Twilio REST API (`https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Calls.json`):
-   - `To`: normalizedPhone
-   - `From`: `TWILIO_PHONE_NUMBER`
-   - `Twiml`: TwiML string (XML-escaped)
-   - `statusCallback`: `{webhookUrl}?type=status&sessionId={sessionId}`
-   - `statusCallbackEvent`: `answered completed no-answer busy failed`
-   - `timeout`: `20` (ring timeout seconds)
-7. Update `call_sessions.twilio_call_sid` with Twilio's returned `sid`
-8. Return `{ success: true, sessionId, callId: sid }`
+## Implementation Notes
 
-**Error handling:** Surface known Twilio errors clearly (geo blocked, unverified number, insufficient balance, invalid number). Never log auth tokens.
+Use Twilio Programmable Voice Calls API:
 
-**Helper functions:**
+```text
+POST https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Calls.json
+```
+
+Required Twilio form fields:
+
+- `To`: destination phone number in E.164 format
+- `From`: Twilio phone number with Voice capability
+- `Twiml`: XML instructions for the call
+
+The simplest v1 TwiML uses `<Say>`:
+
+```xml
+<Response>
+  <Say language="pt-PT">Teste de chamada do Elite CondoGuard.</Say>
+</Response>
+```
+
+Important implementation details:
+
+- escape XML characters in the message before inserting it into TwiML
+- accept phone numbers with or without `+244`
+- normalize local Angola numbers to E.164
+- return the Twilio `sid` as `callId`
+- do not log Twilio credentials
+- return Twilio error details in development, but avoid leaking sensitive data
+
+## Example Edge Function
+
 ```typescript
-function normalizeAngolaPhone(value: string): string {
-  const trimmed = value.trim()
-  if (trimmed.startsWith('+')) return trimmed
-  const digits = trimmed.replace(/\D/g, '').replace(/^0+/, '')
-  if (digits.startsWith('244')) return `+${digits}`
-  return `+244${digits}`
+Deno.serve(async (req) => {
+  try {
+    if (req.method !== "POST") {
+      return json({ success: false, error: "Method not allowed" }, 405);
+    }
+
+    const { to, message } = await req.json();
+
+    if (!to || !message) {
+      return json({ success: false, error: "Missing to or message" }, 400);
+    }
+
+    const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+    const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+    const from = Deno.env.get("TWILIO_PHONE_NUMBER");
+
+    if (!accountSid || !authToken || !from) {
+      return json({ success: false, error: "Missing Twilio config" }, 500);
+    }
+
+    const normalizedTo = normalizeAngolaPhone(to);
+    const twiml = `<Response><Say language="pt-PT">${escapeXml(message)}</Say></Response>`;
+
+    const body = new URLSearchParams({
+      To: normalizedTo,
+      From: from,
+      Twiml: twiml,
+    });
+
+    const response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
+      },
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return json({ success: false, error: result.message, details: result }, response.status);
+    }
+
+    return json({ success: true, callId: result.sid });
+  } catch (error) {
+    return json({ success: false, error: String(error) }, 500);
+  }
+});
+
+function json(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
-function escapeXml(value: string): string {
+function normalizeAngolaPhone(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.startsWith("+")) return trimmed;
+
+  const digits = trimmed.replace(/\D/g, "").replace(/^0+/, "");
+  if (digits.startsWith("244")) return `+${digits}`;
+  return `+244${digits}`;
+}
+
+function escapeXml(value: string) {
   return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;')
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 }
 ```
 
----
+## Deploy
 
-### `supabase/functions/twilio-call-webhook/index.ts`
-
-Handles two event types via `?type=` query param. Uses `SUPABASE_SERVICE_ROLE_KEY` (auto-injected) for DB writes.
-
-**Event: `type=gather`** (resident keypress via DTMF)
-
-| Digits | DB update | TwiML response |
-|---|---|---|
-| `1` | `status='APPROVED'`, `updated_at=NOW()` | `<Say language="pt-PT">Entrada autorizada. Obrigado.</Say>` |
-| `2` | `status='DENIED'`, `updated_at=NOW()` | `<Say language="pt-PT">Entrada recusada. Obrigado.</Say>` |
-| _(none)_ | `status='NO_ANSWER'`, `updated_at=NOW()` | `<Response/>` |
-
-Returns `Content-Type: text/xml`.
-
-**Event: `type=status`** (Twilio call lifecycle)
-
-| CallStatus | DB update |
-|---|---|
-| `answered` | `answered_at=NOW()` |
-| `completed` | `ended_at=NOW()`, `duration_seconds={CallDuration}` |
-| `no-answer` | `status='NO_ANSWER'`, `ended_at=NOW()` |
-| `busy` | `status='FAILED'`, `ended_at=NOW()` |
-| `failed` | `status='FAILED'`, `ended_at=NOW()` |
-
-Returns HTTP 200 JSON (no TwiML needed).
-
-**Deploy:**
 ```bash
 supabase functions deploy send-call
-supabase functions deploy twilio-call-webhook
 ```
 
----
+## Manual Test
 
-## DataService (`src/services/dataService.ts`)
+```bash
+curl -X POST "https://SEU_PROJECT_REF.supabase.co/functions/v1/send-call" \
+  -H "Authorization: Bearer SEU_ANON_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"to":"+244933198143","message":"Teste de chamada do Elite CondoGuard."}'
+```
+
+## Frontend Integration
+
+Add a service wrapper after the Edge Function is deployed.
+
+Suggested interface:
 
 ```typescript
-async initiateResidentCall(params: {
-  visitId: number | null
-  residentPhone: string
-  visitorName: string
-  residentId: number | null
-  unitId: number
-  condominiumId: number
-  guardId: number
-  deviceId: string
-}): Promise<{ success: boolean; sessionId?: number; callId?: string; error?: string }>
+type SendCallResult = {
+  success: boolean;
+  callId?: string;
+  error?: string;
+};
+
+DataService.sendCall(to: string, message: string): Promise<SendCallResult>
 ```
 
-- If `!this.isBackendHealthy`: return `{ success: false, error: 'Chamada requer conexão à internet' }` — calls have no offline fallback
-- Otherwise: delegate to `SupabaseService.initiateResidentCall(params)`
-- Never throws — always returns structured result
+Potential v1 entry points:
 
-Also add:
-```typescript
-async updateCallSessionVisitId(sessionId: number, visitId: number): Promise<void>
-```
-Called after visit creation on submit to link the session to the new visit.
+- admin-only test action
+- resident contact fallback in visitor approval flows
+- urgent notification action from incident detail
+- future visitor access notification flow
 
----
+## UI References
 
-## Supabase.ts (`src/services/Supabase.ts`)
+The attached screenshots define the first Guard UI surfaces where this feature should appear.
 
-```typescript
-static async initiateResidentCall(params: InitiateCallParams): Promise<CallSessionResult> {
-  const { data, error } = await supabase.functions.invoke('send-call', { body: params })
-  if (error) throw error
-  return data
-}
+Store the screenshots in:
+
+```text
+src/docs/TODO/assets/twilio-call-entry-approval.png
+src/docs/TODO/assets/twilio-call-activity-card.png
 ```
 
----
+Then keep these image references in this document:
 
-## Frontend Changes
+![Entry approval call action](./assets/twilio-call-entry-approval.png)
 
-### Guard UI State Machine (`src/components/ApprovalModeSelector.tsx`)
+**Reference behavior:** in the final approval step, when the selected unit has no resident app installed, the existing `Telefone` approval option should be able to trigger the Twilio voice-call flow. The call action currently appears as a green `Ligar +11846490264` button below the phone approval method.
 
-```
-IDLE
-  │  guard clicks "Ligar"
-  ▼
-CALLING  ← spinner + "Chamando residente..."  (button disabled)
-  │
-  ├── Realtime UPDATE: status=APPROVED
-  │     ▼
-  │   APPROVED  ← green banner "✓ Residente autorizou entrada"
-  │               "Registar Entrada" button UNLOCKS
-  │
-  ├── Realtime UPDATE: status=DENIED
-  │     ▼
-  │   DENIED  ← red banner "✗ Residente recusou entrada"
-  │             "Ligar novamente" button available
-  │
-  ├── Realtime UPDATE: status=NO_ANSWER
-  │     ▼
-  │   NO_ANSWER  ← amber banner "Sem resposta. Tente novamente."
-  │               "Ligar novamente" button available
-  │
-  └── network / Edge Function error
-        ▼
-      FAILED  ← red banner "Erro na chamada."
-                "Tentar novamente" button available
-```
+![Today activity call action](./assets/twilio-call-activity-card.png)
 
-**New props:**
-```typescript
-visitId: number | null
-guardId: number
-onCallSessionCreated?: (sessionId: number) => void
-```
-
-**New local state:**
-```typescript
-type CallState = 'IDLE' | 'CALLING' | 'APPROVED' | 'DENIED' | 'NO_ANSWER' | 'FAILED'
-const [callState, setCallState] = useState<CallState>('IDLE')
-const [callSessionId, setCallSessionId] = useState<number | null>(null)
-```
-
-**Realtime subscription** (mounts when `callSessionId` set, cleans up on unmount):
-```typescript
-supabase
-  .channel(`call-session-${callSessionId}`)
-  .on('postgres_changes', {
-    event: 'UPDATE',
-    schema: 'public',
-    table: 'call_sessions',
-    filter: `id=eq.${callSessionId}`
-  }, (payload) => {
-    const { status } = payload.new
-    setCallState(status as CallState)
-    if (status === 'APPROVED') onCallMade?.()
-  })
-  .subscribe()
-```
-
-**Button + banner by state:**
-
-| State | Button | Banner |
-|---|---|---|
-| `IDLE` | Green "Ligar: +244..." | — |
-| `CALLING` | Disabled spinner "Chamando..." | Blue "Aguardando resposta do residente..." |
-| `APPROVED` | Hidden | Green "✓ Residente autorizou entrada" |
-| `DENIED` | "Ligar novamente" | Red "✗ Residente recusou entrada" |
-| `NO_ANSWER` | "Ligar novamente" | Amber "Sem resposta. Tente novamente." |
-| `FAILED` | "Tentar novamente" | Red "Erro na chamada." |
-
-Reset `callState` to `IDLE` and `callSessionId` to `null` when `unitId` or `approvalMode` changes.
-
-### `src/utils/approvalModes.ts`
-- Remove `initiatePhoneCall()` (native `tel:` URI — silently fails on tablets)
-- Add `initiateResidentCall()` async function that calls `DataService.initiateResidentCall()`
-
-### `src/pages/NewEntry.tsx`
-- Pass `guardId` (from `currentUser.id`) and `onCallSessionCreated` callback to `ApprovalModeSelector`
-- Track `callSessionId` in local state alongside existing `callMade`
-- After visit is created on submit, call `DataService.updateCallSessionVisitId(callSessionId, newVisitId)` to link the session
-
----
-
-## Implementation Order
-
-1. [ ] Add `CallStatus` and `CallSession` to `src/types.ts`
-2. [ ] Create migration `src/database/call_sessions.sql` + apply via `/db-migrate`
-3. [ ] Add `call_sessions` DDL to `src/database/schema_complete.sql`
-4. [ ] Create `supabase/functions/send-call/index.ts`
-5. [ ] Create `supabase/functions/twilio-call-webhook/index.ts`
-6. [ ] Deploy both Edge Functions
-7. [ ] Add `initiateResidentCall()` and `updateCallSessionVisitId()` to `src/services/Supabase.ts`
-8. [ ] Add `initiateResidentCall()` and `updateCallSessionVisitId()` to `src/services/dataService.ts`
-9. [ ] Update `src/utils/approvalModes.ts` — replace `initiatePhoneCall()` with async Twilio call
-10. [ ] Update `src/components/ApprovalModeSelector.tsx` — new props, state machine, Realtime sub
-11. [ ] Update `src/pages/NewEntry.tsx` — pass `guardId`, track `callSessionId`, update on submit
-
----
+**Reference behavior:** in `Atividade de Hoje`, each pending visit card can expose a direct `Ligar` action next to the `Video` action. The highlighted `Ligar` button is a natural entry point for the outbound voice-call feature.
 
 ## Security and Abuse Controls
 
-Voice calls cost money. Add before production exposure:
+Voice calls cost money and can be abused. Add controls before exposing this broadly.
 
-- Restrict to authenticated staff/admin flows only
-- Rate-limit calls per destination number (max 3 attempts per visit)
-- Rate-limit calls per guard per hour
-- Log all calls with `guard_id`, `twilio_call_sid`, destination, and result
-- Never log Twilio auth tokens
-- Use fixed TTS message template — do not accept arbitrary message text from frontend
-- Future v2: verify `X-Twilio-Signature` header in webhook to prevent spoofed POSTs
+- restrict caller actions to authenticated staff/admin flows
+- avoid exposing arbitrary message text to unauthenticated users
+- rate-limit calls per destination number
+- rate-limit calls per guard/admin user
+- log who triggered the call, destination number, and Twilio `callId`
+- never log Twilio auth tokens
+- consider a fixed approved message template list for v1
 
----
+## Error Handling
 
-## Error Handling (UI Messages)
+Common Twilio errors to surface clearly:
 
-| Twilio Error | Guard sees |
-|---|---|
-| Trial account / unverified number | "Número não verificado na conta Twilio." |
-| Geo permissions blocked | "Chamadas para Angola não estão activadas. Contacte o administrador." |
-| Twilio number has no Voice | "Número Twilio não suporta voz. Contacte o administrador." |
-| Insufficient balance | "Saldo Twilio insuficiente. Contacte o administrador." |
-| Invalid phone number | "Número de telefone inválido." |
-| Network / Edge Function error | "Erro na chamada. Tente novamente." |
+- Trial account cannot call unverified number
+- destination country blocked by Geo Permissions
+- Twilio number does not support Voice
+- insufficient balance
+- invalid destination phone number
+- destination carrier rejected the call
 
----
+The UI should show a human-readable failure and keep a technical detail available for admins.
 
-## Verification / Testing Checklist
+## Testing Checklist
 
-- [ ] Confirm Twilio account is upgraded or test number is verified
-- [ ] Confirm `TWILIO_PHONE_NUMBER` has Voice capability
-- [ ] Confirm Angola `+244` enabled in Voice Geo Permissions
-- [ ] Deploy `send-call` and `twilio-call-webhook`
-- [ ] Test via curl with a verified Angola number — confirm `call_sessions` row created with `status=CALLING`
-- [ ] Resident receives call → presses 1 → row updates to `APPROVED` → guard screen shows ✓ banner + button unlocks
-- [ ] Resident presses 2 → `DENIED` → guard screen shows ✗ banner + "Ligar novamente"
-- [ ] Call rings out (no answer) → `NO_ANSWER` → guard screen shows amber banner + retry button
-- [ ] Test phone normalization: bare `933198143`, `244933198143`, `+244933198143` all normalize correctly
-- [ ] Test offline guard: `isBackendHealthy=false` → immediate error, no call placed
-- [ ] Verify `twilio_call_sid` in DB matches call in Twilio Console → Monitor → Logs → Calls
-- [ ] Verify `answered_at`, `ended_at`, `duration_seconds` populated after completed call
-- [ ] Confirm Twilio credentials never appear in Edge Function logs
-
----
+- [ ] Confirm Twilio account is upgraded or the test number is verified.
+- [ ] Confirm `TWILIO_PHONE_NUMBER` supports Voice.
+- [ ] Confirm Angola / `+244` is enabled in Voice Geo Permissions.
+- [ ] Deploy `send-call`.
+- [ ] Call a verified test number.
+- [ ] Confirm the call plays the Portuguese message.
+- [ ] Test a local Angola number without `+244`; confirm it normalizes correctly.
+- [ ] Test an invalid number; confirm the function returns a clear error.
+- [ ] Test missing `to`; confirm HTTP 400.
+- [ ] Test missing `message`; confirm HTTP 400.
+- [ ] Confirm Twilio credentials are not printed in logs.
+- [ ] Confirm the returned `callId` maps to the call in Twilio Console logs.
 
 ## References
 
 - Existing SMS documentation: `src/docs/SUPABASE_AND_TWILIO.md`
-- Existing Edge Functions: `supabase/functions/send-video-call-push/`
+- Existing Supabase functions folder: `supabase/functions`
 - Twilio Console: `https://console.twilio.com/`
-- Twilio Voice Geo Permissions: `Twilio Console > Voice > Settings > Geo permissions`
 - Twilio Voice logs: `Twilio Console > Monitor > Logs > Calls`
-- Twilio Angola pricing: `https://www.twilio.com/en-us/voice/pricing/ao`
-- Supabase project ID: `nfuglaftnaohzacilike`

@@ -227,14 +227,8 @@ class VideoCallService {
     logger.info('[VCALL] guard ended call', { sessionId, wasConnected });
     void this.sendBroadcast('hangup', {});
     this.cleanup();
-    if (wasConnected) {
-      this.setState('ENDED');
-      void SupabaseService.updateVideoCallSessionStatus(sessionId, 'ENDED');
-      return;
-    }
-
-    this.setState('MISSED', { rejectionReason: 'Chamada cancelada antes de o morador atender.' });
-    void SupabaseService.updateVideoCallSessionStatus(sessionId, 'MISSED');
+    this.setState('ENDED');
+    void SupabaseService.updateVideoCallSessionStatus(sessionId, wasConnected ? 'ENDED' : 'MISSED');
   }
 
   private handleNetworkDrop(): void {
