@@ -705,9 +705,11 @@ export default function Dashboard() {
           residentPhotoUrl={activeVideoCall.residentPhotoUrl}
           residentName={activeVideoCall.residentName}
           onClose={() => setActiveVideoCall(null)}
-          onEnded={async () => {
+          onEnded={async ({ wasConnected }) => {
             await api.logVideoCallEvent(activeVideoCall.visit.id);
-            setPostCallVisitId(activeVideoCall.visit.id);
+            if (wasConnected) {
+              setPostCallVisitId(activeVideoCall.visit.id);
+            }
           }}
         />
       )}

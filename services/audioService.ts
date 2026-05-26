@@ -16,6 +16,9 @@ interface RingbackToneNodeSet {
   cleanupTimer: ReturnType<typeof setTimeout>;
 }
 
+const RINGBACK_PULSE_SECONDS = 1.15;
+const RINGBACK_REPEAT_MS = 1200;
+
 class AudioService {
   private audioContext: AudioContext | null = null;
   private readonly STORAGE_KEY = 'audio_permission_enabled';
@@ -197,8 +200,12 @@ class AudioService {
     try {
       this.playRingbackPulse();
       this.ringbackInterval = setInterval(() => {
+        if (!this.ringbackRequested) {
+          this.stopRingbackTone();
+          return;
+        }
         this.playRingbackPulse();
-      }, 3000);
+      }, RINGBACK_REPEAT_MS);
       logger.debug('Ringback tone started');
       return true;
     } catch (err) {
@@ -248,7 +255,7 @@ class AudioService {
 
     const context = this.audioContext;
     const startTime = context.currentTime;
-    const stopTime = startTime + 1.2;
+    const stopTime = startTime + RINGBACK_PULSE_SECONDS;
     const gainNode = context.createGain();
     const oscillators = [440, 480].map(frequency => {
       const oscillator = context.createOscillator();
@@ -263,13 +270,13 @@ class AudioService {
       gainNode,
       cleanupTimer: setTimeout(() => {
         this.releaseRingbackNodeSet(nodeSet);
-      }, 1400)
+      }, RINGBACK_REPEAT_MS + 200)
     };
 
     gainNode.connect(context.destination);
     gainNode.gain.setValueAtTime(0.0001, startTime);
     gainNode.gain.exponentialRampToValueAtTime(0.18, startTime + 0.05);
-    gainNode.gain.setValueAtTime(0.18, startTime + 1.0);
+    gainNode.gain.setValueAtTime(0.18, startTime + RINGBACK_PULSE_SECONDS - 0.2);
     gainNode.gain.exponentialRampToValueAtTime(0.0001, stopTime);
 
     this.ringbackNodeSets.push(nodeSet);
