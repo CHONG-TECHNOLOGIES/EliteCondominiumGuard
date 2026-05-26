@@ -6,10 +6,6 @@ function residentHasApp(resident?: Resident | null): boolean {
   return Boolean(resident && (resident.has_app_installed === true || resident.device_token));
 }
 
-function pickResidentWithApp(residents: Resident[]): Resident | null {
-  return residents.find(residentHasApp) ?? null;
-}
-
 function pickResidentWithPhone(residents: Resident[]): Resident | null {
   return residents.find(resident => Boolean(resident.phone)) ?? null;
 }
@@ -87,15 +83,15 @@ export async function findResidentForPhone(visit: Visit, isOnline: boolean): Pro
   return pickResidentWithPhone(residents);
 }
 
-export async function findResidentForVideoCall(visit: Visit, isOnline: boolean): Promise<Resident | null> {
+export async function findResidentForVideoCall(visit: Visit, isOnline: boolean): Promise<Resident[]> {
   const residents = isOnline
     ? await getOnlineResidentsByVisit(visit)
     : await getOfflineResidentsByVisit(visit);
 
-  return pickResidentWithApp(residents);
+  return residents.filter(residentHasApp);
 }
 
 export async function visitHasResidentWithApp(visit: Visit, isOnline: boolean): Promise<boolean> {
-  const resident = await findResidentForVideoCall(visit, isOnline);
-  return Boolean(resident);
+  const residents = await findResidentForVideoCall(visit, isOnline);
+  return residents.length > 0;
 }

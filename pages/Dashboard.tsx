@@ -355,16 +355,18 @@ export default function Dashboard() {
       return;
     }
 
-    const resident = await findResidentForVideoCall(visit, isOnline);
-    if (!resident) {
+    const residents = await findResidentForVideoCall(visit, isOnline);
+    if (residents.length === 0) {
       showToast('error', 'O morador desta unidade não tem a app instalada.');
       return;
     }
 
+    const primaryResident = residents[0];
+
     const session = await SupabaseService.createVideoCallSession({
       visit_id: visit.id,
       guard_id: user.id,
-      resident_id: resident.id,
+      resident_id: primaryResident.id,
       unit_id: visit.unit_id,
       condominium_id: user.condominium_id,
       device_id: getDeviceIdentifier() ?? undefined
@@ -375,30 +377,30 @@ export default function Dashboard() {
       return;
     }
 
-    const notificationResult = await SupabaseService.createVideoCallNotification({
-      resident_id: resident.id,
-      condominium_id: user.condominium_id,
-      unit_id: visit.unit_id,
-      session_id: session.id,
-      visit_id: visit.id,
-      visitor_name: visit.visitor_name,
-      visitor_photo_url: visit.photo_url ?? undefined,
-      guard_name: `${user.first_name} ${user.last_name}`,
-      unit_number: visit.unit_number ?? undefined,
-      unit_block: visit.unit_block ?? undefined
-    });
+    let anyNotified = false;
+    for (const resident of residents) {
+      const notificationResult = await SupabaseService.createVideoCallNotification({
+        resident_id: resident.id,
+        condominium_id: user.condominium_id,
+        unit_id: visit.unit_id,
+        session_id: session.id,
+        visit_id: visit.id,
+        visitor_name: visit.visitor_name,
+        visitor_photo_url: visit.photo_url ?? undefined,
+        guard_name: `${user.first_name} ${user.last_name}`,
+        unit_number: visit.unit_number ?? undefined,
+        unit_block: visit.unit_block ?? undefined
+      });
+      if (notificationResult.notificationCreated) anyNotified = true;
+    }
 
-    if (!notificationResult.notificationCreated) {
+    if (!anyNotified) {
       await SupabaseService.updateVideoCallSessionStatus(session.id, 'FAILED');
-      showToast('error', notificationResult.message ?? 'Não foi possível notificar o morador para a chamada de vídeo.');
+      showToast('error', 'Não foi possível notificar o morador para a chamada de vídeo.');
       return;
     }
 
-    if (!notificationResult.pushSent) {
-      showToast('warning', notificationResult.message ?? 'O alerta push falhou. O morador pode não receber a chamada.');
-    }
-
-    setActiveVideoCall({ session, visit, residentPhotoUrl: resident.avatar_url ?? resident.photo_url ?? undefined, residentName: resident.name });
+    setActiveVideoCall({ session, visit, residentPhotoUrl: primaryResident.avatar_url ?? primaryResident.photo_url ?? undefined, residentName: primaryResident.name });
   }, [user, showToast, isOnline]);
 
   const getStatusColor = (status: VisitStatus) => {
