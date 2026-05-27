@@ -294,9 +294,8 @@ private startHealthCheck() {
     if (this.isOnline) {
       const wasUnhealthy = this.backendHealthScore === 0;
 
-      // Ping backend via RPC call
-      const success = await SupabaseService.getServiceTypes()
-        .then(res => res.length > 0).catch(() => false);
+      // Ping backend with a lightweight HEAD request
+      const success = await this.pingBackend();
 
       if (success) {
         this.backendHealthScore = 3;
@@ -549,7 +548,7 @@ On decommission: calls `SupabaseService.decommissionDevice(deviceId)` and clears
 Layer 1: navigator.onLine (browser API)
 Layer 2: window 'online'/'offline' events
 Layer 3: Backend ping (HEAD request with 3s timeout)
-Layer 4: Health check RPC call every 60s
+Layer 4: Lightweight backend HEAD check every 60s
 ```
 
 ### UI Integration

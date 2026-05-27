@@ -80,6 +80,9 @@ class DataService {
   private isSyncing: boolean = false; // Prevent concurrent syncs
   private readonly pendingAuditLogsKey = 'pending_audit_logs';
   private readonly initPromise: Promise<void>;
+  private configRefreshPromise: Promise<void> | null = null;
+  private lastConfigRefreshAt = 0;
+  private readonly configRefreshIntervalMs = 5 * 60 * 1000;
 
   constructor() {
     logger.setContext({ service: 'DataService' });
@@ -165,6 +168,35 @@ class DataService {
    * Verify actual connectivity to backend on startup
    * Don't trust navigator.onLine - do a real backend check
    */
+  private async pingBackend(timeoutMs: number = 3000): Promise<boolean> {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    if (!SUPABASE_URL) return false;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const headers: Record<string, string> = {};
+      if (SUPABASE_ANON_KEY) {
+        headers.apikey = SUPABASE_ANON_KEY;
+        headers.Authorization = `Bearer ${SUPABASE_ANON_KEY}`;
+      }
+
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+        method: 'HEAD',
+        headers,
+        signal: controller.signal
+      });
+
+      return response.ok || response.status === 401 || response.status === 404;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
   private async verifyConnectivity(): Promise<void> {
     if (!navigator.onLine) {
       logger.info('Browser reports offline - setting offline state');
@@ -175,32 +207,14 @@ class DataService {
 
     logger.info('Verifying backend connectivity...');
     try {
-      // Quick backend health check with 3 second timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const isReachable = await this.pingBackend();
 
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const headers: Record<string, string> = {};
-      if (SUPABASE_ANON_KEY) {
-        headers.apikey = SUPABASE_ANON_KEY;
-        headers.Authorization = `Bearer ${SUPABASE_ANON_KEY}`;
-      }
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
-        method: 'HEAD',
-        headers,
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok || response.status === 401 || response.status === 404) {
-        // Backend is reachable (401/404 are expected for HEAD requests)
+      if (isReachable) {
         logger.info('Backend is reachable');
         this.isOnline = true;
         this.backendHealthScore = 3;
       } else {
-        logger.warn('Backend returned non-OK status', { data: response.status });
+        logger.warn('Backend unreachable - setting offline mode');
         this.isOnline = false;
         this.backendHealthScore = 0;
       }
@@ -294,8 +308,7 @@ class DataService {
       if (this.isOnline) {
         const wasUnhealthy = this.backendHealthScore === 0;
 
-        // Ping Supabase
-        const success = await SupabaseService.getServiceTypes().then(res => res.length > 0).catch(() => false);
+        const success = await this.pingBackend();
 
         if (success) {
           this.backendHealthScore = 3;
@@ -376,7 +389,7 @@ class DataService {
       if (devices.length) await db.devices.bulkPut(devices);
 
       await Promise.all([
-        this.refreshConfigs(this.currentCondoId),
+        this.refreshConfigs(this.currentCondoId, { force: true }),
         this.refreshRestaurantsAndSports(this.currentCondoId),
         this.refreshUnits(this.currentCondoId),
         this.refreshIncidentConfigs()
@@ -1126,7 +1139,7 @@ class DataService {
           }
           await db.staff.put(staff); // Cache verified staff (with pin_hash) before syncStaff overwrites
           await this.syncStaff(deviceCondoId); // Sync all staff after a successful login
-          await this.refreshConfigs(deviceCondoId);
+          await this.refreshConfigs(deviceCondoId, { force: true });
           await this.logAudit({
             condominium_id: staff.condominium_id ?? deviceCondoId,
             actor_id: staff.id,
@@ -1252,24 +1265,46 @@ class DataService {
   }
 
   // --- Configurações (Cache-then-Network) ---
-  private async refreshConfigs(condoId: number) {
+  private async refreshConfigs(condoId: number, options: { force?: boolean } = {}) {
     if (!this.isBackendHealthy) return;
-    logger.info('refreshConfigs called for condo', { data: condoId });
-    try {
-      const vt = await SupabaseService.getVisitTypes(condoId);
-      logger.debug('Received visit types from Supabase', { count: vt.length, data: vt });
-      if (vt.length) {
-        await db.visitTypes.bulkPut(vt);
-        logger.info('Visit types saved to IndexedDB');
-      }
 
-      const st = await SupabaseService.getServiceTypes();
-      logger.debug('Received service types from Supabase', { arg1: st.length, arg2: 'items' });
-      if (st.length) await db.serviceTypes.bulkPut(st);
-    } catch (e) {
-      logger.error('Config sync failed', e, ErrorCategory.SYNC);
-      this.backendHealthScore--;
+    if (this.configRefreshPromise) {
+      return this.configRefreshPromise;
     }
+
+    const now = Date.now();
+    if (!options.force && this.lastConfigRefreshAt > 0 && now - this.lastConfigRefreshAt < this.configRefreshIntervalMs) {
+      logger.debug('Skipping config refresh; cached config is still fresh');
+      return;
+    }
+
+    this.configRefreshPromise = (async () => {
+      logger.info('refreshConfigs called for condo', { data: condoId });
+      try {
+        const [vt, st] = await Promise.all([
+          SupabaseService.getVisitTypes(condoId),
+          SupabaseService.getServiceTypes()
+        ]);
+
+        logger.debug('Received visit types from Supabase', { count: vt.length, data: vt });
+        if (vt.length) {
+          await db.visitTypes.bulkPut(vt);
+          logger.info('Visit types saved to IndexedDB');
+        }
+
+        logger.debug('Received service types from Supabase', { arg1: st.length, arg2: 'items' });
+        if (st.length) await db.serviceTypes.bulkPut(st);
+
+        this.lastConfigRefreshAt = Date.now();
+      } catch (e) {
+        logger.error('Config sync failed', e, ErrorCategory.SYNC);
+        this.backendHealthScore--;
+      } finally {
+        this.configRefreshPromise = null;
+      }
+    })();
+
+    return this.configRefreshPromise;
   }
 
   async getVisitTypes(): Promise<VisitTypeConfig[]> {
@@ -1280,7 +1315,7 @@ class DataService {
     if (local.length > 0) {
       logger.info('Returning cached visit types');
       if (this.isBackendHealthy && this.currentCondoId) {
-        this.refreshConfigs(this.currentCondoId); // Fire-and-forget
+        void this.refreshConfigs(this.currentCondoId);
       }
       return local;
     }
@@ -1288,7 +1323,7 @@ class DataService {
     // If local DB is empty, wait for sync to complete
     if (this.isBackendHealthy && this.currentCondoId) {
       logger.info('Fetching visit types from backend for condo', { data: this.currentCondoId });
-      await this.refreshConfigs(this.currentCondoId);
+      await this.refreshConfigs(this.currentCondoId, { force: true });
       const synced = await db.visitTypes.toArray();
       logger.debug('Synced visit types', { arg1: synced.length, arg2: 'items' });
       if (synced.length > 0) return synced;
@@ -1310,14 +1345,14 @@ class DataService {
     // If we have local data, return it and sync in background
     if (local.length > 0) {
       if (this.isBackendHealthy && this.currentCondoId) {
-        this.refreshConfigs(this.currentCondoId); // Fire-and-forget
+        void this.refreshConfigs(this.currentCondoId);
       }
       return local;
     }
 
     // If local DB is empty, wait for sync to complete
     if (this.isBackendHealthy && this.currentCondoId) {
-      await this.refreshConfigs(this.currentCondoId);
+      await this.refreshConfigs(this.currentCondoId, { force: true });
       const synced = await db.serviceTypes.toArray();
       if (synced.length > 0) return synced;
     }
